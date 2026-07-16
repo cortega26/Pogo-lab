@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.mechanics",
     "apps.sources",
     "apps.content",
+    "apps.calculators",
 ]
 
 MIDDLEWARE = [
