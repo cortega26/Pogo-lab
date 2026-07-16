@@ -77,7 +77,19 @@ filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
 source = ["engine", "config", "apps"]
-omit = ["*/migrations/*", "*/tests/*", "config/settings/*"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "config/settings/*",
+    "config/asgi.py",
+    "config/wsgi.py",
+    # Esqueleto del engine (M0): cuerpos `...` sin implementar todavía.
+    # QUITAR de omit al implementar cada módulo: probability→M3, intervals/stat_tests→M5.
+    "engine/probability.py",
+    "engine/intervals.py",
+    "engine/stat_tests.py",
+    "engine/versioning.py",
+]
 
 [tool.coverage.report]
 fail_under = 80
