@@ -1,6 +1,6 @@
 # Modelo de dominio — Pogo-lab
 
-> Fuente única: [`docs/plan.md` §E](../plan.md). Este documento refina el ERD del plan en
+> Fuente única: [`docs/plan.md` §E](plan.md). Este documento refina el ERD del plan en
 > especificaciones de campos, constraints, índices, privacidad y versionado para cada entidad.
 > **No reemplaza el plan: lo detalla.** Las migraciones Django se derivan de aquí (M2+).
 
