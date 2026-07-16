@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.mfa",
     "apps.core",
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
