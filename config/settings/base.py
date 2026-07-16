@@ -34,6 +34,9 @@ INSTALLED_APPS = [
     "allauth.mfa",
     "apps.core",
     "apps.accounts",
+    "apps.mechanics",
+    "apps.sources",
+    "apps.content",
 ]
 
 MIDDLEWARE = [

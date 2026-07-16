@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ translation.seo_title|default:translation.title }} — Pogo-lab{% endblock %}
+
+{% block meta_description %}{{ translation.seo_description }}{% endblock %}
+
+{% block extra_head %}
+  {% if translation.seo_title %}
+    <meta property="og:title" content="{{ translation.seo_title }}">
+  {% endif %}
+  {% if translation.seo_description %}
+    <meta property="og:description" content="{{ translation.seo_description }}">
+    <meta name="description" content="{{ translation.seo_description }}">
+  {% endif %}
+  <meta property="og:type" content="article">
+  <meta property="og:locale" content="{{ LANGUAGE_CODE }}">
+{% endblock %}
+
+{% block content %}
+<article class="prose prose-blue max-w-3xl">
+  <h1>{{ translation.title }}</h1>
+  <div>{{ translation.body|safe }}</div>
+</article>
+{% endblock %}

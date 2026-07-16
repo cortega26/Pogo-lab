@@ -12,4 +12,6 @@ urlpatterns += i18n_patterns(
     path(_("cuenta/"), include("allauth.urls")),
     path(_("cuenta/"), include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
+    path(_("mecanicas/"), include("apps.mechanics.urls")),
+    path(_("guias/"), include("apps.content.urls")),
 )
