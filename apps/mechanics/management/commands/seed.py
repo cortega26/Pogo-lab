@@ -5,9 +5,10 @@ Los pisos de IV por amistad y Lucky=12 son HECHOS COMUNITARIOS:
 se almacenan como RuleParameter citados por SourceClaim con
 source_type=community_research/datamining y su confidence_level.
 
-Verificación contra datamining comunitario (Silph Road, GamePress, GAME_MASTER):
-los valores actuales (Good=1, Great=2, Ultra=3, Best=5, Lucky=12) son
-consistentes con el consenso de la comunidad y el datamining del GAME_MASTER.
+Procedencia (audit 2026-07-16): los valores (Good=1, Great=2, Ultra=3, Best=5,
+Lucky=12) se verificaron contra una fuente comunitaria (Dexerto) vía fetch web.
+Las fuentes primarias (The Silph Road, datamining del GAME_MASTER) quedan marcadas
+como PENDIENTES de verificación (status=en_revision), no como confirmadas.
 """
 
 from datetime import UTC, datetime
@@ -58,22 +59,27 @@ class Command(BaseCommand):
         self._create_rulesets(mechanic)
 
     def _create_rulesets(self, mechanic):
-        ruleset, _ = MechanicRuleSet.objects.update_or_create(
-            mechanic=mechanic,
-            version=1,
-            defaults={
-                "name": "Ruleset base de intercambios",
-                "effective_from": SEED_DATE,
-                "effective_to": None,
-                "is_published": True,
-                "confidence_level": "high",
-            },
-        )
+        # Idempotente sin violar la inmutabilidad (ADR-0002): si el ruleset publicado
+        # ya existe, se reutiliza tal cual — NUNCA se re-guarda (el guard de save() lo
+        # rechazaría). Solo se crea cuando falta.
+        ruleset = MechanicRuleSet.objects.filter(mechanic=mechanic, version=1).first()
+        if ruleset is None:
+            ruleset = MechanicRuleSet.objects.create(
+                mechanic=mechanic,
+                version=1,
+                name="Ruleset base de intercambios",
+                effective_from=SEED_DATE,
+                effective_to=None,
+                is_published=True,
+                confidence_level="high",
+            )
+            self.stdout.write(f"  Ruleset v{ruleset.version} publicado: {ruleset.name}")
+        else:
+            self.stdout.write(f"  Ruleset v{ruleset.version} ya existe (inmutable); se reutiliza.")
         self._create_parameters(ruleset)
         self._create_sources_and_claims(ruleset)
         mechanic.current_ruleset = ruleset
         mechanic.save(update_fields=["current_ruleset"])
-        self.stdout.write(f"  Ruleset v{ruleset.version} publicado: {ruleset.name}")
 
     def _create_parameters(self, ruleset):
         params_data = [
@@ -94,63 +100,54 @@ class Command(BaseCommand):
     def _create_sources_and_claims(self, ruleset):
         sources_data: list[dict[str, Any]] = [
             {
-                "key": "spr_friendship",
-                "title": "The Silph Road — Guía de IV post-intercambio",
-                "url": "https://thesilphroad.com/guides/pokemon-go-trading",
+                "key": "dexerto_floors",
+                "title": "Dexerto — IV floors by encounter (intercambios y Lucky)",
+                "url": "https://www.dexerto.com/pokemon/pokemon-go-iv-floors-by-encounter-1012278/",
                 "source_type": "community_research",
-                "author_org": "The Silph Road",
-                "published_at": _utc(2020, 6, 1),
+                "author_org": "Dexerto",
+                "published_at": None,
                 "retrieved_at": SEED_DATE,
                 "status": "vigente",
-                "notes": "Consenso comunitario sobre pisos de IV por nivel de amistad. "
-                "Referencia principal de la comunidad.",
-            },
-            {
-                "key": "gp_lucky",
-                "title": "GamePress — Pokémon GO Lucky Pokémon",
-                "url": "https://gamepress.gg/pokemongo/lucky-pokemon",
-                "source_type": "community_research",
-                "author_org": "GamePress",
-                "published_at": _utc(2019, 8, 1),
-                "retrieved_at": SEED_DATE,
-                "status": "vigente",
-                "notes": "Documentación del piso Lucky=12 y mecánica Lucky Friend.",
-            },
-            {
-                "key": "gm_floor",
-                "title": "Análisis del GAME_MASTER — parámetros de intercambio",
-                "url": "https://pokemongohub.net/post/research/pokemon-go-game-master-trading-iv-floor/",
-                "source_type": "datamining",
-                "author_org": "Pokémon GO Hub / Research",
-                "published_at": _utc(2021, 3, 15),
-                "retrieved_at": SEED_DATE,
-                "status": "vigente",
-                "notes": "Datamining del GAME_MASTER confirmando los pisos de IV por "
-                "nivel de amistad y el override Lucky=12 como re-roll uniforme.",
+                "notes": "Fuente comunitaria VERIFICADA el 2026-07-16 (fetch web durante el audit): "
+                "enuncia Good=1, Great=2, Ultra=3, Best=5 y Lucky=12, re-roll uniforme, "
+                "p_hundo Lucky=1/64.",
             },
             {
                 "key": "spr_uniform",
-                "title": "The Silph Road — Investigación de uniformidad de IV post-trade",
-                "url": "https://thesilphroad.com/science/pokemon-go-trading-iv-distribution",
+                "title": "The Silph Road — Distribución uniforme de IV post-intercambio",
+                "url": None,
                 "source_type": "community_research",
                 "author_org": "The Silph Road Research Group",
-                "published_at": _utc(2021, 1, 20),
+                "published_at": None,
                 "retrieved_at": SEED_DATE,
-                "status": "vigente",
-                "notes": "Estudio comunitario verificando la distribución uniforme en [f, 15] "
-                "y la independencia entre stats (supuesto del modelo).",
+                "status": "en_revision",
+                "notes": "Estudio comunitario sobre re-roll uniforme en [f, 15] (no clamping) e "
+                "independencia entre stats. URL primaria PENDIENTE de verificación humana.",
+            },
+            {
+                "key": "gm_datamining",
+                "title": "Datamining del GAME_MASTER — parámetros de intercambio",
+                "url": None,
+                "source_type": "datamining",
+                "author_org": "Comunidad de datamining de Pokémon GO",
+                "published_at": None,
+                "retrieved_at": SEED_DATE,
+                "status": "en_revision",
+                "notes": "El GAME_MASTER define los parámetros de intercambio. Enlace primario de "
+                "datamining PENDIENTE de localizar y verificar; no citar como confirmación definitiva.",
             },
             {
                 "key": "internal_review",
-                "title": "Revisión interna — verificación de pisos contra GAME_MASTER 2026-07",
+                "title": "Verificación de procedencia Pogo-lab (audit 2026-07-16)",
                 "url": None,
                 "source_type": "internal_hypothesis",
                 "author_org": "Pogo-lab",
                 "published_at": SEED_DATE,
                 "retrieved_at": SEED_DATE,
                 "status": "vigente",
-                "notes": "Verificación propia de que los valores de pisos coinciden con "
-                "el consenso comunitario y el análisis del GAME_MASTER.",
+                "notes": "Verificación 2026-07-16: los pisos coinciden con la fuente comunitaria "
+                "verificada (Dexerto). PENDIENTE: verificar fuentes primarias (The Silph Road, "
+                "datamining del GAME_MASTER). Valores = hechos comunitarios, no oficiales de Niantic.",
             },
         ]
 
@@ -165,61 +162,56 @@ class Command(BaseCommand):
 
         claims_data: list[dict[str, Any]] = [
             {
-                "source_key": "spr_friendship",
+                "source_key": "dexerto_floors",
                 "scope": "Pisos de IV por nivel de amistad",
                 "quote_summary": (
-                    "Los pisos mínimos de IV post-intercambio según nivel de amistad son: "
-                    "Good=1, Great=2, Ultra=3, Best=5. Valores confirmados por pruebas "
-                    "comunitarias extensivas y consistentes con el GAME_MASTER."
+                    "Pisos mínimos de IV post-intercambio: Good=1, Great=2, Ultra=3, Best=5. "
+                    "Verificado contra Dexerto el 2026-07-16."
                 ),
                 "confidence_level": "high",
                 "parameter_key": None,
             },
             {
-                "source_key": "gp_lucky",
+                "source_key": "dexerto_floors",
                 "scope": "Piso Lucky=12",
                 "quote_summary": (
-                    "Los Pokémon Lucky tienen un piso de IV de 12 en cada stat "
-                    "(Atk/Def/HP), independientemente del nivel de amistad. "
-                    "Esto da k=4 valores posibles y p_hundo=1/64."
+                    "Los Pokémon Lucky tienen piso 12 en cada stat, independientemente de la "
+                    "amistad → k=4 y p_hundo=1/64. Verificado contra Dexerto el 2026-07-16."
                 ),
                 "confidence_level": "high",
                 "parameter_key": "floor.lucky",
             },
             {
-                "source_key": "gm_floor",
-                "scope": "Confirmación de pisos vía GAME_MASTER",
-                "quote_summary": (
-                    "El GAME_MASTER contiene los parámetros de intercambio que definen "
-                    "los pisos mínimos de IV. El datamining confirma Good=1, Great=2, "
-                    "Ultra=3, Best=5, y el override Lucky=12 como re-roll uniforme, "
-                    "no como clamping de los IV originales."
-                ),
-                "confidence_level": "high",
-                "parameter_key": None,
-            },
-            {
                 "source_key": "spr_uniform",
                 "scope": "Distribución uniforme post-trade (re-roll, no clamping)",
                 "quote_summary": (
-                    "Los IV post-intercambio siguen una distribución uniforme en [f, 15] "
-                    "(re-roll completo de cada stat), no un clamping max(iv_original, f). "
-                    "No hay evidencia de pico en el piso. La independencia entre stats "
-                    "es consistente con los datos observados."
+                    "Los IV post-intercambio son un re-roll uniforme en [f, 15], no un clamping "
+                    "max(iv_original, f); no hay pico en el piso. Independencia entre stats como "
+                    "supuesto del modelo. Fuente primaria pendiente de verificación."
                 ),
                 "confidence_level": "medium",
                 "parameter_key": None,
             },
             {
-                "source_key": "internal_review",
-                "scope": "Verificación interna de pisos 2026-07",
+                "source_key": "gm_datamining",
+                "scope": "Datamining del GAME_MASTER (referenciado por la comunidad)",
                 "quote_summary": (
-                    "Verificación interna: los pisos configurados coinciden con el consenso "
-                    "comunitario y el análisis del GAME_MASTER. Los valores son consistentes "
-                    "con Silph Road, GamePress y datamining reciente. Se marcan como "
-                    "hechos comunitarios, no oficiales de Niantic."
+                    "El GAME_MASTER define los parámetros de intercambio que fijan los pisos. "
+                    "Enlace primario de datamining pendiente de verificación; no tratar como "
+                    "confirmación definitiva."
                 ),
-                "confidence_level": "high",
+                "confidence_level": "low",
+                "parameter_key": None,
+            },
+            {
+                "source_key": "internal_review",
+                "scope": "Verificación de procedencia (audit 2026-07-16)",
+                "quote_summary": (
+                    "Los pisos configurados coinciden con la fuente comunitaria verificada "
+                    "(Dexerto). Pendiente: verificar fuentes primarias (Silph Road, datamining). "
+                    "Valores marcados como hechos comunitarios, no oficiales de Niantic."
+                ),
+                "confidence_level": "medium",
                 "parameter_key": None,
             },
         ]
@@ -326,9 +318,9 @@ class Command(BaseCommand):
                             "<tr><td>Lucky</td><td>12</td><td>4</td><td>1/64</td></tr>"
                             "</table>"
                             "<p>Estos valores son <strong>hechos comunitarios</strong>, "
-                            "verificados por datamining del GAME_MASTER y estudios "
-                            "de The Silph Road y GamePress. No son cifras oficiales "
-                            "de Niantic.</p>"
+                            "concordantes con fuentes comunitarias (verificados contra "
+                            "Dexerto). La verificación de fuentes primarias de datamining "
+                            "está en curso. No son cifras oficiales de Niantic.</p>"
                         ),
                         "seo_title": "Piso de IV por categoría de amistad | Pogo-lab",
                         "seo_description": (
@@ -353,9 +345,9 @@ class Command(BaseCommand):
                             "<tr><td>Lucky</td><td>12</td><td>4</td><td>1/64</td></tr>"
                             "</table>"
                             "<p>These values are <strong>community-established facts</strong>, "
-                            "verified through GAME_MASTER datamining and research by "
-                            "The Silph Road and GamePress. They are not official "
-                            "Niantic figures.</p>"
+                            "consistent with community sources (verified against Dexerto). "
+                            "Verification of primary datamining sources is in progress. "
+                            "They are not official Niantic figures.</p>"
                         ),
                         "seo_title": "IV Floor by Friendship Category | Pogo-lab",
                         "seo_description": (
