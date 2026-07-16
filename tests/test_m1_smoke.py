@@ -138,7 +138,9 @@ class TestAuthSmoke:
         from django.contrib.auth import get_user_model
 
         user_model = get_user_model()
-        user = user_model.objects.create_user(username="export_tester", password="pass1234")
+        user = user_model.objects.create_user(
+            email="export_tester@example.com", password="pass1234"
+        )
         client = Client()
         client.force_login(user)
         response = client.get("/es/cuenta/exportar/")
@@ -148,7 +150,9 @@ class TestAuthSmoke:
         from django.contrib.auth import get_user_model
 
         user_model = get_user_model()
-        user = user_model.objects.create_user(username="delete_tester", password="pass1234")
+        user = user_model.objects.create_user(
+            email="delete_tester@example.com", password="pass1234"
+        )
         client = Client()
         client.force_login(user)
         response = client.get("/es/cuenta/eliminar/")
@@ -192,9 +196,7 @@ class TestUserProfile:
         from django.contrib.auth import get_user_model
 
         user_model = get_user_model()
-        user = user_model.objects.create_user(
-            username="smoketest", email="test@example.com", password="pass1234"
-        )
+        user = user_model.objects.create_user(email="test@example.com", password="pass1234")
         assert hasattr(user, "profile")
         assert user.profile.locale == "es"
 
@@ -218,9 +220,7 @@ class TestUserProfile:
         user_model = get_user_model()
         from apps.accounts.models import UserProfile
 
-        user = user_model.objects.create_user(
-            username="delete_test", email="delete@example.com", password="pass1234"
-        )
+        user = user_model.objects.create_user(email="delete@example.com", password="pass1234")
         profile_id = user.profile.id
         user.delete()
         assert not UserProfile.objects.filter(id=profile_id).exists()

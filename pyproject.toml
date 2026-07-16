@@ -75,6 +75,12 @@ disable_error_code = ["var-annotated", "misc"]
 module = "apps.*"
 disable_error_code = ["var-annotated"]
 
+[[tool.mypy.overrides]]
+# django-stubs: fricción conocida del User custom (override de ClassVar de AbstractBaseUser
+# y tipo del manager). El `set_password` sobre el TypeVar se resuelve con BaseUserManager["User"].
+module = "apps.accounts.models"
+disable_error_code = ["misc", "assignment"]
+
 [tool.django-stubs]
 django_settings_module = "config.settings.test"
 
