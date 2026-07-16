@@ -1,77 +1,60 @@
-name: ci
+name: CI
 
 on:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
-permissions:
-  contents: read
+env:
+  UV_SYNC_GROUP: dev
+  DJANGO_SETTINGS_MODULE: config.settings.test
+  SECRET_KEY: ci-test-key-not-for-production
+  DATABASE_URL: sqlite:///db.sqlite3
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.13"
-          enable-cache: true
-      - run: uv sync --all-extras
-      - name: Ruff check
-        run: uv run ruff check .
-      - name: Ruff format
-        run: uv run ruff format --check .
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.13"
-          enable-cache: true
-      - run: uv sync --all-extras
-      - name: mypy
-        run: uv run mypy .
-
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: pogo
-          POSTGRES_PASSWORD: pogo
-          POSTGRES_DB: pogo
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.13"
-          enable-cache: true
-      - run: uv sync --all-extras
-      - name: Run tests
-        run: uv run pytest
-        env:
-          DATABASE_URL: postgres://pogo:pogo@localhost:5432/pogo
-          DJANGO_SETTINGS_MODULE: config.settings.test
+    strategy:
+      matrix:
+        python-version: ["3.13"]
 
-  import-linter:
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.13"
           enable-cache: true
-      - run: uv sync --all-extras
-      - name: Check engine purity
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy typecheck
+        run: uv run mypy config engine apps
+
+      - name: Import linter
         run: uv run lint-imports
+
+      - name: Migration check
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Django system check
+        run: uv run python manage.py check --deploy
+
+      - name: Tests
+        run: uv run pytest --no-header -q --tb=short
+
+      - name: Coverage
+        run: uv run coverage run -m pytest && uv run coverage report
