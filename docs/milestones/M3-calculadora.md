@@ -24,6 +24,7 @@ Es el núcleo del **camino crítico** (valida el wedge "entender + calcular").
 - [ ] `p_at_least_one(p,n)`, `p_zero(p,n)`, `expected_successes(p,n)`, `outcome_distribution(p,n)`, `trades_for_confidence(p,c)`.
 - [ ] `per_trade_success_prob(f, target)` (mapea objetivo → p; Lucky sobrescribe f=12).
 - [ ] Tests **unit + property (Hypothesis)** + **fixtures calculadas a mano** (no snapshots).
+- [ ] **Test anti-drift de datos:** los ejemplos de `docs/plan.md` / `AGENTS.md` (`1/64`, `1/3375`, pisos) se verifican contra la salida del `engine/` — una sola fuente de verdad.
 
 ### PR-10 · calculators
 - [ ] `compute_scenario(CalcInput) -> CalcResult`.

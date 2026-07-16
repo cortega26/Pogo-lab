@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | ⬜ Pendiente |
+| **Estado** | 🟨 En progreso |
 | **Tamaño** | S |
 | **Depende de** | — |
 | **Entregable** | ADRs + esqueleto `engine/` (firmas) + modelo de dominio |
-| **Actualizado** | 2026-07-16 (creado) |
+| **Actualizado** | 2026-07-16 (ADRs 0001–0007 redactados) |
 
 ## Objetivo
 Fijar stack, límites de dominio y contratos matemáticos/estadísticos **antes** de escribir producto, para que la
@@ -17,8 +17,9 @@ implementación no reinterprete decisiones.
 - Como implementador, quiero las firmas del `engine/` congeladas para construir apps sin ambigüedad.
 
 ## Tareas
-- [ ] **ADR-0001** — Stack: Django 5.2 + Postgres + HTMX vs TS+Fastify/SPA (incluir justificación: SciPy, admin, i18n, monolito).
-- [ ] **ADR-0002** — Versionado inmutable de rulesets (`effective_from/to`, publicación congelada).
+- [x] **ADRs foundational redactados** en [`../adr/`](../adr/) (Estado: Aceptada): 0001 stack · 0002 versionado de
+      rulesets · 0003 motor puro · 0004 métodos estadísticos · 0005 datos privados/públicos · 0006 recomendaciones
+      deterministas · 0007 i18n.
 - [ ] Documentar el **modelo de dominio** (plan §E): validar 21 entidades, relaciones, constraints, privacidad.
 - [ ] Congelar **contratos del `engine/`** (plan §F): firmas de `probability / intervals / stat_tests / decisions / rulesets`.
 - [ ] Crear **esqueleto `engine/`**: módulos con firmas + docstrings (sin implementación) y tests *skeleton* (`xfail`/`skip`).
@@ -53,3 +54,4 @@ Ninguno: es el cimiento.
 | Fecha | Estado | Nota |
 |---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada a partir del plan aprobado. |
+| 2026-07-16 | 🟨 | ADRs 0001–0007 redactados en `docs/adr/`. Pendiente: `docs/domain-model.md` + esqueleto `engine/`. |

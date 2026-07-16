@@ -28,7 +28,11 @@ Proyecto Django ejecutable con CI verde, autenticación, i18n, layout base y obs
 - [ ] **Ruff** (lint + format) configurado.
 - [ ] **mypy** + `django-stubs`.
 - [ ] **pre-commit** (Ruff, mypy, checks básicos).
-- [ ] `.github/workflows/ci.yml` (lint/type/test) en **verde**.
+- [ ] `.github/workflows/ci.yml` (lint/type/test) en **verde**, junto al `docs.yml` ya existente.
+- [ ] **import-linter**: contrato "`engine/` no importa Django; las apps dependen de `engine/`" ([ADR-0003](../adr/0003-motor-dominio-puro.md)) — **CI falla si se rompe**.
+- [ ] Cobertura con umbral (objetivo `engine/` ≥95%) + `pytest-randomly` (orden determinista).
+- [ ] Activar en `.pre-commit-config.yaml` los hooks de **código** (Ruff, mypy, import-linter, pytest rápido).
+- [ ] CHANGELOG con `git-cliff` (Conventional Commits) + añadir ecosistema `pip` a `.github/dependabot.yml`.
 
 ### PR-03 · core
 - [ ] `TimestampedModel` (mixin `created_at`/`updated_at`).

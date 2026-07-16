@@ -20,7 +20,7 @@ milestone en curso (no el plan completo), lo que mantiene el contexto pequeño y
 
 | Milestone | Objetivo | Tamaño | Depende de | PRs | Estado |
 |---|---|:--:|:--:|---|:--:|
-| [M0 — Descubrimiento y decisiones](M0-descubrimiento.md) | Fijar stack, dominio y contratos estadísticos | S | — | ADR + skeleton | ⬜ |
+| [M0 — Descubrimiento y decisiones](M0-descubrimiento.md) | Fijar stack, dominio y contratos estadísticos | S | — | ADR + skeleton | 🟨 |
 | [M1 — Fundación](M1-fundacion.md) | Proyecto ejecutable, CI, auth, i18n, layout, observabilidad | M | M0 | PR-01…05 | ⬜ |
 | [M2 — Rules & Evidence](M2-rules-evidence.md) | Conocimiento versionado con procedencia + admin + contenido | M | M1 | PR-07…09 | ⬜ |
 | [M3 — Calculadora pública](M3-calculadora.md) | Motor de probabilidad + calculadora SSR compartible + SEO | M | M1, M2 | PR-06, 10, 11 | ⬜ |

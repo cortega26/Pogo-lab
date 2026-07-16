@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Mantiene actualizadas las versiones de las GitHub Actions (anti-drift, activo hoy).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+  # El ecosistema pip/uv se añade en M1, cuando exista pyproject.toml:
+  # - package-ecosystem: pip
+  #   directory: /
+  #   schedule:
+  #     interval: weekly

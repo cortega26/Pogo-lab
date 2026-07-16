@@ -1,0 +1,49 @@
+name: docs
+
+# Guardrails de documentación (activos en la fase actual, sin código).
+# Los jobs de código (lint/type/test/coverage/import-linter) se añaden en M1 en `ci.yml`.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: "**/*.md"
+
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # --offline: verifica solo enlaces internos/relativos (evita flakiness de red);
+      # atrapa el drift real: un enlace roto entre documentos.
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: "--no-progress --offline ./**/*.md"
+          fail: true
+
+  milestones-listed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cada milestone existe y está enlazado en el tablero
+        run: |
+          set -euo pipefail
+          board=docs/milestones/README.md
+          fail=0
+          for f in docs/milestones/M*.md; do
+            base=$(basename "$f")
+            if ! grep -q "$base" "$board"; then
+              echo "::error file=$board::$base no está enlazado en el tablero"
+              fail=1
+            fi
+          done
+          exit "$fail"

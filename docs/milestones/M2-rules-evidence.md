@@ -24,6 +24,7 @@ Conocimiento **versionado con procedencia** (reglas, parámetros, fuentes, claim
 - [ ] `resolve_active_ruleset(mechanic, at_datetime)` por `effective_from/to`.
 - [ ] `engine/rulesets.py` — schemas de parámetros (dataclasses/pydantic).
 - [ ] Registro en **Django Admin** (mecánicas, rulesets, parámetros, fuentes, claims).
+- [ ] **ERD auto-generado** desde los modelos (`django-extensions graph_models`) → `docs/` (evita drift del diagrama vs. el modelo real).
 
 ### PR-08 · Seed inicial
 - [ ] Mecánica `trade_iv` + varios rulesets configurables.

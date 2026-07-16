@@ -1,0 +1,8 @@
+{
+  // Configuración de markdownlint para la documentación de Pogo-lab.
+  "default": true,
+  "MD013": false, // longitud de línea: los docs usan tablas y URLs largas
+  "MD033": false, // se permite HTML inline (marcadores, <!-- comentarios -->)
+  "MD041": false, // el primer encabezado no siempre es H1 (plantillas con comentarios)
+  "MD024": { "siblings_only": true } // encabezados repetidos permitidos en secciones distintas
+}

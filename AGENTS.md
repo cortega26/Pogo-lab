@@ -4,9 +4,11 @@ Guía canónica para **cualquier agente o modelo** que trabaje en este repositor
 Léela **antes** de tocar nada. `CLAUDE.md` apunta aquí.
 
 ## Estado actual
-Fase de **planificación**: aún no hay código. Artefactos:
-- `docs/plan.md` — plan maestro (arquitectura, modelo de datos, motor estadístico, decisiones). Referencia; **no lo recargues entero** cada sesión.
+Fase de **planificación**: aún no hay código. Artefactos (mapa de propiedad SSOT en `docs/README.md`):
+- `docs/plan.md` — plan maestro **canónico** (arquitectura, modelo de datos, motor estadístico, decisiones). Referencia; **no lo recargues entero** cada sesión. (No edites la copia de `~/.claude/plans/`.)
+- `docs/adr/` — **decisiones de arquitectura** por escrito (ADR-0001…0007). Registro detallado del *rationale*.
 - `docs/milestones/` — seguimiento por milestone (`README.md` = tablero; `M0…M7` = hojas autocontenidas). **Carga solo la hoja del milestone en curso.**
+- `CONTRIBUTING.md` — flujo de trabajo (TDD, commits, tooling y contratos de guardrails). `.github/PULL_REQUEST_TEMPLATE.md` — checklist de no-negociables.
 - `.codegraph/` — índice de código (vacío hasta que haya fuentes).
 
 ## Qué es
@@ -54,6 +56,22 @@ autohospedado. Un **paquete puro `engine/`** (sin Django) concentra toda la mate
 - **App `analysis`, NO `statistics`** (colisiona con el módulo stdlib de Python).
 - Commits/PRs **pequeños y revisables** (ver `docs/plan.md` §M — 21 PRs) que terminan con
   `Co-Authored-By` cuando aplique.
+
+## Principios de diseño (atados a contratos, no prosa)
+- **KISS / YAGNI.** Sin microservicios, colas, Redis ni abstracciones genéricas sin necesidad demostrada
+  (`docs/plan.md` §21). Se construye la **1ª familia** (intercambios/IV); las demás se **documentan**, no se pre-abstraen.
+- **DRY.** Cada hecho vive en **un solo** documento/módulo (mapa SSOT en `docs/README.md`). Las constantes (pisos,
+  `1/64`, `1/3375`) tienen **una fuente** (engine/seed); un test verifica que los ejemplos de los docs coinciden con
+  el engine (gate de **M3**).
+- **SOLID / DIP.** Las capas dependen **hacia el dominio**, no al revés. Contrato **import-linter** (**M1**):
+  `engine/` no importa Django; las apps dependen de `engine/` → **CI falla si se rompe** (ver
+  [ADR-0003](docs/adr/0003-motor-dominio-puro.md)).
+- **SRP.** `engine/` = verdad matemática; apps = orquestación delgada; `content` = editorial. Un módulo, una sola
+  razón para cambiar.
+
+**Dónde se hacen cumplir:** reglas **mecanizables** → CI/pre-commit (Ruff, mypy, import-linter, tests); reglas **no
+mecanizables** (honestidad estadística, procedencia) → checklist de PR + revisión humana. Decisiones arquitectónicas
+→ `docs/adr/`. Flujo de trabajo → `CONTRIBUTING.md`.
 
 ## Cómo trabajar
 1. Abre `docs/milestones/README.md` (tablero) y la **hoja del milestone en curso**.
