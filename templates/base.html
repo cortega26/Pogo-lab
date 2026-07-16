@@ -16,7 +16,7 @@
       <a href="{% url 'healthz' %}" class="text-lg font-bold text-blue-600">Pogo-lab</a>
 
       <div class="flex items-center gap-4">
-        <form action="{% url 'set_language' %}" method="post">
+        <form action="/i18n/setlang/" method="post">
           {% csrf_token %}
           <input name="next" type="hidden" value="{{ request.get_full_path }}">
           <select name="language" onchange="this.form.submit()" class="rounded border px-2 py-1 text-sm">

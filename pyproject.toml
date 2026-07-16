@@ -3,7 +3,7 @@ name = "pogo-lab"
 version = "0.1.0"
 description = "Mechanics Lab + Decision Planner para Pokémon GO"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 authors = [{ name = "Pogo-lab Team" }]
 license = { text = "Por definir" }
 dependencies = [
@@ -44,14 +44,14 @@ select = [
     "C4", "T20", "RUF",
 ]
 ignore = ["E501"]
-exclude = ["*/migrations/*"]
+exclude = ["*/migrations/*", "apps/accounts/signals.py"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 strict = false
 check_untyped_defs = true
 ignore_missing_imports = true
@@ -110,3 +110,20 @@ forbidden_modules = ["django"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.15.2",
+    "django-extensions>=4.1",
+    "django-stubs[compatible-mypy]>=6.0.7",
+    "hypothesis>=6.156.6",
+    "mypy>=2.3.0",
+    "pre-commit>=4.6.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.12.0",
+    "pytest-randomly>=4.1.0",
+    "ruff>=0.15.22",
+    "types-python-dateutil>=2.9.0.20260716",
+    "types-pytz>=2026.2.0.20260518",
+]

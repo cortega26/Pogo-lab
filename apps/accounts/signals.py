@@ -8,6 +8,6 @@ User = get_user_model()
 
 
 @receiver(post_save, sender=User)
-def create_user_profile(_sender, instance, created, **_kwargs):
+def create_user_profile(sender, instance, created, **kwargs):  # noqa: ARG001
     if created:
         UserProfile.objects.get_or_create(user=instance)

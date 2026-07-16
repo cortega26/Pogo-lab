@@ -5,11 +5,11 @@ from django.utils.translation import gettext_lazy as _
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("admin/", admin.site.urls),
+    path("i18n/", include("django.conf.urls.i18n")),
 ]
 
 urlpatterns += i18n_patterns(
     path(_("cuenta/"), include("allauth.urls")),
     path(_("cuenta/"), include("apps.accounts.urls")),
     path("", include("apps.core.urls")),
-    prefix_default_language=False,
 )
