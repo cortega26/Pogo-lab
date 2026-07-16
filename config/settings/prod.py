@@ -15,9 +15,14 @@ ACCOUNT_EMAIL_VERIFICATION = "optional"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "correlation_id": {
+            "()": "apps.core.logging_filters.CorrelationIdFilter",
+        },
+    },
     "formatters": {
         "json": {
-            "format": "{levelname} {asctime} {module} {correlation_id} {message}",
+            "format": "{levelname} {asctime} {module} [{correlation_id}] {message}",
             "style": "{",
         },
     },
@@ -25,6 +30,7 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "json",
+            "filters": ["correlation_id"],
         },
     },
     "root": {

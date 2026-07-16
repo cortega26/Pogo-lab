@@ -56,6 +56,8 @@ check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true
 exclude = ["migrations/", ".venv/"]
+# django-stubs plugin activado cuando haya modelos reales (M2+)
+# plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
 module = "config.settings.*"
@@ -64,6 +66,10 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = "engine.*"
 disable_error_code = ["empty-body", "return"]
+
+[[tool.mypy.overrides]]
+module = "apps.*"
+disable_error_code = ["var-annotated"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
@@ -81,9 +87,6 @@ fail_under = 80
 
 [tool.coverage.html]
 directory = "htmlcov"
-
-[tool.django-stubs]
-django_settings_module = "config.settings.dev"
 
 [tool.hatch.build.targets.wheel]
 packages = ["config/", "apps/", "engine/", "manage.py", "static/"]

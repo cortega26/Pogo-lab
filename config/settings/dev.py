@@ -9,9 +9,14 @@ INSTALLED_APPS += [  # noqa: F405
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "correlation_id": {
+            "()": "apps.core.logging_filters.CorrelationIdFilter",
+        },
+    },
     "formatters": {
         "verbose": {
-            "format": "{levelname} {asctime} {module} {correlation_id} {message}",
+            "format": "{levelname} {asctime} {module} [{correlation_id}] {message}",
             "style": "{",
         },
     },
@@ -19,6 +24,7 @@ LOGGING = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+            "filters": ["correlation_id"],
         },
     },
     "root": {
