@@ -130,6 +130,33 @@ class TestValidateParameters:
         errors = validate_parameters("unknown_mechanic", params)
         assert any("No hay schema definido" in e for e in errors)
 
+    def test_empty_params_returns_all_missing(self):
+        errors = validate_parameters("trade_iv", [])
+        assert len(errors) == 5
+        assert all("Falta el parámetro obligatorio" in e for e in errors)
+
+    def test_bool_not_accepted_as_integer(self):
+        params = [
+            RuleParameterValue(key="floor.friendship.good", value=True, data_type="integer"),
+            RuleParameterValue(key="floor.friendship.great", value=2, data_type="integer"),
+            RuleParameterValue(key="floor.friendship.ultra", value=3, data_type="integer"),
+            RuleParameterValue(key="floor.friendship.best", value=5, data_type="integer"),
+            RuleParameterValue(key="floor.lucky", value=12, data_type="integer"),
+        ]
+        errors = validate_parameters("trade_iv", params)
+        assert any("bool no es un entero válido" in e for e in errors)
+
+    def test_value_above_max(self):
+        params = [
+            RuleParameterValue(key="floor.friendship.good", value=1, data_type="integer"),
+            RuleParameterValue(key="floor.friendship.great", value=2, data_type="integer"),
+            RuleParameterValue(key="floor.friendship.ultra", value=3, data_type="integer"),
+            RuleParameterValue(key="floor.friendship.best", value=5, data_type="integer"),
+            RuleParameterValue(key="floor.lucky", value=99, data_type="integer"),
+        ]
+        errors = validate_parameters("trade_iv", params)
+        assert any("mayor que máximo" in e for e in errors)
+
 
 class TestResolveActiveRuleset:
     def test_resolves_correct_ruleset(self):
@@ -188,6 +215,10 @@ class TestResolveActiveRuleset:
             is_published=True,
         )
         result = resolve_active_ruleset([rs], _utc(2026, 7, 15))
+        assert result is None
+
+    def test_empty_ruleset_list_returns_none(self):
+        result = resolve_active_ruleset([], _utc(2026, 7, 15))
         assert result is None
 
     def test_returns_highest_version_on_overlap(self):

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.db.models import Q
 
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
 from apps.sources.models import SourceClaim, SourceReference
@@ -33,6 +34,26 @@ def draft_ruleset(trade_mechanic):
         effective_from=_utc(2026, 1, 1),
         is_published=False,
     )
+
+
+@pytest.fixture
+def published_ruleset(trade_mechanic):
+    rs = MechanicRuleSet.objects.create(
+        mechanic=trade_mechanic,
+        version=1,
+        name="Ruleset publicado",
+        effective_from=_utc(2026, 1, 1),
+        is_published=True,
+    )
+    params = [
+        RuleParameter(ruleset=rs, key="floor.friendship.good", value=1, data_type="integer"),
+        RuleParameter(ruleset=rs, key="floor.friendship.great", value=2, data_type="integer"),
+        RuleParameter(ruleset=rs, key="floor.friendship.ultra", value=3, data_type="integer"),
+        RuleParameter(ruleset=rs, key="floor.friendship.best", value=5, data_type="integer"),
+        RuleParameter(ruleset=rs, key="floor.lucky", value=12, data_type="integer"),
+    ]
+    RuleParameter.objects.bulk_create(params)
+    return rs
 
 
 @pytest.mark.django_db
@@ -86,11 +107,10 @@ class TestMechanicRuleSet:
         rs.refresh_from_db()
         assert rs.is_published
 
-    def test_published_ruleset_is_readonly(self, draft_ruleset):
-        draft_ruleset.is_published = True
-        draft_ruleset.save()
-        draft_ruleset.refresh_from_db()
-        assert draft_ruleset.is_published
+    def test_cannot_edit_published_ruleset(self, published_ruleset):
+        published_ruleset.name = "Intento de editar nombre"
+        with pytest.raises(ValidationError, match="No se puede editar un ruleset ya publicado"):
+            published_ruleset.save()
 
     def test_effective_to_must_be_after_from(self, trade_mechanic):
         with pytest.raises(ValidationError):
@@ -101,6 +121,46 @@ class TestMechanicRuleSet:
                 effective_from=_utc(2026, 6, 1),
                 effective_to=_utc(2026, 1, 1),
             )
+
+    def test_resolve_active_by_datetime(self, trade_mechanic):
+        MechanicRuleSet.objects.create(
+            mechanic=trade_mechanic, version=1, name="old",
+            effective_from=_utc(2026, 1, 1), effective_to=_utc(2026, 6, 30),
+            is_published=True,
+        )
+        MechanicRuleSet.objects.create(
+            mechanic=trade_mechanic, version=2, name="current",
+            effective_from=_utc(2026, 7, 1), effective_to=None,
+            is_published=True,
+        )
+        MechanicRuleSet.objects.create(
+            mechanic=trade_mechanic, version=3, name="future",
+            effective_from=_utc(2027, 1, 1), effective_to=None,
+            is_published=True,
+        )
+        now = _utc(2026, 10, 1)
+        active = MechanicRuleSet.objects.filter(
+            mechanic=trade_mechanic, is_published=True,
+            effective_from__lte=now,
+        ).filter(
+            Q(effective_to__isnull=True) | Q(effective_to__gt=now),
+        ).order_by("-version").first()
+        assert active is not None
+        assert active.version == 2
+
+    def test_no_active_ruleset_outside_range(self, trade_mechanic):
+        MechanicRuleSet.objects.create(
+            mechanic=trade_mechanic, version=1, name="old",
+            effective_from=_utc(2026, 1, 1), effective_to=_utc(2026, 6, 30),
+            is_published=True,
+        )
+        active = MechanicRuleSet.objects.filter(
+            mechanic=trade_mechanic, is_published=True,
+            effective_from__lte=_utc(2026, 12, 1),
+        ).filter(
+            Q(effective_to__isnull=True) | Q(effective_to__gt=_utc(2026, 12, 1)),
+        ).first()
+        assert active is None
 
 
 @pytest.mark.django_db
@@ -170,6 +230,64 @@ class TestSourceClaim:
         choices = SourceClaim._meta.get_field("confidence_level").choices or ()
         for cl, _label in choices:
             assert cl in ("high", "medium", "low", "hypothetical")
+
+
+@pytest.mark.django_db
+class TestMechanicViews:
+    def test_mechanic_list_empty(self, client):
+        resp = client.get("/es/mecanicas/")
+        assert resp.status_code == 200
+        assert "No hay mecánicas" in resp.content.decode()
+
+    def test_mechanic_detail_404_for_unknown(self, client):
+        resp = client.get("/es/mecanicas/no-existe/")
+        assert resp.status_code == 404
+
+    def test_mechanic_detail_shows_ruleset(self, client, published_ruleset):  # noqa: ARG002
+        resp = client.get("/es/mecanicas/iv-en-intercambios/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "Reglas vigentes" in html
+        assert "v1" in html
+        assert "floor.friendship.good" in html
+
+
+@pytest.mark.django_db
+class TestContentPageViews:
+    def test_content_page_404_for_unpublished(self, client):
+        from apps.content.models import ContentPage
+        ContentPage.objects.create(slug="borrador", page_type="guide", status="draft")
+        resp = client.get("/es/guias/borrador/")
+        assert resp.status_code == 404
+
+    def test_content_page_404_for_unknown(self, client):
+        resp = client.get("/es/guias/no-existe/")
+        assert resp.status_code == 404
+
+    def test_content_page_renders_with_seo(self, client, seed_content_pages):  # noqa: ARG002
+        resp = client.get("/es/guias/no-afiliacion/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "No afiliación" in html
+        assert "No afiliación — Pogo-lab" in html
+
+
+@pytest.fixture
+def seed_content_pages():
+    """Crea páginas de contenido seed para tests de vistas."""
+    from apps.content.models import ContentPage, ContentPageTranslation
+    for slug, page_type, title_es, title_en in [
+        ("no-afiliacion", "legal", "No afiliación", "No Affiliation"),
+        ("iv-en-intercambios", "mechanics", "IV en intercambios", "IVs in Trades"),
+    ]:
+        page, _ = ContentPage.objects.update_or_create(
+            slug=slug, defaults={"page_type": page_type, "status": "published"},
+        )
+        for locale, title in [("es", title_es), ("en", title_en)]:
+            ContentPageTranslation.objects.update_or_create(
+                page=page, locale=locale,
+                defaults={"title": title, "body": f"<p>{title}</p>", "is_published": True},
+            )
 
 
 @pytest.mark.django_db
