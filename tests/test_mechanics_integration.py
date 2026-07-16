@@ -124,42 +124,65 @@ class TestMechanicRuleSet:
 
     def test_resolve_active_by_datetime(self, trade_mechanic):
         MechanicRuleSet.objects.create(
-            mechanic=trade_mechanic, version=1, name="old",
-            effective_from=_utc(2026, 1, 1), effective_to=_utc(2026, 6, 30),
+            mechanic=trade_mechanic,
+            version=1,
+            name="old",
+            effective_from=_utc(2026, 1, 1),
+            effective_to=_utc(2026, 6, 30),
             is_published=True,
         )
         MechanicRuleSet.objects.create(
-            mechanic=trade_mechanic, version=2, name="current",
-            effective_from=_utc(2026, 7, 1), effective_to=None,
+            mechanic=trade_mechanic,
+            version=2,
+            name="current",
+            effective_from=_utc(2026, 7, 1),
+            effective_to=None,
             is_published=True,
         )
         MechanicRuleSet.objects.create(
-            mechanic=trade_mechanic, version=3, name="future",
-            effective_from=_utc(2027, 1, 1), effective_to=None,
+            mechanic=trade_mechanic,
+            version=3,
+            name="future",
+            effective_from=_utc(2027, 1, 1),
+            effective_to=None,
             is_published=True,
         )
         now = _utc(2026, 10, 1)
-        active = MechanicRuleSet.objects.filter(
-            mechanic=trade_mechanic, is_published=True,
-            effective_from__lte=now,
-        ).filter(
-            Q(effective_to__isnull=True) | Q(effective_to__gt=now),
-        ).order_by("-version").first()
+        active = (
+            MechanicRuleSet.objects.filter(
+                mechanic=trade_mechanic,
+                is_published=True,
+                effective_from__lte=now,
+            )
+            .filter(
+                Q(effective_to__isnull=True) | Q(effective_to__gt=now),
+            )
+            .order_by("-version")
+            .first()
+        )
         assert active is not None
         assert active.version == 2
 
     def test_no_active_ruleset_outside_range(self, trade_mechanic):
         MechanicRuleSet.objects.create(
-            mechanic=trade_mechanic, version=1, name="old",
-            effective_from=_utc(2026, 1, 1), effective_to=_utc(2026, 6, 30),
+            mechanic=trade_mechanic,
+            version=1,
+            name="old",
+            effective_from=_utc(2026, 1, 1),
+            effective_to=_utc(2026, 6, 30),
             is_published=True,
         )
-        active = MechanicRuleSet.objects.filter(
-            mechanic=trade_mechanic, is_published=True,
-            effective_from__lte=_utc(2026, 12, 1),
-        ).filter(
-            Q(effective_to__isnull=True) | Q(effective_to__gt=_utc(2026, 12, 1)),
-        ).first()
+        active = (
+            MechanicRuleSet.objects.filter(
+                mechanic=trade_mechanic,
+                is_published=True,
+                effective_from__lte=_utc(2026, 12, 1),
+            )
+            .filter(
+                Q(effective_to__isnull=True) | Q(effective_to__gt=_utc(2026, 12, 1)),
+            )
+            .first()
+        )
         assert active is None
 
 
@@ -256,6 +279,7 @@ class TestMechanicViews:
 class TestContentPageViews:
     def test_content_page_404_for_unpublished(self, client):
         from apps.content.models import ContentPage
+
         ContentPage.objects.create(slug="borrador", page_type="guide", status="draft")
         resp = client.get("/es/guias/borrador/")
         assert resp.status_code == 404
@@ -276,16 +300,19 @@ class TestContentPageViews:
 def seed_content_pages():
     """Crea páginas de contenido seed para tests de vistas."""
     from apps.content.models import ContentPage, ContentPageTranslation
+
     for slug, page_type, title_es, title_en in [
         ("no-afiliacion", "legal", "No afiliación", "No Affiliation"),
         ("iv-en-intercambios", "mechanics", "IV en intercambios", "IVs in Trades"),
     ]:
         page, _ = ContentPage.objects.update_or_create(
-            slug=slug, defaults={"page_type": page_type, "status": "published"},
+            slug=slug,
+            defaults={"page_type": page_type, "status": "published"},
         )
         for locale, title in [("es", title_es), ("en", title_en)]:
             ContentPageTranslation.objects.update_or_create(
-                page=page, locale=locale,
+                page=page,
+                locale=locale,
                 defaults={"title": title, "body": f"<p>{title}</p>", "is_published": True},
             )
 

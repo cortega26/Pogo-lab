@@ -63,4 +63,4 @@ Número de rulesets seed (empezar con Good/Great/Ultra/Best + Lucky).
 | Fecha | Estado | Nota |
 |---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada. |
-| 2026-07-16 | ✅ | M2 completado. PR-07, PR-08, PR-09 implementados: apps mechanics+sources+content, engine/rulesets.py con validación y resolución, seed con trade_iv y pisos comunitarios citados, páginas de contenido es/en. 67 tests pasan, lint/mypy/import-linter verdes. |
+| 2026-07-16 | ✅ | M2 completado. PR-07, PR-08, PR-09 implementados: apps mechanics+sources+content, engine/rulesets.py con validación y resolución, seed con trade_iv y pisos comunitarios citados, páginas de contenido es/en. 79 tests pasan (incl. sad paths: publicación inmutable, resolución por fecha, validación de parámetros, vistas con/sin datos), lint/mypy/import-linter verdes. |
