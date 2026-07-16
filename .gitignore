@@ -1,0 +1,54 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# === Entornos virtuales / uv ===
+.venv/
+venv/
+env/
+
+# === Django ===
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/media/
+/staticfiles/
+/static_collected/
+
+# === Secretos / entorno ===
+.env
+.env.*
+!.env.example
+
+# === Testing / type checking / lint ===
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# === Playwright / Node (Tailwind CLI, E2E) ===
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+
+# === CodeGraph (índice local regenerable con `codegraph init`) ===
+.codegraph/
+
+# === SO / editores ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
