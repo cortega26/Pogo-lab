@@ -28,12 +28,14 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+  # mypy local (usa el env de uv → plugin django-stubs disponible; mismo alcance que CI)
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies: [django-stubs, django-stubs-ext]
-        args: ["--ignore-missing-imports"]
+        name: mypy (uv run, con plugin django-stubs)
+        entry: uv run mypy
+        language: system
+        types: [python]
         pass_filenames: false
 
   - repo: https://github.com/compilerla/conventional-pre-commit

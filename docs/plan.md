@@ -7,7 +7,7 @@
 > prácticas. El MVP valida el ciclo **Entender → Calcular → Registrar → Analizar → Decidir** con **una** familia de
 > problemas: **intercambios, IV y Pokémon Lucky**.
 >
-> **Toolchain verificado en el entorno:** Python 3.14.3, `uv` 0.10.11, Docker 29.1.3, Node 24.15. No hay `psql`
+> **Toolchain verificado en el entorno:** Python 3.13.12, `uv` 0.10.11, Docker 29.1.3, Node 24.15. No hay `psql`
 > local (Postgres irá vía Docker) ni Poetry (usaremos `uv`).
 >
 > **Decisiones del usuario para este plan:** (1) **Alcance completo M0–M7** — el dataset comunitario entra en el

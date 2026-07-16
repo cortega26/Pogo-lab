@@ -3,7 +3,7 @@ name = "pogo-lab"
 version = "0.1.0"
 description = "Mechanics Lab + Decision Planner para Pokémon GO"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 authors = [{ name = "Pogo-lab Team" }]
 license = { text = "Por definir" }
 dependencies = [
@@ -51,14 +51,13 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.13"
 strict = false
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true
 exclude = ["migrations/", ".venv/"]
-# django-stubs plugin activado cuando haya modelos reales (M2+)
-# plugins = ["mypy_django_plugin.main"]
+plugins = ["mypy_django_plugin.main"]
 
 [[tool.mypy.overrides]]
 module = "config.settings.*"
@@ -75,6 +74,9 @@ disable_error_code = ["var-annotated", "misc"]
 [[tool.mypy.overrides]]
 module = "apps.*"
 disable_error_code = ["var-annotated"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"

@@ -50,6 +50,12 @@ node_modules/
 # === CodeGraph (índice local regenerable con `codegraph init`) ===
 .codegraph/
 
+# === Agent skills instaladas localmente (contenido regenerable; como node_modules) ===
+.agents/skills/
+.claude/skills/
+.continue/skills/
+skills-lock.json
+
 # === SO / editores ===
 .DS_Store
 Thumbs.db

@@ -80,3 +80,4 @@ Verificación de email diferible a M7 (⏭️).
 | 2026-07-16 | 🟨 | PR-03 (core) completado. |
 | 2026-07-16 | 🟨 | PR-04 (accounts) completado. |
 | 2026-07-16 | ✅ | M1 completo: PR-01..05, CI verde, i18n, Tailwind layout. |
+| 2026-07-16 | ✅ | Auditoría (Opus): revertido baseline a Python 3.13, mypy verde (plugin django-stubs activado), gates de mypy unificados (CI `mypy .` + pre-commit local). Verificado verde en 3.13.12. |
