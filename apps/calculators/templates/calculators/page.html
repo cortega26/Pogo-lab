@@ -3,6 +3,12 @@
 
 {% block title %}{% trans "Calculadora de IV — Pogo-lab" %}{% endblock %}
 
+{% block extra_head %}
+<meta name="description" content="{% trans "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de Pokémon GO." %}">
+<meta property="og:title" content="{% trans "Calculadora de IV — Pogo-lab" %}">
+<meta property="og:description" content="{% trans "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de Pokémon GO." %}">
+{% endblock %}
+
 {% block content %}
 <h1 class="mb-6 text-3xl font-bold">{% trans "Calculadora de probabilidad de IV" %}</h1>
 
