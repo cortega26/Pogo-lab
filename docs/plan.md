@@ -78,6 +78,7 @@ M0–M7** y **despliegue como recomendación reversible (PaaS por defecto)**. El
 en este plan con supuestos razonables y reversibles (tabla §B). Se puede iniciar la implementación de M0/M1.
 
 Dos **checkpoints no bloqueantes** que requieren verificación humana antes de publicar, no antes de codificar:
+
 1. **Revisión legal/marca** del disclaimer de no afiliación, licencias y política de privacidad (antes de beta, §I).
 2. **Verificación de los valores comunitarios** de pisos por amistad contra datamining, al hacer el seed (S2).
 
@@ -340,7 +341,7 @@ gráficos diferidos). Tres niveles de accesibilidad intelectual en cada análisi
 
 ### Sitemap y rutas (con `i18n_patterns`; `{lang}` ∈ es|en, pt preparado)
 
-```
+```text
 /{lang}/                                  Landing (3 CTA)
 /{lang}/mecanicas/                        Índice de mecánicas
 /{lang}/mecanicas/iv-en-intercambios/     Página de mecánica (explicación+reglas+calc+evidencia+changelog)
@@ -394,6 +395,7 @@ reproduce el cálculo.
 Servicios de dominio (Python) que envuelven `engine/` y el ORM. Firmas orientativas:
 
 ### `calculators`
+
 - `compute_scenario(inputs: CalcInput) -> CalcResult`
   - `CalcInput{friendship_level, trade_type, floor_override?, n, target{kind, threshold?}, confidence}`
   - `CalcResult{p_per_trade, p_cumulative, expected_successes, p_zero, distribution?, trades_for_confidence,
@@ -401,6 +403,7 @@ Servicios de dominio (Python) que envuelven `engine/` y el ORM. Firmas orientati
 - `encode_share_url(inputs) / decode_share_url(query) -> CalcInput` (determinista, canónico).
 
 ### `trades`
+
 - `create_session(owner, data) -> TradeSession`
 - `add_observation(session, data) -> TradeObservation` (valida IV∈[0,15], coherencia piso↔ruleset, Lucky)
 - `bulk_add(session, rows) -> BatchResult{created[], errors[]}`
@@ -408,28 +411,34 @@ Servicios de dominio (Python) que envuelven `engine/` y el ORM. Firmas orientati
 - `set_observation_state(obs, state, reason, actor) -> TradeObservation` (emite `AuditEvent`)
 
 ### `analysis`
+
 - `run_personal_analysis(owner, filters) -> AnalysisRun` → persiste `AnalysisResult[]`
 - `run_dataset_analysis(dataset_version, filters) -> AnalysisRun`
 - Cada run llama `engine.stat_tests`/`intervals`; separa **obligatoriamente Lucky/normal** y por **ruleset/periodo**.
 
 ### `decisions`
+
 - `recommend(analysis_run) -> list[DecisionRecommendation]` (delega en `engine.decisions.evaluate`)
 
 ### `contributions`
+
 - `grant_consent(user, scope, text_version) / revoke_consent(consent)`
 - `build_dataset_version(criteria) -> DatasetVersion` (anonimiza: excluye `notes`, sin trainer/ubicación; país
   agregado; `dedup_hash`; aplica `min_sample`; marca `is_public`)
 - `export_public_dataset(version) -> CSV` (sanitizado anti spreadsheet-injection)
 
 ### `sources` / `mechanics`
+
 - `publish_ruleset(ruleset) -> None` (congela; valida parámetros contra schema del engine)
 - `resolve_active_ruleset(mechanic, at_datetime) -> MechanicRuleSet` (por `effective_from/to`)
 
 ### Eventos / auditoría
+
 - `AuditEvent` en: cambio de estado de observación, publicación de ruleset, build de dataset, revocación de
   consentimiento, recálculo. Incluyen `correlation_id`.
 
 ### Imports/exports
+
 - **Import:** CSV con cabecera documentada (plantilla en `/docs/csv_template.csv`); validación por fila; límite de
   tamaño/filas; sin fórmulas.
 - **Export:** CSV del usuario (sus datos) y CSV público del dataset; celdas que empiezan por `= + - @` se
@@ -440,11 +449,13 @@ Servicios de dominio (Python) que envuelven `engine/` y el ORM. Firmas orientati
 ## I. Seguridad, privacidad y cumplimiento
 
 ### Threat model proporcional
+
 Activos: PII mínima (email, país opcional), datos privados de intercambios, integridad del dataset público.
 Amenazas: XSS, CSRF, inyección, carga maliciosa de CSV, spam/automatización de contribuciones, envenenamiento del
 dataset, exfiltración de PII en logs. Mitigaciones proporcionadas (no infraestructura empresarial).
 
 ### Controles
+
 - **Auth:** django-allauth (email+password, verificación de email, reset seguro). Sesiones seguras, cookies
   `HttpOnly`/`Secure`/`SameSite`.
 - **CSRF** middleware de Django en todos los POST/HTMX. **Validación server-side** siempre (no confiar en cliente).
@@ -464,6 +475,7 @@ dataset, exfiltración de PII en logs. Mitigaciones proporcionadas (no infraestr
   datasets sospechosos.
 
 ### Legal / IP (requiere revisión profesional — **no es asesoría concluyente**)
+
 - **Sin** logos/sprites/ilustraciones/recursos oficiales; **sin** dominio que implique afiliación; **sin** APIs
   privadas ni automatización del juego.
 - Incluir: **disclaimer de no afiliación**, política de privacidad, términos de uso, consentimiento de
@@ -501,6 +513,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
 > verificable**. "Recortes posibles" = qué soltar si un milestone amenaza el avance.
 
 ### M0 — Descubrimiento y decisiones · **S**
+
 - **Objetivo:** fijar stack, dominio y contratos estadísticos antes de escribir producto.
 - **Tareas:** ADR-0001 (stack Django/Postgres/HTMX vs alternativas), modelo de dominio (§E), contratos del
   `engine/` (firmas §F), riesgos, criterios de aceptación, mock de navegación (§G).
@@ -509,6 +522,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   acordadas. **Demo:** documento + árbol de repo. **Recortes:** ninguno (es el cimiento).
 
 ### M1 — Fundación · **M**
+
 - **Objetivo:** proyecto ejecutable, CI verde, auth, i18n, layout, observabilidad mínima.
 - **Historias:** bootstrap `uv` + Django + settings por entorno; Docker Compose Postgres; allauth; `i18n_patterns`
   es/en; layout Tailwind; logging estructurado + `/healthz`; Ruff/mypy/pre-commit; pytest base.
@@ -517,6 +531,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   **Demo:** login + cambio de idioma. **Recortes:** verificación de email diferible a M7.
 
 ### M2 — Rules & Evidence · **M**
+
 - **Objetivo:** conocimiento versionado con procedencia + admin + contenido base.
 - **Historias:** modelos `Mechanic/MechanicRuleSet/RuleParameter/SourceReference/SourceClaim`; publicación inmutable;
   `resolve_active_ruleset`; Django Admin; `ContentPage/ContentPageTranslation`; seed inicial (**verificar pisos
@@ -527,6 +542,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   **Recortes:** número de rulesets seed.
 
 ### M3 — Calculadora pública · **M**
+
 - **Objetivo:** motor de probabilidad + calculadora SSR compartible, sin login, SEO es/en.
 - **Historias:** `engine/probability.py` completo + tests de propiedad; `calculators.compute_scenario`;
   formulario HTMX; `encode/decode_share_url`; explicación en lenguaje natural; sitemap/hreflang/OG.
@@ -536,6 +552,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   **Recortes:** distribución de suma (mostrar solo hundo/acumulada primero).
 
 ### M4 — Trade Tracker · **L**
+
 - **Objetivo:** registrar sesiones/observaciones (manual+lotes+CSV) con validación y dashboard básico.
 - **Historias:** `TradeSession/TradeObservation`; entrada rápida móvil; import CSV con vista previa; validaciones y
   estados; dashboard básico (totales, Lucky vs normal).
@@ -545,6 +562,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   a un fast-follow si la entrada manual ya demuestra valor.
 
 ### M5 — Analysis & Decisions · **L**
+
 - **Objetivo:** inferencia honesta reproducible + recomendaciones deterministas.
 - **Historias:** `engine/intervals.py` + `stat_tests.py` + `decisions.py`; `AnalysisRun/AnalysisResult`;
   `DecisionRule/Recommendation`; panel con IC, distribuciones, observado vs esperado, advertencias, umbrales.
@@ -554,6 +572,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   **Recortes:** test de independencia y bayesiano a v1.1.
 
 ### M6 — Community Dataset · **L**
+
 - **Objetivo:** contribución opt-in anonimizada, moderación, versionado y dashboard público.
 - **Historias:** `DataContributionConsent`; `build_dataset_version` (anonimización + min_sample + dedup);
   moderación (suspicious/duplicate); dashboard comunitario + descarga; advertencia de sesgo de selección.
@@ -563,6 +582,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
   **Recortes:** descarga pública diferible; empezar con dashboard de solo lectura.
 
 ### M7 — Hardening y beta · **M**
+
 - **Objetivo:** E2E, accesibilidad, rendimiento, seguridad, backup/restore, despliegue, analítica, beta cerrada.
 - **Historias:** suite Playwright completa; auditoría a11y/CWV; CSP/rate limit/pip-audit; **decidir hosting**
   (PaaS por defecto) + deploy; backup + **prueba de restore**; métricas de producto; disclaimer/legal revisados.
@@ -574,7 +594,7 @@ Lucky f=12 → k=4, p_hundo=1/64; estándar f=1 → k=15, p_hundo=1/3375). **QA 
 
 ## L. File tree propuesto
 
-```
+```text
 Pogo-lab/
 ├─ pyproject.toml            # uv + deps + Ruff/mypy/pytest config
 ├─ uv.lock
@@ -752,11 +772,13 @@ metadata SEO · criterio de aceptación. Todas es/en (pt preparado), SSR e index
 ## Cierre (spec §22)
 
 ### 1. Primer milestone recomendado
+
 **M0 — Descubrimiento y decisiones**, fusionado con el arranque de **M1** para llegar rápido a algo ejecutable:
 registrar ADR-0001 (stack), congelar los contratos del `engine/` (§F) y dejar el proyecto Django corriendo con CI
 verde. Entregable de M0: ADRs + esqueleto `engine/` (firmas) + repo booteable.
 
 ### 2. Primeros cinco pasos concretos
+
 1. `uv init` + añadir Django 5.2, deps base y `pyproject.toml` con Ruff/mypy/pytest; crear `config/settings/{base,dev,test}.py` y `.env.example`.
 2. `compose.yaml` con **Postgres 16**; `manage.py migrate`; `/healthz`; verificar `runserver` contra la DB.
 3. Configurar **CI** (`.github/workflows/ci.yml`: Ruff + mypy + pytest) y **pre-commit**; dejar el pipeline verde.
@@ -764,12 +786,14 @@ verde. Entregable de M0: ADRs + esqueleto `engine/` (firmas) + repo booteable.
 5. Escribir **ADR-0001** (stack Django/Postgres/HTMX vs TS+Fastify/SPA, con la justificación de esta sesión) y **ADR-0002** (versionado inmutable de rulesets); esbozar el seed de la mecánica de intercambios marcando los pisos como *pendientes de verificación comunitaria*.
 
 ### 3. Preguntas bloqueantes pendientes
+
 **Ninguna.** Las dos decisiones scope-changing ya fueron resueltas (alcance completo M0–M7; hosting reversible con
 PaaS por defecto). Quedan dos verificaciones **no bloqueantes para codificar**: verificar los pisos comunitarios
 contra datamining al hacer el seed, y la revisión legal/marca antes de beta.
 
 ### 4. Comando/prompt sugerido para iniciar la implementación
-```
+
+```text
 Implementa el Milestone 0→M1 del plan en /home/carlos/.claude/plans/rol-act-a-como-scalable-cookie.md:
 1) uv init + Django 5.2 + config/settings/{base,dev,test} + .env.example + Makefile;
 2) compose.yaml con Postgres 16, migrate, /healthz, runserver verde contra la DB;

@@ -14,6 +14,7 @@ grandes.
 ## Decisión
 
 Métodos seleccionados y **encapsulados en el `engine/`**:
+
 - **Intervalos de proporción:** **Wilson** por defecto (buena cobertura con n pequeño y p extrema); **Clopper–Pearson**
   exacto disponible para modo estricto. Se descarta **Wald**.
 - **Hundos vs modelo:** **prueba binomial exacta** (`scipy.stats.binomtest`). **Chi-cuadrado queda prohibido** para

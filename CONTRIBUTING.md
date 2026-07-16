@@ -48,6 +48,7 @@ inertes para que no drifteen contra lo que genere `uv init`).
 | **Dependabot** | anti-drift de dependencias | PRs automáticos (GitHub Actions ya; pip en M1) |
 
 Dos gates específicos anti-regresión (agendados):
+
 - **M1** — contrato import-linter "`engine/` no importa Django".
 - **M3** — test "**constantes de docs == salida del engine**" (`1/64`, `1/3375`, pisos): una sola fuente, los
   ejemplos de `plan.md`/`AGENTS.md` se verifican contra lo que calcula el `engine/`.

@@ -4,5 +4,6 @@
   "MD013": false, // longitud de línea: los docs usan tablas y URLs largas
   "MD033": false, // se permite HTML inline (marcadores, <!-- comentarios -->)
   "MD041": false, // el primer encabezado no siempre es H1 (plantillas con comentarios)
+  "MD060": false, // estilo de columnas de tabla: demasiado opinionado y sensible a la versión
   "MD024": { "siblings_only": true } // encabezados repetidos permitidos en secciones distintas
 }

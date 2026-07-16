@@ -3,6 +3,7 @@
 La guía canónica de este repositorio está en **[AGENTS.md](AGENTS.md)** — léela primero.
 
 Recordatorio de no-negociables (detalle en `AGENTS.md`):
+
 - **`engine/` puro** y testeado con **fixtures calculadas a mano**; **binomial exacta** para hundos (no chi²),
   **Wilson** por defecto; reproducibilidad con semilla.
 - **Procedencia separada**; los pisos de IV son **hechos comunitarios** versionados (`SourceClaim`), **verificados
