@@ -6,8 +6,8 @@ datos configurables, nunca hardcodeados.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 
 
 class FriendshipLevel(Enum):
@@ -41,6 +41,7 @@ class ConfidenceLevel(Enum):
 @dataclass(frozen=True)
 class RuleParameterValue:
     """Valor de un parámetro de ruleset."""
+
     key: str
     value: float | int | bool | dict
     data_type: str  # "integer" | "float" | "boolean" | "json"
@@ -50,6 +51,7 @@ class RuleParameterValue:
 @dataclass(frozen=True)
 class SourceClaim:
     """Afirmación citada por una fuente."""
+
     source_title: str
     source_url: str | None
     source_type: SourceType
@@ -63,6 +65,7 @@ class MechanicRuleSet:
 
     Una vez publicado, no se modifica — los cambios crean una nueva versión.
     """
+
     mechanic_key: str
     version: int
     name: str

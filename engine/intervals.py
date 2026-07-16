@@ -19,6 +19,7 @@ def wilson_interval(successes: int, n: int, conf: float = 0.95) -> tuple[float, 
     Returns:
         (límite_inferior, límite_superior).
     """
+    ...
 
 
 def clopper_pearson_interval(successes: int, n: int, conf: float = 0.95) -> tuple[float, float]:
@@ -35,6 +36,7 @@ def clopper_pearson_interval(successes: int, n: int, conf: float = 0.95) -> tupl
     Returns:
         (límite_inferior, límite_superior).
     """
+    ...
 
 
 def beta_binomial_credible(
@@ -56,3 +58,4 @@ def beta_binomial_credible(
     Returns:
         (límite_inferior, límite_superior).
     """
+    ...

@@ -1,5 +1,6 @@
-import environ
 from pathlib import Path
+
+import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -113,10 +114,3 @@ LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-
-IMPORT_LINTER_CONFIG = {
-    "root_package": "engine",
-    "forbidden_imports": [
-        {"module": "django", "message": "engine/ no puede importar Django (ADR-0003)"},
-    ],
-}

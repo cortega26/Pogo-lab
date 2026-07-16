@@ -1,0 +1,30 @@
+# git-cliff configuration
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = "# Changelog\n\nRegistro de cambios significativos en Pogo-lab.\n"
+body = ""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+
+[git.parse]
+conventional_description = true
+conventional_description_trim = true
+
+[git.conventional]
+types = [
+    { type = "feat",       section = "Nuevas funcionalidades" },
+    { type = "fix",        section = "Correcciones" },
+    { type = "docs",       section = "Documentación" },
+    { type = "test",       section = "Pruebas" },
+    { type = "refactor",   section = "Refactorización" },
+    { type = "chore",      section = "Mantenimiento" },
+    { type = "ci",         section = "CI / CD" },
+    { type = "build",      section = "Build" },
+    { type = "perf",       section = "Rendimiento" },
+]

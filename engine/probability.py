@@ -12,6 +12,7 @@ def possible_values(f: int) -> int:
 
     k = 16 - f  (para 0 <= f <= 15).
     """
+    ...
 
 
 def p_specific_iv(f: int) -> Fraction:
@@ -19,6 +20,7 @@ def p_specific_iv(f: int) -> Fraction:
 
     P = 1/k, donde k = 16 - f.
     """
+    ...
 
 
 def p_stat_at_least(f: int, t: int) -> Fraction:
@@ -26,6 +28,7 @@ def p_stat_at_least(f: int, t: int) -> Fraction:
 
     Válido solo para t ≥ f. P = (16 - t) / k.
     """
+    ...
 
 
 def p_hundo(f: int) -> Fraction:
@@ -33,6 +36,7 @@ def p_hundo(f: int) -> Fraction:
 
     P = (1/k)^3, donde k = 16 - f. Asume independencia Att/Def/HP (S3).
     """
+    ...
 
 
 def iv_sum_distribution(f: int) -> dict[int, Fraction]:
@@ -40,6 +44,7 @@ def iv_sum_distribution(f: int) -> dict[int, Fraction]:
 
     Soporte: [3f, 45]. Σ = 1 exacto.
     """
+    ...
 
 
 def p_sum_at_least(f: int, s: int) -> Fraction:
@@ -47,6 +52,7 @@ def p_sum_at_least(f: int, s: int) -> Fraction:
 
     Cola de `iv_sum_distribution`.
     """
+    ...
 
 
 def p_at_least_one(p: float, n: int) -> float:
@@ -54,6 +60,7 @@ def p_at_least_one(p: float, n: int) -> float:
 
     P = 1 - (1 - p)^n.
     """
+    ...
 
 
 def p_zero(p: float, n: int) -> float:
@@ -61,6 +68,7 @@ def p_zero(p: float, n: int) -> float:
 
     P = (1 - p)^n.
     """
+    ...
 
 
 def expected_successes(p: float, n: int) -> float:
@@ -68,6 +76,7 @@ def expected_successes(p: float, n: int) -> float:
 
     E = n * p.
     """
+    ...
 
 
 def outcome_distribution(p: float, n: int) -> list[float]:
@@ -75,6 +84,7 @@ def outcome_distribution(p: float, n: int) -> list[float]:
 
     Devuelve probabilidades P(X=i) para i = 0..n.
     """
+    ...
 
 
 def trades_for_confidence(p: float, c: float) -> int:
@@ -82,6 +92,7 @@ def trades_for_confidence(p: float, c: float) -> int:
 
     n = ceil(ln(1 - c) / ln(1 - p)).
     """
+    ...
 
 
 def per_trade_success_prob(f: int, target: dict) -> float:
@@ -94,3 +105,4 @@ def per_trade_success_prob(f: int, target: dict) -> float:
 
     El piso `f` proviene del RuleParameter (no del código).
     """
+    ...

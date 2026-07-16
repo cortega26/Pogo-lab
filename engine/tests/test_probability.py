@@ -7,7 +7,6 @@ Casos de referencia (plan §F, §J):
 """
 
 import pytest
-from fractions import Fraction
 
 
 class TestPossibleValues:

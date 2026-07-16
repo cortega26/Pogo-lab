@@ -61,6 +61,10 @@ exclude = ["migrations/", ".venv/"]
 module = "config.settings.*"
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = "engine.*"
+disable_error_code = ["empty-body", "return"]
+
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 testpaths = ["engine/tests", "apps", "tests"]
@@ -83,6 +87,17 @@ django_settings_module = "config.settings.dev"
 
 [tool.hatch.build.targets.wheel]
 packages = ["config/", "apps/", "engine/", "manage.py", "static/"]
+
+[tool.importlinter]
+root_packages = ["engine"]
+include_external_packages = true
+exclude_type_checking_imports = false
+
+[[tool.importlinter.contracts]]
+name = "engine-purity"
+type = "forbidden"
+source_modules = ["engine"]
+forbidden_modules = ["django"]
 
 [build-system]
 requires = ["hatchling"]

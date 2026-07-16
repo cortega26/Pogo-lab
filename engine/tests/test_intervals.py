@@ -34,7 +34,7 @@ class TestClopperPearsonInterval:
 
     @pytest.mark.skip(reason="esqueleto M0 — implementar en M5")
     def test_zero_successes(self):
-        """successes=0 → [0, 1 - (α/2)^(1/n)]."""
+        """successes=0 → [0, 1 - (a/2)^(1/n)]."""
 
 
 class TestBetaBinomialCredible:

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Recommendation:
     """Recomendación generada por una regla."""
+
     rule_key: str
     rule_version: str
     message_key: str
@@ -20,6 +21,7 @@ class Recommendation:
 @dataclass
 class AnalysisContext:
     """Contexto para evaluar reglas de decisión."""
+
     n: int
     successes: int
     p0: float
@@ -51,6 +53,7 @@ def evaluate(context: AnalysisContext) -> list[Recommendation]:
     Returns:
         Lista de recomendaciones aplicables, ordenadas por severidad.
     """
+    ...
 
 
 # Reglas registradas con su versión

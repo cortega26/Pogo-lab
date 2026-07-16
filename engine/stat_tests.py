@@ -13,6 +13,7 @@ from dataclasses import dataclass
 @dataclass
 class TestResult:
     """Resultado de una prueba estadística."""
+
     stat: float
     p_value: float
     effect_size: float | None
@@ -34,6 +35,7 @@ def exact_binomial_test(successes: int, n: int, p0: float) -> TestResult:
     Returns:
         TestResult con stat, p_value, effect_size (diferencia absoluta), method_used="exact_binomial".
     """
+    ...
 
 
 def uniformity_test(
@@ -55,6 +57,7 @@ def uniformity_test(
     Returns:
         TestResult con method_used="chisquare" o "monte_carlo", effect_size (Cramér's V).
     """
+    ...
 
 
 def independence_test(
@@ -74,6 +77,7 @@ def independence_test(
     Returns:
         TestResult con method_used, effect_size (Cramér's V).
     """
+    ...
 
 
 def min_sample_for(metric: str) -> int:
@@ -88,3 +92,4 @@ def min_sample_for(metric: str) -> int:
     Returns:
         Número mínimo de observaciones.
     """
+    ...
