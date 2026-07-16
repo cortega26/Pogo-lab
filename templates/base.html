@@ -1,14 +1,34 @@
 <!DOCTYPE html>
-{% load i18n static %}
+{% load i18n static seo_tags %}
 {% get_current_language as LANGUAGE_CODE %}
 {% get_available_languages as LANGUAGES %}
+{% get_language_info_list for LANGUAGES as language_info_list %}
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Pogo-lab{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/output.css' %}">
+
   {% block extra_head %}{% endblock %}
+
+  {% block hreflang %}
+    {% for lang in language_info_list %}
+      <link rel="alternate" hreflang="{{ lang.code }}"
+            href="{{ request.scheme }}://{{ request.get_host }}{% change_lang lang.code %}">
+    {% endfor %}
+    <link rel="alternate" hreflang="x-default"
+          href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  {% endblock %}
+
+  {% block canonical %}
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+  {% endblock %}
+
+  <meta property="og:site_name" content="Pogo-lab">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="{{ LANGUAGE_CODE }}">
+
+  <link rel="stylesheet" href="{% static 'css/output.css' %}">
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased">
   <header class="border-b border-gray-200 bg-white">
@@ -16,6 +36,13 @@
       <a href="{% url 'healthz' %}" class="text-lg font-bold text-blue-600">Pogo-lab</a>
 
       <div class="flex items-center gap-4">
+        <a href="{% url 'calculator' %}" class="text-sm text-gray-600 hover:text-gray-900">
+          {% trans "Calculadora" %}
+        </a>
+        <a href="{% url 'mechanic_list' %}" class="text-sm text-gray-600 hover:text-gray-900">
+          {% trans "Mecánicas" %}
+        </a>
+
         <form action="/i18n/setlang/" method="post">
           {% csrf_token %}
           <input name="next" type="hidden" value="{{ request.get_full_path }}">
@@ -47,6 +74,14 @@
 
   <footer class="border-t border-gray-200 bg-white py-6 text-center text-sm text-gray-500">
     <p>Pogo-lab &mdash; {% trans "No afiliado a Niantic ni The Pokémon Company" %}</p>
+    <nav class="mt-2 flex justify-center gap-4">
+      <a href="{% url 'calculator' %}" class="text-gray-400 hover:text-gray-600">
+        {% trans "Calculadora" %}
+      </a>
+      <a href="{% url 'mechanic_list' %}" class="text-gray-400 hover:text-gray-600">
+        {% trans "Mecánicas" %}
+      </a>
+    </nav>
   </footer>
 </body>
 </html>

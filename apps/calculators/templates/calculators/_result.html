@@ -1,0 +1,61 @@
+{% load i18n %}
+
+<div class="rounded-lg border border-blue-200 bg-blue-50 p-6">
+  <h2 class="mb-4 text-xl font-semibold">{% trans "Resultados" %}</h2>
+
+  <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div>
+      <dt class="text-sm text-gray-500">{% trans "Piso (f)" %}</dt>
+      <dd class="font-medium">{{ result.floor }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-gray-500">{% trans "Valores posibles por stat (k)" %}</dt>
+      <dd class="font-medium">{{ result.k }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-gray-500">{% trans "Probabilidad por intercambio" %}</dt>
+      <dd class="font-medium">{{ result.p_per_trade|floatformat:6 }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-gray-500">{% trans "Probabilidad acumulada (n=" %}{{ result.params.n }}{% trans ")" %}</dt>
+      <dd class="font-medium">{{ result.p_cumulative|floatformat:6 }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-gray-500">{% trans "Éxitos esperados" %}</dt>
+      <dd class="font-medium">{{ result.expected_successes|floatformat:4 }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-gray-500">{% trans "Probabilidad de cero éxitos" %}</dt>
+      <dd class="font-medium">{{ result.p_zero|floatformat:6 }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-gray-500">
+        {% blocktrans with conf=result.params.confidence|floatformat:0 %}
+        Intercambios para confianza al {{ conf }}%
+        {% endblocktrans %}
+      </dt>
+      <dd class="font-medium">{{ result.trades_for_confidence }}</dd>
+    </div>
+  </dl>
+
+  <div class="mt-4">
+    <h3 class="mb-2 text-sm font-semibold text-gray-500">{% trans "Supuestos" %}</h3>
+    <ul class="list-inside list-disc text-sm text-gray-600">
+      {% for assumption in result.assumptions %}
+        <li>{{ assumption }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="mt-4">
+    <h3 class="mb-2 text-sm font-semibold text-gray-500">{% trans "Enlace compartible" %}</h3>
+    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}"
+           class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700"
+           onclick="this.select(); navigator.clipboard?.writeText(this.value);">
+  </div>
+
+  <div class="mt-4 border-t border-blue-200 pt-3 text-xs text-gray-400">
+    ruleset v{{ result.ruleset_version|default:"—" }}
+    &middot; algoritmo {{ result.algorithm_version }}
+  </div>
+</div>

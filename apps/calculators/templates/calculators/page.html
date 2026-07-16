@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "Calculadora de IV — Pogo-lab" %}{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="{% trans "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de Pokémon GO." %}">
+<meta property="og:title" content="{% trans "Calculadora de IV — Pogo-lab" %}">
+<meta property="og:description" content="{% trans "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de Pokémon GO." %}">
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-6 text-3xl font-bold">{% trans "Calculadora de probabilidad de IV" %}</h1>
+
+<form id="calc-form"
+      hx-post="{% url 'calculator' %}"
+      hx-target="#calc-results"
+      hx-swap="innerHTML"
+      class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+
+  {% csrf_token %}
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="friendship_level">
+        {% trans "Nivel de amistad" %}
+      </label>
+      <select name="friendship_level" id="friendship_level"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        {% for val, label in friendship_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="trade_type">
+        {% trans "Tipo de intercambio" %}
+      </label>
+      <select name="trade_type" id="trade_type"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        {% for val, label in trade_type_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="n">
+        {% trans "Número de intercambios (n)" %}
+      </label>
+      <input type="number" name="n" id="n" value="1" min="1" max="100000"
+             class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="target_kind">
+        {% trans "Objetivo" %}
+      </label>
+      <select name="target_kind" id="target_kind"
+              onchange="document.getElementById('threshold-group').style.display = this.value === 'hundo' ? 'none' : 'block'"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        {% for val, label in target_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div id="threshold-group" style="display:none">
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="threshold">
+        {% trans "Umbral" %}
+      </label>
+      <input type="number" name="threshold" id="threshold" value="42" min="0" max="45"
+             class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="confidence">
+        {% trans "Nivel de confianza" %}
+      </label>
+      <select name="confidence" id="confidence"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        <option value="0.5">50%</option>
+        <option value="0.75">75%</option>
+        <option value="0.9">90%</option>
+        <option value="0.95">95%</option>
+        <option value="0.99">99%</option>
+      </select>
+    </div>
+  </div>
+
+  <button type="submit"
+          class="mt-4 rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700">
+    {% trans "Calcular" %}
+  </button>
+</form>
+
+<div id="calc-results">
+  {% if error %}
+    <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      {{ error }}
+    </div>
+  {% elif result %}
+    {% include "calculators/_result.html" %}
+  {% endif %}
+</div>
+
+{% endblock %}
