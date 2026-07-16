@@ -1,5 +1,5 @@
-from django.http import JsonResponse
+from django.shortcuts import render
 
 
-def healthz(_request):
-    return JsonResponse({"status": "ok"})
+def healthz(request):
+    return render(request, "core/healthz.html")

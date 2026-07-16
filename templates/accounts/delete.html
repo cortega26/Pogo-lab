@@ -4,6 +4,16 @@
 {% block title %}{% trans "Eliminar cuenta" %} — Pogo-lab{% endblock %}
 
 {% block content %}
-<h1>{% trans "Eliminar cuenta" %}</h1>
-<p>{% trans "Función de eliminación de cuenta disponible próximamente." %}</p>
+  <div class="mx-auto max-w-md">
+    <h1 class="mb-4 text-2xl font-bold text-red-600">{% trans "Eliminar cuenta" %}</h1>
+    <form method="post" class="rounded-lg border bg-white p-6">
+      {% csrf_token %}
+      <p class="mb-4 text-gray-600">
+        {% trans "Esta acción es irreversible. Todos tus datos serán eliminados." %}
+      </p>
+      <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">
+        {% trans "Confirmar eliminación" %}
+      </button>
+    </form>
+  </div>
 {% endblock %}

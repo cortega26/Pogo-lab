@@ -37,7 +37,11 @@ htmlcov/
 .ruff_cache/
 .hypothesis/
 
-# === Playwright / Node (Tailwind CLI, E2E) ===
+# === Tailwind standalone CLI ===
+tailwindcss
+/static/css/output.css
+
+# === Playwright / Node (Tailwind CLI via npm, E2E) ===
 node_modules/
 /test-results/
 /playwright-report/

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+{% load i18n static %}
+{% get_current_language as LANGUAGE_CODE %}
+{% get_available_languages as LANGUAGES %}
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Pogo-lab{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/output.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+  <header class="border-b border-gray-200 bg-white">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <a href="{% url 'healthz' %}" class="text-lg font-bold text-blue-600">Pogo-lab</a>
+
+      <div class="flex items-center gap-4">
+        <form action="{% url 'set_language' %}" method="post">
+          {% csrf_token %}
+          <input name="next" type="hidden" value="{{ request.get_full_path }}">
+          <select name="language" onchange="this.form.submit()" class="rounded border px-2 py-1 text-sm">
+            {% for code, name in LANGUAGES %}
+              <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
+                {{ name }}
+              </option>
+            {% endfor %}
+          </select>
+        </form>
+
+        {% if user.is_authenticated %}
+          <a href="{% url 'account_logout' %}" class="text-sm text-gray-600 hover:text-gray-900">
+            {% trans "Cerrar sesión" %}
+          </a>
+        {% else %}
+          <a href="{% url 'account_login' %}" class="text-sm text-gray-600 hover:text-gray-900">
+            {% trans "Iniciar sesión" %}
+          </a>
+        {% endif %}
+      </div>
+    </nav>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-gray-200 bg-white py-6 text-center text-sm text-gray-500">
+    <p>Pogo-lab &mdash; {% trans "No afiliado a Niantic ni The Pokémon Company" %}</p>
+  </footer>
+</body>
+</html>

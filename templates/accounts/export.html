@@ -4,6 +4,18 @@
 {% block title %}{% trans "Exportar datos" %} — Pogo-lab{% endblock %}
 
 {% block content %}
-<h1>{% trans "Exportar datos" %}</h1>
-<p>{% trans "Función de exportación disponible próximamente." %}</p>
+  <div class="mx-auto max-w-md">
+    <h1 class="mb-4 text-2xl font-bold">{% trans "Exportar datos" %}</h1>
+    <div class="rounded-lg border bg-white p-6">
+      <p class="mb-4 text-gray-600">
+        {% trans "Recibirás un enlace de descarga con todos tus datos." %}
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+          {% trans "Solicitar exportación" %}
+        </button>
+      </form>
+    </div>
+  </div>
 {% endblock %}

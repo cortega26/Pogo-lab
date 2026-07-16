@@ -1,0 +1,70 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-07-16 22:02+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: config/urls.py:11 config/urls.py:12
+msgid "cuenta/"
+msgstr ""
+
+#: templates/accounts/delete.html:4 templates/accounts/delete.html:8
+msgid "Eliminar cuenta"
+msgstr ""
+
+#: templates/accounts/delete.html:12
+msgid "Esta acción es irreversible. Todos tus datos serán eliminados."
+msgstr ""
+
+#: templates/accounts/delete.html:15
+msgid "Confirmar eliminación"
+msgstr ""
+
+#: templates/accounts/export.html:4 templates/accounts/export.html:8
+msgid "Exportar datos"
+msgstr ""
+
+#: templates/accounts/export.html:11
+msgid "Recibirás un enlace de descarga con todos tus datos."
+msgstr ""
+
+#: templates/accounts/export.html:16
+msgid "Solicitar exportación"
+msgstr ""
+
+#: templates/base.html:33
+msgid "Cerrar sesión"
+msgstr ""
+
+#: templates/base.html:37
+msgid "Iniciar sesión"
+msgstr ""
+
+#: templates/base.html:49
+msgid "No afiliado a Niantic ni The Pokémon Company"
+msgstr ""
+
+#: templates/core/healthz.html:4
+msgid "Estado"
+msgstr ""
+
+#: templates/core/healthz.html:8
+msgid "Operativo"
+msgstr ""
+
+#: templates/core/healthz.html:9
+msgid "El sistema está funcionando correctamente."
+msgstr ""

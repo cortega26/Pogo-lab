@@ -1,4 +1,4 @@
-.PHONY: bootstrap migrate seed test run lint typecheck coverage precommit clean
+.PHONY: bootstrap migrate seed test run lint typecheck coverage precommit clean tailwind-install tailwind-build tailwind-watch
 
 bootstrap: .venv compose.yaml
 	uv sync
@@ -38,6 +38,19 @@ coverage:
 precommit:
 	uv run pre-commit run --all-files
 
+tailwind-install:
+	curl -sL https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 \
+	  -o /tmp/tailwindcss
+	chmod +x /tmp/tailwindcss
+	mv /tmp/tailwindcss tailwindcss
+
+tailwind-build: tailwindcss
+	./tailwindcss -i static/css/input.css -o static/css/output.css --minify
+
+tailwind-watch: tailwindcss
+	./tailwindcss -i static/css/input.css -o static/css/output.css --watch
+
 clean:
 	rm -rf .venv __pycache__ .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage
+	rm -f tailwindcss
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
