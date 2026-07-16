@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ mechanic.name }} — Pogo-lab{% endblock %}
+
+{% block content %}
+<nav class="mb-4 text-sm text-gray-500">
+  <a href="{% url 'mechanic_list' %}" class="hover:text-blue-600">{% trans "Mecánicas" %}</a>
+  &rsaquo; <span>{{ mechanic.name }}</span>
+</nav>
+
+<h1 class="mb-2 text-3xl font-bold">{{ mechanic.name }}</h1>
+
+{% if mechanic.description %}
+  <p class="mb-6 text-gray-600">{{ mechanic.description }}</p>
+{% endif %}
+
+{% if ruleset %}
+  <section class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+    <h2 class="mb-4 text-xl font-semibold">
+      {% trans "Reglas vigentes" %}
+      <span class="ml-2 text-sm font-normal text-gray-500">v{{ ruleset.version }}</span>
+    </h2>
+
+    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <dt class="text-sm text-gray-500">{% trans "Versión" %}</dt>
+        <dd class="font-medium">{{ ruleset.version }}</dd>
+      </div>
+      <div>
+        <dt class="text-sm text-gray-500">{% trans "Vigente desde" %}</dt>
+        <dd class="font-medium">{{ ruleset.effective_from|date:"SHORT_DATETIME_FORMAT" }}</dd>
+      </div>
+      {% if ruleset.effective_to %}
+        <div>
+          <dt class="text-sm text-gray-500">{% trans "Vigente hasta" %}</dt>
+          <dd class="font-medium">{{ ruleset.effective_to|date:"SHORT_DATETIME_FORMAT" }}</dd>
+        </div>
+      {% endif %}
+      {% if ruleset.confidence_level %}
+        <div>
+          <dt class="text-sm text-gray-500">{% trans "Nivel de confianza" %}</dt>
+          <dd class="font-medium">{{ ruleset.get_confidence_level_display }}</dd>
+        </div>
+      {% endif %}
+    </dl>
+
+    {% if ruleset.parameters.exists %}
+      <h3 class="mt-6 mb-3 text-lg font-semibold">{% trans "Parámetros" %}</h3>
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="py-2 font-medium text-gray-500">{% trans "Clave" %}</th>
+            <th class="py-2 font-medium text-gray-500">{% trans "Valor" %}</th>
+            <th class="py-2 font-medium text-gray-500">{% trans "Unidad" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for param in ruleset.parameters.all %}
+            <tr class="border-b border-gray-100">
+              <td class="py-2 font-mono text-xs">{{ param.key }}</td>
+              <td class="py-2">{{ param.value }}</td>
+              <td class="py-2 text-gray-500">{{ param.unit|default:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+
+  {% with claims=ruleset.claims.all %}
+    {% if claims %}
+      <section class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+        <h2 class="mb-4 text-xl font-semibold">{% trans "Fuentes y evidencia" %}</h2>
+        {% for claim in claims %}
+          <div class="mb-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+            <p class="text-sm text-gray-600">{{ claim.quote_summary }}</p>
+            <p class="mt-1 text-xs text-gray-400">
+              <span class="font-medium">{{ claim.source.title }}</span>
+              {% if claim.source.source_type %}
+                · {{ claim.source.get_source_type_display }}
+              {% endif %}
+              · {% trans "Confianza:" %} {{ claim.get_confidence_level_display }}
+            </p>
+          </div>
+        {% endfor %}
+      </section>
+    {% endif %}
+  {% endwith %}
+{% else %}
+  <p class="text-gray-500">{% trans "No hay reglas publicadas para esta mecánica." %}</p>
+{% endif %}
+{% endblock %}
