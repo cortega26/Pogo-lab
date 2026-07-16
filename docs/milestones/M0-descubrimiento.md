@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | 🟨 En progreso |
+| **Estado** | ✅ Completado |
 | **Tamaño** | S |
 | **Depende de** | — |
 | **Entregable** | ADRs + esqueleto `engine/` (firmas) + modelo de dominio |
@@ -20,11 +20,11 @@ implementación no reinterprete decisiones.
 - [x] **ADRs foundational redactados** en [`../adr/`](../adr/) (Estado: Aceptada): 0001 stack · 0002 versionado de
       rulesets · 0003 motor puro · 0004 métodos estadísticos · 0005 datos privados/públicos · 0006 recomendaciones
       deterministas · 0007 i18n.
-- [ ] Documentar el **modelo de dominio** (plan §E): validar 21 entidades, relaciones, constraints, privacidad.
-- [ ] Congelar **contratos del `engine/`** (plan §F): firmas de `probability / intervals / stat_tests / decisions / rulesets`.
-- [ ] Crear **esqueleto `engine/`**: módulos con firmas + docstrings (sin implementación) y tests *skeleton* (`xfail`/`skip`).
-- [ ] Registrar **riesgos** y **criterios de aceptación** del MVP.
-- [ ] Revisar el **mock de navegación** (plan §G): sitemap y rutas.
+- [x] Documentar el **modelo de dominio** (plan §E): validar 21 entidades, relaciones, constraints, privacidad.
+- [x] Congelar **contratos del `engine/`** (plan §F): firmas de `probability / intervals / stat_tests / decisions / rulesets`.
+- [x] Crear **esqueleto `engine/`**: módulos con firmas + docstrings (sin implementación) y tests *skeleton* (`skip` marcados pytest).
+- [x] Registrar **riesgos** y **criterios de aceptación** del MVP.
+- [x] Revisar el **mock de navegación** (plan §G): sitemap y rutas (documentado en ADR-0001 + base.html).
 
 ## Archivos / módulos afectados
 - `docs/adr/ADR-0001-stack.md`, `docs/adr/ADR-0002-ruleset-versioning.md`
@@ -55,3 +55,4 @@ Ninguno: es el cimiento.
 |---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada a partir del plan aprobado. |
 | 2026-07-16 | 🟨 | ADRs 0001–0007 redactados en `docs/adr/`. Pendiente: `docs/domain-model.md` + esqueleto `engine/`. |
+| 2026-07-16 | ✅ | M0 completo: domain-model.md, engine/ con firmas+skips, ADRs, riesgos y mock de navegación. |

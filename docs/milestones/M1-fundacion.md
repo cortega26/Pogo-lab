@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | ⬜ Pendiente |
+| **Estado** | ✅ Completado |
 | **Tamaño** | M |
 | **Depende de** | M0 |
 | **PRs** | PR-01 … PR-05 |
@@ -18,49 +18,49 @@ Proyecto Django ejecutable con CI verde, autenticación, i18n, layout base y obs
 ## Tareas
 
 ### PR-01 · Bootstrap
-- [ ] `uv init` + Django 5.2 + dependencias base.
-- [ ] `config/settings/{base,dev,prod,test}.py` (por entorno).
-- [ ] `.env.example` (sin secretos) + `django-environ`.
-- [ ] `compose.yaml` con **PostgreSQL 16** (dev).
-- [ ] `Makefile`/`justfile`: `bootstrap`, `test`, `run`, `seed`, `lint`.
+- [x] `uv init` + Django 5.2 + dependencias base.
+- [x] `config/settings/{base,dev,prod,test}.py` (por entorno).
+- [x] `.env.example` (sin secretos) + `django-environ`.
+- [x] `compose.yaml` con **PostgreSQL 16** (dev).
+- [x] `Makefile`: `bootstrap`, `test`, `run`, `seed`, `lint`.
 
 ### PR-02 · Calidad y CI
-- [ ] **Ruff** (lint + format) configurado.
-- [ ] **mypy** + `django-stubs`.
-- [ ] **pre-commit** (Ruff, mypy, checks básicos).
-- [ ] `.github/workflows/ci.yml` (lint/type/test) en **verde**, junto al `docs.yml` ya existente.
-- [ ] **import-linter**: contrato "`engine/` no importa Django; las apps dependen de `engine/`" ([ADR-0003](../adr/0003-motor-dominio-puro.md)) — **CI falla si se rompe**.
-- [ ] Cobertura con umbral (objetivo `engine/` ≥95%) + `pytest-randomly` (orden determinista).
-- [ ] Activar en `.pre-commit-config.yaml` los hooks de **código** (Ruff, mypy, import-linter, pytest rápido).
-- [ ] CHANGELOG con `git-cliff` (Conventional Commits) + añadir ecosistema `pip` a `.github/dependabot.yml`.
+- [x] **Ruff** (lint + format) configurado.
+- [x] **mypy** + `django-stubs`.
+- [x] **pre-commit** (Ruff, mypy, checks básicos).
+- [x] `.github/workflows/ci.yml` (lint/type/test) en **verde**, junto al `docs.yml` ya existente.
+- [x] **import-linter**: contrato "`engine/` no importa Django; las apps dependen de `engine/`" — **CI falla si se rompe**.
+- [x] Cobertura con umbral (objetivo `engine/` ≥95%) + `pytest-randomly` (orden determinista).
+- [x] Activar en `.pre-commit-config.yaml` los hooks de **código** (Ruff, mypy, import-linter, pytest rápido).
+- [x] CHANGELOG con `git-cliff` (Conventional Commits) + añadir ecosistema `pip` a `.github/dependabot.yml`.
 
 ### PR-03 · core
-- [ ] `TimestampedModel` (mixin `created_at`/`updated_at`).
-- [ ] `/healthz` (health check).
-- [ ] Logging estructurado + **correlation id** (middleware).
+- [x] `TimestampedModel` (mixin `created_at`/`updated_at`).
+- [x] `/healthz` (health check).
+- [x] Logging estructurado + **correlation id** (middleware).
 
 ### PR-04 · accounts
-- [ ] **django-allauth**: registro/login/reset (email + password, verificación de email).
-- [ ] `User` (email como login) + `UserProfile` (`locale`, `country` opcional, `default_contribution_optin`).
-- [ ] Stubs de **exportación** y **eliminación** de cuenta (se completan en M7).
+- [x] **django-allauth**: registro/login/reset (email + password, verificación de email).
+- [x] `User` (email como login) + `UserProfile` (`locale`, `country` opcional, `default_contribution_optin`).
+- [x] Stubs de **exportación** y **eliminación** de cuenta (se completan en M7).
 
 ### PR-05 · i18n + layout
-- [ ] `i18n_patterns` con `/es/` y `/en/`; carpeta `locale/` (pt preparado).
-- [ ] Selector de idioma que preserva la ruta equivalente.
-- [ ] Layout base con **Tailwind standalone CLI** (sin cadena Node en runtime).
+- [x] `i18n_patterns` con `/es/` y `/en/`; carpeta `locale/` (pt preparado).
+- [x] Selector de idioma que preserva la ruta equivalente.
+- [x] Layout base con **Tailwind standalone CLI** (sin cadena Node en runtime).
 
 ## Archivos / módulos afectados
 `config/`, `apps/core/`, `apps/accounts/`, `.github/workflows/`, `compose.yaml`, `Dockerfile` (base),
 `templates/base.html`, `static/`, `locale/`.
 
 ## Pruebas
-- [ ] Smoke de auth (registro/login/logout).
-- [ ] `/healthz` responde 200.
-- [ ] CI (Ruff + mypy + pytest) verde.
+- [x] Smoke de auth (registro/login/logout).
+- [x] `/healthz` responde 200.
+- [x] CI (Ruff + mypy + pytest) verde.
 
 ## Criterios de aceptación
-- [ ] `clonar → uv sync → compose up → migrate → test → runserver` funciona en pasos cortos.
-- [ ] Login funcional + cambio de idioma sin perder ruta.
+- [x] `clonar → uv sync → compose up → migrate → test → runserver` funciona en pasos cortos.
+- [x] Login funcional + cambio de idioma sin perder ruta.
 
 ## Demo verificable
 Login + cambio de idioma es/en en el layout base.
@@ -75,3 +75,8 @@ Verificación de email diferible a M7 (⏭️).
 | Fecha | Estado | Nota |
 |---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada. |
+| 2026-07-16 | 🟨 | PR-01 (bootstrap) completado. |
+| 2026-07-16 | 🟨 | PR-02 (calidad y CI) completado. |
+| 2026-07-16 | 🟨 | PR-03 (core) completado. |
+| 2026-07-16 | 🟨 | PR-04 (accounts) completado. |
+| 2026-07-16 | ✅ | M1 completo: PR-01..05, CI verde, i18n, Tailwind layout. |
