@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ session.label|default:session.started_at|date:"Y-m-d" }} — Pogo-lab{% endblock %}
+
+{% block content %}
+<h1 class="mb-6 text-3xl font-bold">{{ session.label|default:session.started_at|date:"Y-m-d H:i" }}</h1>
+
+<p class="mb-4 text-sm text-gray-500">
+  {% trans "Amistad" %}: {{ session.get_default_friendship_display }}
+  &middot; {% trans "Tipo" %}: {{ session.get_default_trade_type_display }}
+</p>
+
+<div class="mb-4 flex gap-2">
+  <a href="{% url 'trades:observation_create' %}"
+     class="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+    {% trans "Nueva observación" %}
+  </a>
+  <a href="{% url 'trades:bulk_add' %}"
+     class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+    {% trans "Añadir por lotes" %}
+  </a>
+  <a href="{% url 'trades:csv_import' %}"
+     class="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
+    {% trans "Importar CSV" %}
+  </a>
+  <a href="{% url 'trades:dashboard' %}"
+     class="rounded bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700">
+    {% trans "Dashboard" %}
+  </a>
+</div>
+
+{% if observations %}
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">{% trans "Fecha" %}</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">{% trans "Amistad" %}</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">{% trans "Tipo" %}</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Atk</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Def</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">HP</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">{% trans "Especie" %}</th>
+          <th class="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">{% trans "Estado" %}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        {% for obs in observations %}
+          <tr class="{% if obs.state == 'suspicious' %}bg-yellow-50{% elif obs.state == 'excluded' %}bg-red-50{% elif obs.state == 'duplicate' %}bg-gray-100{% endif %}">
+            <td class="whitespace-nowrap px-4 py-2 text-sm">{{ obs.observed_at|date:"Y-m-d H:i" }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm">{{ obs.get_friendship_level_display }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm">{{ obs.get_trade_type_display }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm font-mono">{{ obs.atk }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm font-mono">{{ obs.iv_def }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm font-mono">{{ obs.hp }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm">{{ obs.species|default:"—" }}</td>
+            <td class="whitespace-nowrap px-4 py-2 text-sm">{{ obs.get_state_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-gray-500">{% trans "No hay observaciones en esta sesión." %}</p>
+{% endif %}
+
+<a href="{% url 'trades:session_list' %}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700">
+  &larr; {% trans "Volver a sesiones" %}
+</a>
+{% endblock %}

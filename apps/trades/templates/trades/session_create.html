@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Nueva sesión — Pogo-lab" %}{% endblock %}
+
+{% block content %}
+<h1 class="mb-6 text-3xl font-bold">{% trans "Nueva sesión de intercambios" %}</h1>
+
+<form method="post" class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+  {% csrf_token %}
+
+  <div class="mb-4">
+    <label class="mb-1 block text-sm font-medium text-gray-700" for="label">
+      {% trans "Etiqueta (opcional)" %}
+    </label>
+    <input type="text" name="label" id="label" maxlength="255"
+           class="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+           placeholder="{% trans 'Ej: Sesión con Juan' %}">
+  </div>
+
+  <div class="mb-4">
+    <label class="mb-1 block text-sm font-medium text-gray-700" for="default_friendship">
+      {% trans "Amistad por defecto" %}
+    </label>
+    <select name="default_friendship" id="default_friendship"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+      <option value="good">{% trans "Good Friends" %}</option>
+      <option value="great">{% trans "Great Friends" %}</option>
+      <option value="ultra">{% trans "Ultra Friends" %}</option>
+      <option value="best">{% trans "Best Friends" %}</option>
+    </select>
+  </div>
+
+  <div class="mb-4">
+    <label class="mb-1 block text-sm font-medium text-gray-700" for="default_trade_type">
+      {% trans "Tipo de intercambio por defecto" %}
+    </label>
+    <select name="default_trade_type" id="default_trade_type"
+            class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+      <option value="normal">{% trans "Normal" %}</option>
+      <option value="lucky">{% trans "Lucky" %}</option>
+      <option value="lucky_guaranteed">{% trans "Lucky garantizado" %}</option>
+    </select>
+  </div>
+
+  <button type="submit"
+          class="rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700">
+    {% trans "Crear sesión" %}
+  </button>
+</form>
+
+<a href="{% url 'trades:session_list' %}" class="text-sm text-gray-500 hover:text-gray-700">
+  &larr; {% trans "Volver" %}
+</a>
+{% endblock %}

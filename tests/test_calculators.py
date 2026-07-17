@@ -15,6 +15,7 @@ from apps.calculators.services import (
     encode_share_url,
 )
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
+from apps.mechanics.services import RulesetUnavailableError
 
 
 def _utc(year, month, day):
@@ -229,7 +230,7 @@ class TestRulesetUnavailableError:
     def test_resolve_floor_raises_without_mechanic(self):
         """Sin mecanica trade_iv, _resolve_floor lanza RulesetUnavailableError."""
         Mechanic.objects.filter(key="trade_iv").delete()
-        from apps.calculators.services import RulesetUnavailableError, _resolve_floor
+        from apps.calculators.services import _resolve_floor
 
         with pytest.raises(RulesetUnavailableError):
             _resolve_floor("good", "normal")

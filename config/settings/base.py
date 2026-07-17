@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.sources",
     "apps.content",
     "apps.calculators",
+    "apps.trades",
 ]
 
 MIDDLEWARE = [

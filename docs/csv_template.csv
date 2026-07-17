@@ -1,0 +1,4 @@
+observed_at,friendship_level,trade_type,atk,def,hp,species
+2026-07-17T12:00:00+00:00,best,lucky,12,15,13,Mewtwo
+2026-07-17T12:05:00+00:00,good,normal,1,5,10,
+2026-07-17T12:10:00+00:00,ultra,normal,10,8,3,Dragonite

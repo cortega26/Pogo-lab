@@ -1,0 +1,10 @@
+{% load i18n %}
+<div class="rounded-lg border border-gray-200 bg-white p-3 text-sm">
+  <span class="font-mono">{{ obs.atk }}/{{ obs.iv_def }}/{{ obs.hp }}</span>
+  &middot; {{ obs.get_friendship_level_display }}
+  &middot; {{ obs.get_trade_type_display }}
+  {% if obs.species %}&middot; {{ obs.species }}{% endif %}
+  <span class="ml-2 rounded bg-{% if obs.state == 'valid' %}green{% elif obs.state == 'suspicious' %}yellow{% elif obs.state == 'excluded' %}red{% else %}gray{% endif %}-100 px-2 py-0.5 text-xs">
+    {{ obs.get_state_display }}
+  </span>
+</div>

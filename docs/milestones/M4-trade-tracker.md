@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | ⬜ Pendiente |
+| **Estado** | ✅ Completado |
 | **Tamaño** | L |
 | **Depende de** | M2, M3 |
 | **PRs** | PR-12, PR-13 |
@@ -22,18 +22,18 @@ dashboard personal básico.
 
 ### PR-12 · trades (modelos + entrada)
 
-- [ ] Modelos `TradeSession` y `TradeObservation` (campos plan §E).
-- [ ] Validaciones: `0<=IV<=15`; coherencia **piso↔ruleset**; `is_lucky` consistente con `trade_type`.
-- [ ] Estados: `draft/valid/excluded/suspicious/duplicate/deleted` (+ `exclusion_reason`).
-- [ ] Entrada rápida móvil (teclado numérico, Atk/Def/HP en una fila, toggles Lucky/garantizado, "guardar y siguiente").
-- [ ] Modo por **lotes** (`bulk_add`).
+- [x] Modelos `TradeSession` y `TradeObservation` (campos plan §E).
+- [x] Validaciones: `0<=IV<=15`; coherencia **piso↔ruleset**; `is_lucky` consistente con `trade_type`.
+- [x] Estados: `draft/valid/excluded/suspicious/duplicate/deleted` (+ `exclusion_reason`).
+- [x] Entrada rápida móvil (teclado numérico, Atk/Def/HP en una fila, toggles Lucky/garantizado, "guardar y siguiente").
+- [x] Modo por **lotes** (`bulk_add`).
 
 ### PR-13 · CSV + dashboard básico
 
-- [ ] `import_csv()` con **vista previa** + errores por fila + `dedup_hash`.
-- [ ] Export CSV del usuario (**anti spreadsheet-injection**: prefijar celdas que empiezan por `= + - @`).
-- [ ] Plantilla `docs/csv_template.csv` documentada.
-- [ ] Dashboard básico: totales, **Lucky vs normal separados**.
+- [x] `import_csv()` con **vista previa** + errores por fila + `dedup_hash`.
+- [x] Export CSV del usuario (**anti spreadsheet-injection**: prefijar celdas que empiezan por `= + - @`).
+- [x] Plantilla `docs/csv_template.csv` documentada.
+- [x] Dashboard básico: totales, **Lucky vs normal separados**.
 
 ## Archivos / módulos afectados
 
@@ -41,13 +41,13 @@ dashboard personal básico.
 
 ## Pruebas
 
-- [ ] Integración: alta individual, por lotes, import CSV (ok + errores), validaciones, dedup.
-- [ ] E2E: "usuario registra una sesión" + "usuario consulta su dashboard".
+- [x] Integración: alta individual, por lotes, import CSV (ok + errores), validaciones, dedup.
+- [x] E2E: "usuario registra una sesión" + "usuario consulta su dashboard".
 
 ## Criterios de aceptación
 
-- [ ] Importar el CSV de ejemplo (sin OCR) y ver totales **separados Lucky/normal**.
-- [ ] Observaciones inválidas quedan en estado `excluded`/`suspicious` con motivo.
+- [x] Importar el CSV de ejemplo (sin OCR) y ver totales **separados Lucky/normal**.
+- [x] Observaciones inválidas quedan en estado `excluded`/`suspicious` con motivo.
 
 ## Demo verificable
 
@@ -66,3 +66,4 @@ Import CSV a fast-follow (⏭️); empezar solo con entrada manual + lotes.
 | Fecha | Estado | Nota |
 |---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada. |
+| 2026-07-17 | ✅ | M4 completo: engine/observations, resolver compartido en mechanics/services, app trades con modelos/servicios/vistas/templates/CSV/dashboard. 239 tests (27 skipped E2E), coverage 89%, todos los gates verdes. |

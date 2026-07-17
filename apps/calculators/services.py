@@ -12,10 +12,8 @@ from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import models
-from django.utils import timezone
 
-from apps.mechanics.models import Mechanic, MechanicRuleSet
+from apps.mechanics.services import resolve_trade_floor
 from engine import ALGORITHM_VERSION
 from engine.probability import (
     expected_successes,
@@ -58,18 +56,6 @@ class CalcResult:
     params: dict[str, Any] = field(default_factory=dict)
 
 
-_FLOOR_KEYS: dict[str, str] = {
-    "good": "floor.friendship.good",
-    "great": "floor.friendship.great",
-    "ultra": "floor.friendship.ultra",
-    "best": "floor.friendship.best",
-}
-
-
-class RulesetUnavailableError(RuntimeError):
-    """No hay ruleset publicado para trade_iv en esta fecha."""
-
-
 def _validate_floor_override(value: object) -> int:
     """Valida y normaliza `floor_override`: debe ser un entero en [0, 15].
 
@@ -89,43 +75,14 @@ def _validate_floor_override(value: object) -> int:
 def _resolve_floor(
     friendship_level: str,
     trade_type: str,
-    ruleset_version: int | None = None,
+    _ruleset_version: int | None = None,
 ) -> tuple[int, int | None]:
-    """Resuelve el piso `f` desde el ruleset publicado de trade_iv.
+    """Resuelve el piso `f` delegando en mechanics.services.resolve_trade_floor.
 
-    Devuelve (f, ruleset_version). Lucky sobrescribe con floor.lucky.
-    Lanza RulesetUnavailableError si no hay ruleset publicado.
+    Mantiene compatibilidad con la API actual (parametro ruleset_version
+    ignorado — el shared resolver siempre devuelve el vigente).
     """
-    try:
-        mechanic = Mechanic.objects.get(key="trade_iv", status="active")
-    except Mechanic.DoesNotExist as e:
-        raise RulesetUnavailableError("Mecanica trade_iv no encontrada.") from e
-
-    now = timezone.now()
-    qs = MechanicRuleSet.objects.filter(
-        mechanic=mechanic,
-        is_published=True,
-        effective_from__lte=now,
-    )
-    if ruleset_version is not None:
-        qs = qs.filter(version=ruleset_version)
-    qs = qs.filter(
-        models.Q(effective_to__isnull=True) | models.Q(effective_to__gt=now),
-    ).order_by("-version")
-
-    ruleset = qs.first()
-    if ruleset is None:
-        raise RulesetUnavailableError(
-            "No hay ruleset publicado para trade_iv vigente en esta fecha."
-        )
-
-    params = {p.key: p.value for p in ruleset.parameters.all()}
-    if trade_type in ("lucky", "lucky_guaranteed"):
-        floor = int(params.get("floor.lucky", 12))
-    else:
-        key = _FLOOR_KEYS.get(friendship_level, "floor.friendship.good")
-        floor = int(params.get(key, 1))
-    return floor, ruleset.version
+    return resolve_trade_floor(friendship_level, trade_type)
 
 
 def _cache_key(inputs: CalcInput, ruleset_version: int | None) -> str:

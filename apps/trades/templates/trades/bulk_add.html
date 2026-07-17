@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Añadir por lotes — Pogo-lab" %}{% endblock %}
+
+{% block content %}
+<h1 class="mb-6 text-3xl font-bold">{% trans "Añadir observaciones por lotes" %}</h1>
+
+<form method="post" class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+  {% csrf_token %}
+
+  <div class="mb-4">
+    <label class="mb-1 block text-sm font-medium text-gray-700" for="observations_json">
+      {% trans "JSON de observaciones" %}
+    </label>
+    <textarea name="observations_json" id="observations_json" rows="10"
+              class="w-full rounded border border-gray-300 px-3 py-2 font-mono text-sm"
+              placeholder='[{"observed_at": "2026-07-17T12:00:00+00:00", "friendship_level": "best", "trade_type": "lucky", "atk": 12, "def": 15, "hp": 13, "species": "Mewtwo"}]'></textarea>
+  </div>
+
+  <button type="submit"
+          class="rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700">
+    {% trans "Guardar todas" %}
+  </button>
+</form>
+
+{% if saved %}
+  <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+    {% blocktrans count counter=created_count %}{{ counter }} observación guardada.{% plural %}{{ counter }} observaciones guardadas.{% endblocktrans %}
+  </div>
+{% endif %}
+
+{% if error %}
+  <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    {{ error }}
+  </div>
+{% endif %}
+
+<a href="{% url 'trades:session_list' %}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700">
+  &larr; {% trans "Volver" %}
+</a>
+{% endblock %}

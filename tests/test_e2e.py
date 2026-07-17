@@ -1,4 +1,4 @@
-"""Tests E2E con Playwright para la calculadora."""
+"""Tests E2E con Playwright para la calculadora y trades."""
 
 import pytest
 
@@ -91,5 +91,90 @@ def test_share_url_reproduces_calculation(live_server, _seeded_mechanic):
         content = page.text_content("body")
         assert content is not None
         assert "Piso (f)" in content
+
+        browser.close()
+
+
+@pytest.mark.skipif(True, reason="Requiere playwright install")
+def test_trade_session_flow(live_server, _seeded_mechanic):
+    """Usuario registra una sesion de intercambios."""
+    from django.contrib.auth import get_user_model
+    from playwright.sync_api import sync_playwright
+
+    user_model = get_user_model()
+    user_model.objects.create_user(email="test@example.com", password="pass123")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        page.goto(f"{live_server.url}/es/cuenta/login/")
+        page.fill("input[name=login]", "test@example.com")
+        page.fill("input[name=password]", "pass123")
+        page.click("button[type=submit]")
+
+        page.goto(f"{live_server.url}/es/intercambios/")
+        page.wait_for_selector("text=Sesiones de intercambios", timeout=5000)
+
+        page.click("text=Nueva sesion")
+        page.fill("input[name=label]", "Sesion E2E")
+        page.click("button[type=submit]")
+
+        content = page.text_content("body")
+        assert content is not None
+        assert "Sesion E2E" in content
+
+        browser.close()
+
+
+@pytest.mark.skipif(True, reason="Requiere playwright install")
+def test_trade_dashboard_flow(live_server, _seeded_mechanic):
+    """Usuario consulta su dashboard de intercambios."""
+    from datetime import UTC, datetime
+
+    from django.contrib.auth import get_user_model
+    from playwright.sync_api import sync_playwright
+
+    from apps.trades.services import register_observation
+
+    user_model = get_user_model()
+    user = user_model.objects.create_user(email="test@example.com", password="pass123")
+
+    register_observation(
+        owner_id=user.pk,
+        observed_at=datetime(2026, 7, 17, tzinfo=UTC),
+        friendship_level="best",
+        trade_type="lucky",
+        atk=12,
+        def_=15,
+        hp=13,
+    )
+    register_observation(
+        owner_id=user.pk,
+        observed_at=datetime(2026, 7, 17, tzinfo=UTC),
+        friendship_level="good",
+        trade_type="normal",
+        atk=5,
+        def_=5,
+        hp=5,
+    )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        page.goto(f"{live_server.url}/es/cuenta/login/")
+        page.fill("input[name=login]", "test@example.com")
+        page.fill("input[name=password]", "pass123")
+        page.click("button[type=submit]")
+
+        page.goto(f"{live_server.url}/es/intercambios/dashboard/")
+        page.wait_for_selector("text=Dashboard de intercambios", timeout=5000)
+
+        content = page.text_content("body")
+        assert content is not None
+        assert "2" in content
+        assert "Lucky" in content
+        assert "Normal" in content
 
         browser.close()

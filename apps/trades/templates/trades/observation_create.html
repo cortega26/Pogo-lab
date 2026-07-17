@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Registrar intercambio — Pogo-lab" %}{% endblock %}
+
+{% block content %}
+<h1 class="mb-6 text-3xl font-bold">{% trans "Registrar intercambio" %}</h1>
+
+<form method="post"
+      hx-post="{% url 'trades:observation_create' %}"
+      hx-target="#obs-list"
+      hx-swap="afterbegin"
+      class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+  {% csrf_token %}
+
+  <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="friendship_level">
+        {% trans "Amistad" %}
+      </label>
+      <select name="friendship_level" id="friendship_level"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        <option value="good">{% trans "Good Friends" %}</option>
+        <option value="great">{% trans "Great Friends" %}</option>
+        <option value="ultra">{% trans "Ultra Friends" %}</option>
+        <option value="best">{% trans "Best Friends" %}</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="mb-1 block text-sm font-medium text-gray-700" for="trade_type">
+        {% trans "Tipo" %}
+      </label>
+      <select name="trade_type" id="trade_type"
+              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+        <option value="normal">{% trans "Normal" %}</option>
+        <option value="lucky">{% trans "Lucky" %}</option>
+        <option value="lucky_guaranteed">{% trans "Lucky garantizado" %}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <label class="mb-1 block text-sm font-medium text-gray-700">{% trans "IVs" %}</label>
+    <div class="flex gap-2">
+      <div class="flex-1">
+        <span class="block text-xs text-gray-500">Atk</span>
+        <input type="number" name="atk" id="atk" min="0" max="15" value="10"
+               inputmode="numeric"
+               class="w-full rounded border border-gray-300 px-3 py-2 text-lg font-mono">
+      </div>
+      <div class="flex-1">
+        <span class="block text-xs text-gray-500">Def</span>
+        <input type="number" name="def" id="def" min="0" max="15" value="10"
+               inputmode="numeric"
+               class="w-full rounded border border-gray-300 px-3 py-2 text-lg font-mono">
+      </div>
+      <div class="flex-1">
+        <span class="block text-xs text-gray-500">HP</span>
+        <input type="number" name="hp" id="hp" min="0" max="15" value="10"
+               inputmode="numeric"
+               class="w-full rounded border border-gray-300 px-3 py-2 text-lg font-mono">
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <label class="mb-1 block text-sm font-medium text-gray-700" for="species">
+      {% trans "Especie (opcional)" %}
+    </label>
+    <input type="text" name="species" id="species" maxlength="128"
+           class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+  </div>
+
+  <button type="submit"
+          class="rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700">
+    {% trans "Guardar y siguiente" %}
+  </button>
+</form>
+
+<div id="obs-list" class="space-y-2">
+</div>
+
+{% if saved %}
+  <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+    {% trans "Observación guardada." %}
+  </div>
+{% endif %}
+
+<a href="{% url 'trades:session_list' %}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700">
+  &larr; {% trans "Volver" %}
+</a>
+{% endblock %}

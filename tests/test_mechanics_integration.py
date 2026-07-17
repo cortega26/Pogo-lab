@@ -284,6 +284,41 @@ class TestContentPageViews:
         resp = client.get("/es/guias/borrador/")
         assert resp.status_code == 404
 
+
+@pytest.mark.django_db
+class TestResolveTradeFloor:
+    def test_resolve_with_published_ruleset(self, published_ruleset):  # noqa: ARG002
+        from apps.mechanics.services import resolve_trade_floor
+
+        floor, version = resolve_trade_floor("good", "normal")
+        assert floor == 1
+        assert version == 1
+
+    def test_resolve_lucky_uses_lucky_floor(self, published_ruleset):  # noqa: ARG002
+        from apps.mechanics.services import resolve_trade_floor
+
+        floor, _version = resolve_trade_floor("best", "lucky")
+        assert floor == 12
+
+    def test_resolve_raises_without_ruleset(self, trade_mechanic):  # noqa: ARG002
+        from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
+
+        with pytest.raises(RulesetUnavailableError):
+            resolve_trade_floor("good", "normal")
+
+    def test_resolve_raises_without_mechanic(self):
+        from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
+
+        with pytest.raises(RulesetUnavailableError):
+            resolve_trade_floor("good", "normal")
+
+    def test_content_page_404_for_unpublished(self, client):
+        from apps.content.models import ContentPage
+
+        ContentPage.objects.create(slug="borrador", page_type="guide", status="draft")
+        resp = client.get("/es/guias/borrador/")
+        assert resp.status_code == 404
+
     def test_content_page_404_for_unknown(self, client):
         resp = client.get("/es/guias/no-existe/")
         assert resp.status_code == 404

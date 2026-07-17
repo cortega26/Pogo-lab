@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Mis sesiones de intercambios — Pogo-lab" %}{% endblock %}
+
+{% block content %}
+<h1 class="mb-6 text-3xl font-bold">{% trans "Sesiones de intercambios" %}</h1>
+
+<a href="{% url 'trades:session_create' %}"
+   class="mb-4 inline-block rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+  {% trans "Nueva sesión" %}
+</a>
+
+{% if sessions %}
+  <div class="space-y-2">
+    {% for session in sessions %}
+      {% include "trades/_session_row.html" %}
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="mt-4 text-gray-500">{% trans "Aún no tienes sesiones de intercambios." %}</p>
+{% endif %}
+{% endblock %}

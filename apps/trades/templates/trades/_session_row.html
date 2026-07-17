@@ -1,0 +1,11 @@
+{% load i18n %}
+<div class="rounded-lg border border-gray-200 bg-white p-4">
+  <a href="{% url 'trades:session_detail' session.pk %}" class="text-lg font-medium text-blue-600 hover:text-blue-800">
+    {{ session.label|default:session.started_at|date:"Y-m-d H:i" }}
+  </a>
+  <p class="mt-1 text-sm text-gray-500">
+    {% trans "Iniciada" %}: {{ session.started_at|date:"Y-m-d H:i" }}
+    &middot; {% trans "Amistad" %}: {{ session.get_default_friendship_display }}
+    &middot; {% trans "Tipo" %}: {{ session.get_default_trade_type_display }}
+  </p>
+</div>
