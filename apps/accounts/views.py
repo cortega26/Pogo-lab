@@ -116,7 +116,6 @@ def delete_account(request):
             return render(request, "accounts/delete_done.html")
 
         user_id = user.pk
-        email_original = user.email
         profile_deleted = True
 
         with transaction.atomic():
@@ -167,7 +166,6 @@ def delete_account(request):
             target_id=user_id,
             metadata={
                 "email_anonymized": True,
-                "original_email_hash": email_original,
                 "stats": {
                     "observations_deleted": obs_count,
                     "observation_pks": obs_pks,

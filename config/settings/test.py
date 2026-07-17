@@ -26,12 +26,18 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 RATELIMIT_ENABLE = False
 
 # CSP relajada para tests (admin inline scripts, htmx nonce, etc.)
-CSP_DEFAULT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'", "data:")
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'")
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_IMG_SRC = ("'self'", "data:")
-CSP_FONT_SRC = ("'self'",)
-CSP_CONNECT_SRC = ("'self'",)
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "data:"],
+        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:"],
+        "font-src": ["'self'"],
+        "connect-src": ["'self'"],
+        "base-uri": ["'self'"],
+        "frame-ancestors": ["'self'"],
+    },
+}
 
 STORAGES = {
     "staticfiles": {

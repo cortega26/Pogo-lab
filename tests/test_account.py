@@ -346,3 +346,38 @@ def test_delete_only_affects_own_data(client, user, user2):
     # El otro usuario sigue activo
     user2.refresh_from_db()
     assert user2.is_active
+
+
+# ── PII EN AUDITORÍA (M7-1) ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_delete_no_pii_in_audit_event(client, user):
+    """El email centinela NO debe aparecer en AuditEvent.metadata tras el borrado."""
+    client.force_login(user)
+    email_original = user.email
+
+    _create_observation(user, atk=12, notes="nota PII")
+    AnalysisRun.objects.create(owner=user)
+    DataContributionConsent.objects.create(
+        user=user,
+        scope="community_dataset",
+        consent_text_version="v1",
+        is_active=True,
+    )
+
+    client.post("/es/cuenta/eliminar/")
+
+    events = AuditEvent.objects.filter(verb="account_deleted")
+    assert events.exists(), "Debe existir al menos un AuditEvent de borrado"
+
+    for event in events:
+        metadata_str = str(event.metadata)
+        assert email_original not in metadata_str, (
+            f"El email {email_original} NO debe aparecer en AuditEvent.metadata: {metadata_str}"
+        )
+
+    # Verificar que el email tampoco está en forma de hash falso
+    first_event = events.first()
+    assert first_event is not None
+    assert "original_email_hash" not in str(first_event.metadata)

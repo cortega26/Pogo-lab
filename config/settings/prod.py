@@ -12,8 +12,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 
-CSP_REPORT_ONLY = False
-
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@pogo-lab.com")
 
 LOGGING = {

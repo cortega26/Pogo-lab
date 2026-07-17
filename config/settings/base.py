@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import environ
+from csp.constants import NONCE, SELF
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -13,7 +14,6 @@ env = environ.Env(
     TIME_ZONE=(str, "UTC"),
     EMAIL_URL=(str, "console://"),
     CACHE_URL=(str, "locmem://"),
-    CSP_REPORT_ONLY=(bool, False),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -140,11 +140,16 @@ CACHES = {
     },
 }
 
-CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'",)
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_IMG_SRC = ("'self'", "data:")
-CSP_FONT_SRC = ("'self'",)
-CSP_CONNECT_SRC = ("'self'",)
-CSP_INCLUDE_NONCE_IN = ["script-src"]
-CSP_REPORT_ONLY = env("CSP_REPORT_ONLY", default=False)
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": [SELF],
+        "script-src": [SELF, NONCE],
+        "style-src": [SELF, "'unsafe-inline'"],
+        "img-src": [SELF, "data:"],
+        "font-src": [SELF],
+        "connect-src": [SELF],
+        "base-uri": [SELF],
+        "frame-ancestors": [SELF],
+        "object-src": ["'none'"],
+    },
+}
