@@ -235,6 +235,62 @@ class TestRulesetUnavailableError:
             _resolve_floor("good", "normal")
 
 
+class TestFloorOverrideValidation:
+    """Regresion F6: floor_override fuera de [0, 15] llegaba al engine sin validar.
+
+    Antes: fo=16 -> Fraction(1, 0) ZeroDivisionError (500 en la vista);
+    fo=17 -> k<0 -> probabilidades negativas mostradas como validas.
+    """
+
+    def _base_input(self, floor_override):
+        return CalcInput(
+            friendship_level="good",
+            trade_type="normal",
+            n=1,
+            target_kind="hundo",
+            floor_override=floor_override,
+        )
+
+    def test_compute_scenario_rejects_floor_16(self):
+        """fo=16 (k=0) -> ValueError, no ZeroDivisionError."""
+        with pytest.raises(ValueError, match=r"\[0, 15\]"):
+            compute_scenario(self._base_input(16))
+
+    def test_compute_scenario_rejects_floor_17(self):
+        """fo=17 (k<0) -> ValueError, no probabilidades negativas."""
+        with pytest.raises(ValueError, match=r"\[0, 15\]"):
+            compute_scenario(self._base_input(17))
+
+    def test_compute_scenario_rejects_negative_floor(self):
+        with pytest.raises(ValueError, match=r"\[0, 15\]"):
+            compute_scenario(self._base_input(-1))
+
+    def test_compute_scenario_accepts_boundaries(self):
+        """f=0 (k=16) y f=15 (k=1) son validos."""
+        assert compute_scenario(self._base_input(0)).floor == 0
+        assert compute_scenario(self._base_input(15)).floor == 15
+
+    def test_decode_share_url_rejects_out_of_range_floor(self):
+        """URL manipulada con fo=16 -> ValueError al decodificar (cae en UI de error)."""
+        crafted = encode_share_url(self._base_input(16))
+        with pytest.raises(ValueError, match=r"\[0, 15\]"):
+            decode_share_url(crafted)
+
+    def test_decode_share_url_rejects_non_int_floor(self):
+        """fo no entero -> ValueError, no TypeError."""
+        crafted = encode_share_url(self._base_input("abc"))
+        with pytest.raises(ValueError, match="entero"):
+            decode_share_url(crafted)
+
+    @pytest.mark.django_db
+    def test_view_share_out_of_range_floor_shows_error_not_500(self, client):
+        """La vista responde 200 con error, no 500, ante fo fuera de rango."""
+        crafted = encode_share_url(self._base_input(16))
+        resp = client.get(f"/es/calculadora/?share={crafted}")
+        assert resp.status_code == 200
+        assert "[0, 15]" in resp.content.decode()
+
+
 @pytest.mark.django_db
 class TestComputeScenarioCached:
     def test_returns_same_as_compute(self):
