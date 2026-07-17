@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Pogo-lab — {% trans "Política de privacidad" %}{% endblock %}
+
+{% block content %}
+  <article class="prose prose-gray max-w-none">
+    <h1>{% trans "Política de privacidad" %}</h1>
+
+    <p class="text-sm text-gray-500 italic">
+      {% trans "Última actualización: por definir." %}
+    </p>
+
+    {# PENDIENTE-HUMANO: Revisión legal requerida antes de publicación. #}
+
+    <h2>{% trans "Datos que recopilamos" %}</h2>
+    <p>
+      {% blocktrans %}
+      Para proporcionar el servicio, recopilamos la siguiente información mínima:
+      {% endblocktrans %}
+    </p>
+    <ul>
+      <li>{% trans "Nombre de usuario y dirección de correo electrónico (para autenticación)." %}</li>
+      <li>
+        {% blocktrans %}
+        Datos de intercambios de Pokémon GO que tú registras voluntariamente:
+        IVs (Ataque/Defensa/HP), nivel de amistad, tipo de intercambio, especie, y otros
+        atributos del juego.
+        {% endblocktrans %}
+      </li>
+      <li>{% trans "País de residencia (agregado, sin ubicación precisa)." %}</li>
+    </ul>
+
+    <h3>{% trans "Lo que NO recopilamos" %}</h3>
+    <ul>
+      <li>{% trans "Ubicación precisa (GPS, coordenadas)." %}</li>
+      <li>{% trans "Nombre de entrenador de Pokémon GO." %}</li>
+      <li>{% trans "Datos personales de terceros." %}</li>
+    </ul>
+
+    <h2>{% trans "Uso de los datos" %}</h2>
+    <ul>
+      <li>{% trans "Proveer y mantener el servicio." %}</li>
+      <li>{% trans "Generar análisis estadísticos agregados de las mecánicas del juego." %}</li>
+      <li>{% trans "Publicar datasets anonimizados e inmutables (con tu consentimiento explícito)." %}</li>
+      <li>{% trans "Notificarte sobre cambios en el servicio (solo correo transaccional)." %}</li>
+    </ul>
+
+    <h2>{% trans "Datos compartidos" %}</h2>
+    <p>
+      {% blocktrans %}
+      No vendemos, compartimos ni transferimos tus datos personales a terceros. Los datasets
+      públicos son snapshots anonimizados que no contienen información personal identificable.
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Notas privadas" %}</h2>
+    <p>
+      {% blocktrans %}
+      El campo "notas" de cada observación es privado y nunca se incluye en análisis
+      agregados ni datasets públicos.
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Tus derechos" %}</h2>
+    <ul>
+      <li>
+        {% trans "Exportar tus datos:" %}
+        <a href="{% url 'export_data' %}">{% trans "descargar copia" %}</a>
+      </li>
+      <li>
+        {% trans "Revocar tu consentimiento para datasets públicos en cualquier momento." %}
+      </li>
+      <li>
+        {% trans "Solicitar la eliminación de tu cuenta y todos tus datos asociados:" %}
+        <a href="{% url 'delete_account' %}">{% trans "eliminar cuenta" %}</a>
+      </li>
+    </ul>
+
+    <h2>{% trans "Cookies" %}</h2>
+    <p>
+      {% blocktrans %}
+      Utilizamos cookies estrictamente necesarias para la sesión y la autenticación.
+      No usamos cookies de seguimiento ni publicidad de terceros.
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Almacenamiento y seguridad" %}</h2>
+    <p>
+      {% blocktrans %}
+      Los datos se almacenan en PostgreSQL con cifrado en reposo según la configuración del
+      proveedor de hosting. Las contraseñas se almacenan con hash (nunca en texto plano).
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Menores de edad" %}</h2>
+    <p>
+      {% blocktrans %}
+      Este servicio no está dirigido a menores de 13 años. No recopilamos intencionadamente
+      datos de menores sin consentimiento parental verificable.
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Cambios a esta política" %}</h2>
+    <p>
+      {% blocktrans %}
+      Notificaremos cualquier cambio material a través del sitio o por correo electrónico
+      antes de que entre en vigor.
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Contacto" %}</h2>
+    <p>
+      {% trans "Para ejercer tus derechos o consultar sobre esta política, abre un issue en el repositorio del proyecto o contacta al mantenedor." %}
+    </p>
+  </article>
+{% endblock %}

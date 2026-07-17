@@ -8,7 +8,8 @@ run_personal_analysis:
   - Fija algoritmo, semilla y versiones para reproducibilidad.
 """
 
-import random
+import hashlib
+import json
 from collections import Counter
 from typing import Any
 
@@ -271,6 +272,28 @@ def _detect_mixing(qs: models.QuerySet) -> dict[str, bool]:
     }
 
 
+def _deterministic_seed_from_data(data: Any) -> int:
+    """Deriva una semilla determinista del hash SHA256 de los datos.
+
+    Los datos se serializan a JSON con claves ordenadas para garantizar que la
+    misma entrada produce siempre el mismo hash, independientemente del orden
+    de inserción de los dicts.
+    """
+    raw = json.dumps(data, sort_keys=True, default=str)
+    digest = hashlib.sha256(raw.encode()).digest()
+    return int.from_bytes(digest[:8], byteorder="big") % (2**31)
+
+
+def _deterministic_seed_from_rows(rows: list[dict[str, Any]]) -> int:
+    """Deriva una semilla determinista del hash del dataset completo.
+
+    Si la lista está vacía, devuelve 0.
+    """
+    if not rows:
+        return 0
+    return _deterministic_seed_from_data(rows)
+
+
 def run_personal_analysis(
     owner_id: int,
     filters: dict[str, Any] | None = None,
@@ -285,14 +308,14 @@ def run_personal_analysis(
     Args:
         owner_id: ID del usuario propietario.
         filters: Filtros opcionales (friendship_level, trade_type, fechas).
-        seed: Semilla para Monte Carlo (None → aleatoria).
+        seed: Semilla para Monte Carlo (None → determinista a partir de owner_id+filters).
         code_sha: SHA del código para trazabilidad.
 
     Returns:
         AnalysisRun creado.
     """
     if seed is None:
-        seed = random.randint(0, 2**31 - 1)
+        seed = _deterministic_seed_from_data({"owner_id": owner_id, "filters": filters})
 
     run = AnalysisRun.objects.create(
         owner_id=owner_id,
@@ -371,6 +394,7 @@ def compute_pooled_statistics(
         groups.setdefault(key, []).append(row)
 
     results: list[dict[str, Any]] = []
+    dataset_seed = _deterministic_seed_from_rows(anonymized_rows)
     for (is_lucky, friendship_level, ruleset_version), group_rows in groups.items():
         n = len(group_rows)
         trade_type = "lucky" if is_lucky else "normal"
@@ -423,9 +447,7 @@ def compute_pooled_statistics(
                 "values": values,
             }
             if n >= min_sample_for("stat_uniformity"):
-                uni_result = uniformity_test(
-                    counts, expected_probs, seed=random.randint(0, 2**31 - 1)
-                )
+                uni_result = uniformity_test(counts, expected_probs, seed=dataset_seed)
                 stat_payload.update(
                     {
                         "stat": uni_result.stat,

@@ -22,7 +22,7 @@ def _utc(year, month, day, hour=0, minute=0, second=0):
 
 
 @pytest.fixture(autouse=True)
-def _seeded_mechanic(db):  # noqa: ARG001
+def _seeded_mechanic(db):
     Mechanic.objects.create(
         slug="iv-en-intercambios",
         key="trade_iv",

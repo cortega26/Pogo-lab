@@ -58,3 +58,33 @@ jobs:
 
       - name: Coverage
         run: uv run coverage run -m pytest && uv run coverage report
+
+      - name: Security audit
+        run: uv run pip-audit
+
+  e2e:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Install Playwright
+        run: uv run playwright install chromium --with-deps
+
+      - name: E2E tests
+        run: uv run pytest tests/test_e2e.py -v --no-header --tb=long
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          SECRET_KEY: ci-e2e-test-key
+          DATABASE_URL: sqlite:///db.sqlite3

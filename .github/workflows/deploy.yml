@@ -1,0 +1,39 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/pogo-lab
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
+      - name: Push to registry
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.IMAGE_NAME }}:latest
+
+# PENDIENTE-HUMANO: Configurar el despliegue en el PaaS elegido (Fly.io, Railway, Render, o VPS).
+# Pasos necesarios:
+# 1. Elegir plataforma de hosting y crear cuenta.
+# 2. Configurar DATABASE_URL, SECRET_KEY, ALLOWED_HOSTS como secretos/variables de entorno en el PaaS.
+# 3. Apuntar el dominio (DNS) a la plataforma.
+# 4. Configurar SSL/TLS (Let's Encrypt o el que provea el PaaS).
+# 5. Verificar que el health check (/healthz) responde correctamente en producción.
+# 6. Configurar backups automáticos de la base de datos (ver bin/backup.sh).

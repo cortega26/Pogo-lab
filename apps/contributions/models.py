@@ -134,13 +134,23 @@ class DatasetVersion(TimestampedModel):
     def clean(self):
         if self.pk:
             original = DatasetVersion.objects.get(pk=self.pk)
-            if original.checksum:
+            if original.checksum and not self._is_meta_only_update(original):
                 raise ValidationError(
                     _(
                         "No se puede editar una versión de dataset ya construida. "
                         "Para actualizar, crea una nueva versión."
                     )
                 )
+
+    def _is_meta_only_update(self, original: "DatasetVersion") -> bool:
+        """Permite actualizar flags operativos (is_public, min_sample_met) sin
+        romper la inmutabilidad del contenido."""
+        for field in self._meta.get_fields():
+            if field.name in ("is_public", "min_sample_met", "updated_at"):
+                continue
+            if getattr(self, field.name) != getattr(original, field.name):
+                return False
+        return True
 
     def save(self, *args, **kwargs):
         self.clean()

@@ -31,7 +31,7 @@ def _utc(year, month, day, hour=0, minute=0, second=0):
 
 
 @pytest.fixture(autouse=True)
-def _seeded_mechanic(db):  # noqa: ARG001
+def _seeded_mechanic(db):
     """Crea la mecánica trade_iv y un ruleset publicado (necesario para FK en obs)."""
     Mechanic.objects.create(
         slug="iv-en-intercambios",
@@ -409,7 +409,14 @@ class TestRevocationVsImmutability:
 
         v1 = build_dataset_version(criteria={"min_sample": 1})
 
+        # Flags operativos (is_public, min_sample_met) sí se permiten
         v1.is_public = True
+        v1.save()
+        v1.refresh_from_db()
+        assert v1.is_public is True
+
+        # Editar campos de contenido sigue bloqueado
+        v1.row_count = 999
         with pytest.raises(ValidationError, match="ya construida"):
             v1.save()
 
