@@ -1,70 +1,101 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
-#, fuzzy
+# Pogo-lab English translations
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-16 22:02+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"Project-Id-Version: Pogo-lab\n"
+"Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-#: config/urls.py:11 config/urls.py:12
+
+#: config/urls.py
 msgid "cuenta/"
-msgstr ""
+msgstr "account/"
 
-#: templates/accounts/delete.html:4 templates/accounts/delete.html:8
+msgid "mecanicas/"
+msgstr "mechanics/"
+
+msgid "guias/"
+msgstr "guides/"
+
+msgid "calculadora/"
+msgstr "calculator/"
+
+msgid "intercambios/"
+msgstr "trades/"
+
+msgid "analisis/"
+msgstr "analysis/"
+
+msgid "contribuciones/"
+msgstr "contributions/"
+
+msgid "comunidad/"
+msgstr "community/"
+
+#: templates
 msgid "Eliminar cuenta"
-msgstr ""
+msgstr "Delete account"
 
-#: templates/accounts/delete.html:12
 msgid "Esta acción es irreversible. Todos tus datos serán eliminados."
-msgstr ""
+msgstr "This action is irreversible. All your data will be deleted."
 
-#: templates/accounts/delete.html:15
 msgid "Confirmar eliminación"
-msgstr ""
+msgstr "Confirm deletion"
 
-#: templates/accounts/export.html:4 templates/accounts/export.html:8
 msgid "Exportar datos"
-msgstr ""
+msgstr "Export data"
 
-#: templates/accounts/export.html:11
 msgid "Recibirás un enlace de descarga con todos tus datos."
-msgstr ""
+msgstr "You will receive a download link with all your data."
 
-#: templates/accounts/export.html:16
 msgid "Solicitar exportación"
-msgstr ""
+msgstr "Request export"
 
-#: templates/base.html:33
 msgid "Cerrar sesión"
-msgstr ""
+msgstr "Log out"
 
-#: templates/base.html:37
 msgid "Iniciar sesión"
-msgstr ""
+msgstr "Log in"
 
-#: templates/base.html:49
 msgid "No afiliado a Niantic ni The Pokémon Company"
-msgstr ""
+msgstr "Not affiliated with Niantic or The Pokémon Company"
 
-#: templates/core/healthz.html:4
 msgid "Estado"
-msgstr ""
+msgstr "Status"
 
-#: templates/core/healthz.html:8
 msgid "Operativo"
-msgstr ""
+msgstr "Operational"
 
-#: templates/core/healthz.html:9
 msgid "El sistema está funcionando correctamente."
-msgstr ""
+msgstr "The system is working correctly."
+
+msgid "Calculadora"
+msgstr "Calculator"
+
+msgid "Mecánicas"
+msgstr "Mechanics"
+
+msgid "¿No tienes cuenta?"
+msgstr "Don't have an account?"
+
+msgid "Regístrate"
+msgstr "Sign up"
+
+msgid "¿Ya tienes cuenta?"
+msgstr "Already have an account?"
+
+msgid "Correo electrónico"
+msgstr "Email"
+
+msgid "Contraseña"
+msgstr "Password"
+
+msgid "Confirmar contraseña"
+msgstr "Confirm password"
+
+msgid "Recordarme"
+msgstr "Remember me"
+
+msgid "Iniciar Sesión"
+msgstr "Log In"
