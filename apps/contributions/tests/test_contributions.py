@@ -473,7 +473,21 @@ class TestMinSample:
 
         version = build_dataset_version(criteria={"min_sample": 30})
         assert version.min_sample_met is True
+        assert version.is_public is True
         assert version.row_count == 50
+
+    @pytest.mark.django_db
+    def test_build_creates_audit_event(self, user):
+        from apps.audit.models import AuditEvent
+
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        _make_obs(user, atk=10, iv_def=11, hp=12)
+
+        version = build_dataset_version(criteria={"min_sample": 1})
+
+        events = AuditEvent.objects.filter(verb="dataset_built", target_id=version.pk)
+        assert events.count() == 1
+        assert events[0].metadata["row_count"] == 1
 
 
 class TestDatasetVersionImmutability:

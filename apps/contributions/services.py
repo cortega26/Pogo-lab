@@ -10,6 +10,7 @@ import hashlib
 import json
 from typing import Any
 
+from apps.audit.models import AuditEvent
 from apps.contributions.models import DataContributionConsent, DatasetVersion
 from apps.trades.models import TradeObservation
 
@@ -104,12 +105,25 @@ def build_dataset_version(
         min_sample_met=min_sample_met,
         row_count=row_count,
         checksum=checksum,
-        is_public=False,
+        is_public=min_sample_met,
         pipeline_version=pipeline_version,
         anonymized_rows=rows,
     )
 
     version.rows_cache = rows  # type: ignore[attr-defined]
+
+    AuditEvent.log(
+        verb="dataset_built",
+        target_type="DatasetVersion",
+        target_id=version.pk,
+        metadata={
+            "number": version.number,
+            "row_count": row_count,
+            "min_sample_met": min_sample_met,
+            "pipeline_version": pipeline_version,
+        },
+    )
+
     return version
 
 

@@ -4,6 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from apps.audit.models import AuditEvent
+from apps.audit.services import mark_dataset_suspicious, mark_observation
 from apps.trades.models import TradeObservation
 
 User = get_user_model()
@@ -65,10 +66,10 @@ class TestAuditEvent:
 
 
 class TestModeration:
-    """Marcado de observaciones como sospechosas/duplicate."""
+    """Marcado de observaciones como sospechosas/duplicate usando servicios de moderación."""
 
     @pytest.mark.django_db
-    def test_mark_suspicious(self):
+    def test_mark_observation_suspicious(self):
         user = User.objects.create_user(email="mod@test.com", password="pass123")
         obs = TradeObservation.objects.create(
             owner=user,
@@ -82,19 +83,38 @@ class TestModeration:
             state="valid",
         )
 
-        obs.state = "suspicious"
-        obs.save()
+        mark_observation(obs.pk, "suspicious", reason="Estadísticamente atípico", actor=user)
 
         obs.refresh_from_db()
         assert obs.state == "suspicious"
+        assert obs.exclusion_reason == "Estadísticamente atípico"
 
-        AuditEvent.log(
-            verb="observation_marked_suspicious",
-            actor=user,
-            target_type="TradeObservation",
-            target_id=obs.pk,
-            metadata={"reason": "Estadísticamente atípico"},
+        events = AuditEvent.objects.filter(verb="observation_marked_suspicious")
+        assert events.count() == 1
+        assert events[0].actor == user
+
+    @pytest.mark.django_db
+    def test_mark_observation_duplicate(self):
+        user = User.objects.create_user(email="dup@test.com", password="pass123")
+        obs = TradeObservation.objects.create(
+            owner=user,
+            observed_at="2026-07-15T00:00:00Z",
+            friendship_level="good",
+            trade_type="normal",
+            is_lucky=False,
+            atk=10,
+            iv_def=10,
+            hp=10,
+            state="valid",
         )
+
+        mark_observation(obs.pk, "duplicate", reason="Hash duplicado", actor=user)
+
+        obs.refresh_from_db()
+        assert obs.state == "duplicate"
+
+        events = AuditEvent.objects.filter(verb="observation_marked_duplicate")
+        assert events.count() == 1
 
     @pytest.mark.django_db
     def test_mark_dataset_suspicious(self):
@@ -107,12 +127,10 @@ class TestModeration:
             checksum="abc123",
         )
 
-        AuditEvent.log(
-            verb="dataset_marked_suspicious",
-            target_type="DatasetVersion",
-            target_id=version.pk,
-            metadata={"reason": "Sospecha de datos manipulados"},
-        )
+        user = User.objects.create_user(email="auditor@test.com", password="pass123")
+        mark_dataset_suspicious(version.pk, reason="Sospecha de datos manipulados", actor=user)
 
         events = AuditEvent.objects.filter(verb="dataset_marked_suspicious")
         assert events.count() == 1
+        assert events[0].actor == user
+        assert events[0].metadata.get("reason") == "Sospecha de datos manipulados"
