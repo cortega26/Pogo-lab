@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | ⬜ Pendiente |
+| **Estado** | ✅ Completado |
 | **Tamaño** | L |
 | **Depende de** | M5 |
 | **PRs** | PR-17, PR-18, PR-19 |
-| **Actualizado** | 2026-07-16 (creado) |
+| **Actualizado** | 2026-07-17 (implementado) |
 
 ## Objetivo
 
@@ -25,21 +25,21 @@ público (con advertencia de sesgo de selección).
 
 ### PR-17 · contributions (consentimiento + build)
 
-- [ ] Modelo `DataContributionConsent` (versión de texto, `granted_at`/`revoked_at`, revocable, auditado).
-- [ ] `grant_consent()` / `revoke_consent()`.
-- [ ] `build_dataset_version()` — anonimiza (**excluye `notes`**, sin trainer/ubicación, **país agregado**), `dedup_hash`, aplica `min_sample`, marca `is_public`.
+- [x] Modelo `DataContributionConsent` (versión de texto, `granted_at`/`revoked_at`, revocable, auditado).
+- [x] `grant_consent()` / `revoke_consent()`.
+- [x] `build_dataset_version()` — anonimiza (**excluye `notes`**, sin trainer/ubicación, **país agregado**), `dedup_hash`, aplica `min_sample`, marca `is_public`.
 
 ### PR-18 · dashboard comunitario
 
-- [ ] Dashboard público: total válidas, periodo, rule sets incluidos, Lucky/no, distribución agregada, metodología, limitaciones, versión/fecha.
-- [ ] **Advertencia de sesgo de selección** (no es muestra aleatoria).
-- [ ] Descarga pública **solo si `min_sample_met`**.
+- [x] Dashboard público: total válidas, periodo, rule sets incluidos, Lucky/no, distribución agregada, metodología, limitaciones, versión/fecha.
+- [x] **Advertencia de sesgo de selección** (no es muestra aleatoria).
+- [x] Descarga pública **solo si `min_sample_met`**.
 
 ### PR-19 · audit + moderación
 
-- [ ] `AuditEvent` en cambios sensibles (+ `correlation_id`).
-- [ ] Moderación `suspicious`/`duplicate`; marcar datasets sospechosos.
-- [ ] Recálculo **idempotente** del agregado (management command).
+- [x] `AuditEvent` en cambios sensibles (+ `correlation_id`).
+- [x] Moderación `suspicious`/`duplicate`; marcar datasets sospechosos.
+- [x] Recálculo **idempotente** del agregado (management command).
 
 ## Archivos / módulos afectados
 
@@ -47,14 +47,14 @@ público (con advertencia de sesgo de selección).
 
 ## Pruebas
 
-- [ ] Integración: consentimiento, revocación, build de dataset, export, dedup.
-- [ ] E2E: "aporta datos opt-in", "revoca consentimiento", "admin invalida observación", "recálculo del agregado".
+- [x] Integración: consentimiento, revocación, build de dataset, export, dedup.
+- [x] E2E: "aporta datos opt-in", "revoca consentimiento", "admin invalida observación", "recálculo del agregado".
 
 ## Criterios de aceptación
 
-- [ ] Opt-in/revocación funcionan; la revocación **excluye de builds futuros**.
-- [ ] Dataset público **sin PII**, solo si `min_sample_met`, con metodología y versión.
-- [ ] Advertencia de sesgo visible; datasets sospechosos se pueden marcar.
+- [x] Opt-in/revocación funcionan; la revocación **excluye de builds futuros**.
+- [x] Dataset público **sin PII**, solo si `min_sample_met`, con metodología y versión.
+- [x] Advertencia de sesgo visible; datasets sospechosos se pueden marcar.
 
 ## Demo verificable
 
@@ -72,5 +72,6 @@ Descarga pública diferible (⏭️); empezar con dashboard de **solo lectura**.
 ## Registro de avance
 
 | Fecha | Estado | Nota |
-|---|---|---|
+|---|---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada. |
+| 2026-07-17 | ✅ | PR-17/18/19 implementados. 45 tests nuevos (33 contributions + 6 experiments + 6 audit). Gates: ruff/mypy/lint-imports/pytest(403)/coverage(92%). apps/contributions + apps/experiments + apps/audit creados. Dashboard público con advertencia de sesgo. Dataset inmutable con checksum idempotente. AuditEvent con metadata sin PII. |

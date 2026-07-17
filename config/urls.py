@@ -37,4 +37,6 @@ urlpatterns += i18n_patterns(
     path(_("calculadora/"), include("apps.calculators.urls")),
     path(_("intercambios/"), include("apps.trades.urls")),
     path(_("analisis/"), include("apps.analysis.urls")),
+    path(_("contribuciones/"), include("apps.contributions.urls")),
+    path(_("comunidad/"), include("apps.experiments.urls")),
 )

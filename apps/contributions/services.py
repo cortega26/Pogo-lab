@@ -1,0 +1,159 @@
+"""Servicios de dominio para apps/contributions.
+
+build_dataset_version: construye un snapshot anonimizado con inclusión AND
+compound (state="valid" AND contribution_optin AND consentimiento activo).
+Anonimiza excluyendo PII (notes, owner, timestamps exactos, country, dedup_hash).
+Calcula checksum SHA-256 sobre contenido anonimizado canonicalizado.
+"""
+
+import hashlib
+import json
+from collections import Counter
+from typing import Any
+
+from apps.contributions.models import DataContributionConsent, DatasetVersion
+from apps.trades.models import TradeObservation
+
+DEFAULT_PIPELINE_VERSION = "1.0.0"
+
+
+def _canonical_row(row: dict[str, Any]) -> str:
+    """Serializa una fila anonimizada de forma canónica para el checksum."""
+    return json.dumps(row, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def build_dataset_version(
+    criteria: dict[str, Any] | None = None,
+    pipeline_version: str = DEFAULT_PIPELINE_VERSION,
+) -> DatasetVersion:
+    """Construye una nueva versión de dataset comunitario anonimizado.
+
+    INCLUSIÓN (AND compuesto, los tres):
+      - observation.state == "valid"
+      - observation.contribution_optin == True
+      - owner tiene DataContributionConsent activo (scope="community_dataset")
+
+    ANONIMIZACIÓN por fila — solo campos no identificantes:
+      - atk, iv_def (como "def"), hp
+      - friendship_level, trade_type, is_lucky
+      - ruleset_version (del ruleset_id asociado)
+      - observed_month (YYYY-MM, bucket de mes)
+
+    EXCLUYE explícitamente: notes, owner (id/email), timestamp exacto,
+    country por fila, dedup_hash, pk/id de observación.
+
+    CHECKSUM: SHA-256 sobre todas las filas anonimizadas, ordenadas de forma
+    estable (por los propios campos anonimizados + observed_month), serializadas
+    con sort_keys. Incluye pipeline_version en el contenido hasheado.
+    """
+    criteria = criteria or _default_criteria()
+
+    min_sample = criteria.get("min_sample", 30)
+    scope = "community_dataset"
+
+    user_ids_with_consent = set(
+        DataContributionConsent.objects.filter(
+            scope=scope,
+            is_active=True,
+        ).values_list("user_id", flat=True)
+    )
+
+    qs = TradeObservation.objects.select_related("ruleset").filter(
+        state="valid",
+        contribution_optin=True,
+        owner_id__in=user_ids_with_consent,
+    )
+
+    ruleset_versions: dict[int, int] = {}
+
+    rows: list[dict[str, Any]] = []
+    for obs in qs.iterator(chunk_size=1000):
+        rs_id = obs.ruleset_id
+        if rs_id is not None and rs_id not in ruleset_versions:
+            from apps.mechanics.models import MechanicRuleSet
+
+            rs = MechanicRuleSet.objects.filter(pk=rs_id).first()
+            ruleset_versions[rs_id] = rs.version if rs else 0
+
+        rows.append(
+            {
+                "atk": obs.atk,
+                "def": obs.iv_def,
+                "hp": obs.hp,
+                "friendship_level": obs.friendship_level,
+                "trade_type": obs.trade_type,
+                "is_lucky": obs.is_lucky,
+                "ruleset_version": ruleset_versions.get(obs.ruleset_id, 0) if obs.ruleset_id else 0,
+                "observed_month": obs.observed_at.strftime("%Y-%m"),
+            }
+        )
+
+    row_count = len(rows)
+    min_sample_met = row_count >= min_sample
+
+    sorted_rows = sorted(rows, key=_canonical_row)
+    canonicalized = "\n".join(_canonical_row(r) for r in sorted_rows)
+    checksum_input = f"{pipeline_version}\n{canonicalized}"
+    checksum = hashlib.sha256(checksum_input.encode("utf-8")).hexdigest()
+
+    latest = DatasetVersion.objects.order_by("-number").first()
+    next_number = (latest.number + 1) if latest else 1
+
+    version = DatasetVersion.objects.create(
+        number=next_number,
+        criteria=criteria,
+        min_sample_met=min_sample_met,
+        row_count=row_count,
+        checksum=checksum,
+        is_public=False,
+        pipeline_version=pipeline_version,
+    )
+
+    version.rows_cache = rows  # type: ignore[attr-defined]
+    return version
+
+
+def _default_criteria() -> dict[str, Any]:
+    return {"min_sample": 30, "state_filter": "valid"}
+
+
+def aggregate_community_distribution(
+    dataset_version: DatasetVersion,
+) -> list[dict[str, Any]]:
+    """Agregado comunitario pooled (sin owner).
+
+    Reutiliza la lógica de agrupamiento de M5 (apps/analysis/services.py):
+    agrupa por (is_lucky, friendship_level, ruleset) y resuelve el piso con
+    floor_for_ruleset — nunca hardcodeado, nunca lumpeando niveles de amistad.
+    """
+    rows = getattr(dataset_version, "rows_cache", [])
+    if not rows:
+        return []
+
+    groups: dict[tuple, list[dict]] = {}
+    for row in rows:
+        key = (row["is_lucky"], row["friendship_level"], row.get("ruleset_version", 0))
+        groups.setdefault(key, []).append(row)
+
+    result: list[dict[str, Any]] = []
+    for (is_lucky, friendship_level, ruleset_version), group_rows in groups.items():
+        n = len(group_rows)
+        hundos = sum(1 for r in group_rows if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15)
+        atk_counts = Counter(r["atk"] for r in group_rows)
+        def_counts = Counter(r["def"] for r in group_rows)
+        hp_counts = Counter(r["hp"] for r in group_rows)
+
+        result.append(
+            {
+                "is_lucky": is_lucky,
+                "friendship_level": friendship_level,
+                "ruleset_version": ruleset_version,
+                "n": n,
+                "hundo_count": hundos,
+                "atk_distribution": {str(k): v for k, v in sorted(atk_counts.items())},
+                "def_distribution": {str(k): v for k, v in sorted(def_counts.items())},
+                "hp_distribution": {str(k): v for k, v in sorted(hp_counts.items())},
+            }
+        )
+
+    return result

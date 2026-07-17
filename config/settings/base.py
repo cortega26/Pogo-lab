@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     "apps.trades",
     "apps.analysis",
     "apps.decisions",
+    "apps.contributions",
+    "apps.experiments",
+    "apps.audit",
 ]
 
 MIDDLEWARE = [
