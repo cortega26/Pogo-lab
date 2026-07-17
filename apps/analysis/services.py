@@ -110,6 +110,30 @@ def _group_floor(group: dict[str, Any]) -> int | None:
     return f
 
 
+def _floor_for_version(
+    ruleset_version: int,
+    friendship_level: str,
+    trade_type: str,
+) -> int | None:
+    """Piso `f` leído del ruleset de ESA versión (no del vigente).
+
+    Para el agregado pooled sobre filas anonimizadas, que solo llevan
+    `ruleset_version`. Si la versión no existe (p. ej. 0 = sin ruleset), cae al
+    vigente; devuelve None si tampoco hay ninguno publicado.
+    """
+    ruleset = MechanicRuleSet.objects.filter(
+        mechanic__key="trade_iv",
+        version=ruleset_version,
+    ).first()
+    if ruleset is not None:
+        return floor_for_ruleset(ruleset, friendship_level, trade_type)
+    try:
+        f, _ = resolve_trade_floor(friendship_level, trade_type)
+    except RulesetUnavailableError:
+        return None
+    return f
+
+
 def _hundo_rate_analysis(
     observations: models.QuerySet,
     f: int,
@@ -333,7 +357,8 @@ def compute_pooled_statistics(
 
     Reutiliza la misma disciplina que run_personal_analysis:
     - Agrupa por (is_lucky, friendship_level, ruleset_version).
-    - Resuelve el piso con floor_for_ruleset (nunca hardcodeado).
+    - Resuelve el piso con floor_for_ruleset desde el ruleset de ESA versión
+      (nunca hardcodeado, nunca del ruleset activo indiscriminadamente).
     - Ejecuta prueba binomial exacta para hundo_rate y uniformity_test por stat.
     - Las mismas funciones del engine que M5 ya tiene testeadas.
 
@@ -350,9 +375,8 @@ def compute_pooled_statistics(
         n = len(group_rows)
         trade_type = "lucky" if is_lucky else "normal"
 
-        try:
-            f, _ = resolve_trade_floor(friendship_level, trade_type)
-        except RulesetUnavailableError:
+        f = _floor_for_version(ruleset_version, friendship_level, trade_type)
+        if f is None:
             continue
 
         hundos = sum(1 for r in group_rows if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15)

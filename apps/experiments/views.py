@@ -18,8 +18,13 @@ from apps.contributions.services import aggregate_community_distribution
 
 
 def community_dashboard(request: HttpRequest) -> HttpResponse:
-    """Dashboard comunitario público (solo lectura)."""
-    latest = DatasetVersion.objects.order_by("-number").first()
+    """Dashboard comunitario público (solo lectura).
+
+    Solo muestra datasets marcados `is_public` (es decir, con `min_sample_met`):
+    honra el umbral mínimo como gate de exposición pública frente a la
+    re-identificación con muestras pequeñas.
+    """
+    latest = DatasetVersion.objects.filter(is_public=True).order_by("-number").first()
 
     context: dict[str, Any] = {
         "dataset_version": latest,

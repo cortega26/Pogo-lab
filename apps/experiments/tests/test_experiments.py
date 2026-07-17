@@ -125,6 +125,20 @@ class TestCommunityDashboardView:
         assert "auto-selección" in content or "sesgo" in content.lower()
 
     @pytest.mark.django_db
+    def test_dashboard_hides_below_threshold_dataset(self, client, user):
+        """Regresión M6-2: un dataset sub-umbral (is_public=False) NO se muestra."""
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        _make_obs(user, atk=15, iv_def=15, hp=15)
+        version = build_dataset_version(criteria={"min_sample": 100})
+        assert version.is_public is False
+
+        response = client.get("/es/comunidad/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # No expone los totales de un dataset que no alcanzó el umbral mínimo.
+        assert "Total de observaciones" not in content
+
+    @pytest.mark.django_db
     def test_download_disabled_by_default(self, client, user):
         DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
         _make_obs(user, atk=15, iv_def=15, hp=15)
