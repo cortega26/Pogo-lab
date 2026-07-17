@@ -16,6 +16,7 @@ from apps.trades.services import (
     dashboard_stats,
     export_csv,
     import_csv,
+    parse_csv_row,
     register_observation,
 )
 
@@ -701,6 +702,76 @@ class TestDetermineState:
         )
         assert state == "suspicious"
         assert "f=12" in reason
+
+    @pytest.mark.django_db
+    def test_suspicious_no_ruleset_falls_back_to_f0(self, user):
+        Mechanic.objects.filter(key="trade_iv").delete()
+        state, reason = _determine_state(
+            -1, 0, 0, "good", "normal", user.pk, _utc(2026, 7, 17), "", ""
+        )
+        assert state == "excluded"
+        assert "fuera de rango" in reason
+
+    @pytest.mark.django_db
+    def test_valid_no_ruleset_does_not_raise(self, user):
+        Mechanic.objects.filter(key="trade_iv").delete()
+        state, _reason = _determine_state(
+            0, 0, 0, "good", "normal", user.pk, _utc(2026, 7, 17), "", ""
+        )
+        assert state == "valid"
+
+
+class TestCSVParsingSadPaths:
+    @pytest.mark.django_db
+    def test_invalid_trade_type(self, user):
+        result = parse_csv_row(
+            {
+                "observed_at": "2026-07-17T12:00:00+00:00",
+                "friendship_level": "best",
+                "trade_type": "invalid",
+                "atk": "12",
+                "def": "15",
+                "hp": "13",
+            },
+            2,
+            user.pk,
+        )
+        assert isinstance(result, str)
+        assert "trade_type invalido" in result
+
+    @pytest.mark.django_db
+    def test_non_integer_ivs(self, user):
+        result = parse_csv_row(
+            {
+                "observed_at": "2026-07-17T12:00:00+00:00",
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "atk": "abc",
+                "def": "15",
+                "hp": "13",
+            },
+            3,
+            user.pk,
+        )
+        assert isinstance(result, str)
+        assert "IVs deben ser enteros" in result
+
+    @pytest.mark.django_db
+    def test_missing_date(self, user):
+        result = parse_csv_row(
+            {
+                "observed_at": "",
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "atk": "12",
+                "def": "15",
+                "hp": "13",
+            },
+            4,
+            user.pk,
+        )
+        assert isinstance(result, str)
+        assert "observed_at invalido" in result
 
 
 class TestTradeViews:
