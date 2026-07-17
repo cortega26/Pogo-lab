@@ -24,6 +24,37 @@ class RulesetUnavailableError(RuntimeError):
     """No hay ruleset publicado para trade_iv en esta fecha."""
 
 
+def _floor_from_params(
+    params: dict[str, Any],
+    friendship_level: str,
+    trade_type: str,
+) -> int:
+    """Extrae el piso `f` de los parámetros de un ruleset.
+
+    Lucky/trade_type in (lucky, lucky_guaranteed) sobrescribe con floor.lucky;
+    en otro caso usa floor.friendship.<nivel>.
+    """
+    if trade_type in ("lucky", "lucky_guaranteed"):
+        return int(params.get("floor.lucky", 12))
+    key = _FLOOR_KEYS.get(friendship_level, "floor.friendship.good")
+    return int(params.get(key, 1))
+
+
+def floor_for_ruleset(
+    ruleset: MechanicRuleSet,
+    friendship_level: str,
+    trade_type: str,
+) -> int:
+    """Piso `f` leído de un ruleset ESPECÍFICO (el vigente al registrar la obs).
+
+    A diferencia de `resolve_trade_floor` (que resuelve el vigente por fecha),
+    lee el piso del ruleset dado — necesario para analizar observaciones
+    históricas con el piso bajo el que se registraron.
+    """
+    params: dict[str, Any] = {p.key: p.value for p in ruleset.parameters.all()}
+    return _floor_from_params(params, friendship_level, trade_type)
+
+
 def resolve_trade_floor(
     friendship_level: str,
     trade_type: str,
@@ -60,9 +91,4 @@ def resolve_trade_floor(
         )
 
     params: dict[str, Any] = {p.key: p.value for p in ruleset.parameters.all()}
-    if trade_type in ("lucky", "lucky_guaranteed"):
-        floor = int(params.get("floor.lucky", 12))
-    else:
-        key = _FLOOR_KEYS.get(friendship_level, "floor.friendship.good")
-        floor = int(params.get(key, 1))
-    return floor, ruleset.version
+    return _floor_from_params(params, friendship_level, trade_type), ruleset.version
