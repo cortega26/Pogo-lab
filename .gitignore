@@ -29,6 +29,8 @@ test_db.sqlite3-wal
 .env
 .env.*
 !.env.example
+.env-oci
+infra/keys/
 
 # === Testing / type checking / lint ===
 .pytest_cache/
@@ -42,7 +44,7 @@ htmlcov/
 
 # === Tailwind standalone CLI ===
 tailwindcss
-/static/css/output.css
+
 
 # === Playwright / Node (Tailwind CLI via npm, E2E) ===
 node_modules/
