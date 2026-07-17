@@ -324,3 +324,107 @@ def run_personal_analysis(
             )
 
     return run
+
+
+def compute_pooled_statistics(
+    anonymized_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Estadísticas pooled (sin owner) usando las mismas pruebas del engine.
+
+    Reutiliza la misma disciplina que run_personal_analysis:
+    - Agrupa por (is_lucky, friendship_level, ruleset_version).
+    - Resuelve el piso con floor_for_ruleset (nunca hardcodeado).
+    - Ejecuta prueba binomial exacta para hundo_rate y uniformity_test por stat.
+    - Las mismas funciones del engine que M5 ya tiene testeadas.
+
+    Recibe filas anonimizadas en el formato de build_dataset_version:
+        {atk, def, hp, friendship_level, trade_type, is_lucky, ruleset_version, observed_month}
+    """
+    groups: dict[tuple, list[dict]] = {}
+    for row in anonymized_rows:
+        key = (row["is_lucky"], row["friendship_level"], row.get("ruleset_version", 0))
+        groups.setdefault(key, []).append(row)
+
+    results: list[dict[str, Any]] = []
+    for (is_lucky, friendship_level, ruleset_version), group_rows in groups.items():
+        n = len(group_rows)
+        trade_type = "lucky" if is_lucky else "normal"
+
+        try:
+            f, _ = resolve_trade_floor(friendship_level, trade_type)
+        except RulesetUnavailableError:
+            continue
+
+        hundos = sum(1 for r in group_rows if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15)
+
+        hundo_payload: dict[str, Any] = {
+            "n": n,
+            "successes": hundos,
+            "p0": float(p_hundo(f)),
+            "floor": f,
+            "observed_rate": hundos / n if n > 0 else 0.0,
+            "min_sample": min_sample_for("hundo_rate"),
+        }
+        min_n = min_sample_for("hundo_rate")
+        if n >= min_n:
+            hundo_result = exact_binomial_test(hundos, n, float(p_hundo(f)))
+            lo, hi = wilson_interval(hundos, n)
+            hundo_payload.update(
+                {
+                    "stat": hundo_result.stat,
+                    "p_value": hundo_result.p_value,
+                    "effect_size": hundo_result.effect_size,
+                    "method_used": hundo_result.method_used,
+                    "ci_lo": lo,
+                    "ci_hi": hi,
+                }
+            )
+        else:
+            hundo_payload["insufficient_sample"] = True
+
+        atk_counts = Counter(r["atk"] for r in group_rows)
+        def_counts = Counter(r["def"] for r in group_rows)
+        hp_counts = Counter(r["hp"] for r in group_rows)
+        k = 16 - f
+        values = list(range(f, 16))
+        expected_probs = [1.0 / k] * k
+
+        stat_results: dict[str, dict[str, Any]] = {}
+        for stat_name, counter in [("atk", atk_counts), ("def", def_counts), ("hp", hp_counts)]:
+            counts = [counter.get(v, 0) for v in values]
+            stat_payload: dict[str, Any] = {
+                "n": n,
+                "min_sample": min_sample_for("stat_uniformity"),
+                "counts": counts,
+                "values": values,
+            }
+            if n >= min_sample_for("stat_uniformity"):
+                uni_result = uniformity_test(
+                    counts, expected_probs, seed=random.randint(0, 2**31 - 1)
+                )
+                stat_payload.update(
+                    {
+                        "stat": uni_result.stat,
+                        "p_value": uni_result.p_value,
+                        "effect_size": uni_result.effect_size,
+                        "method_used": uni_result.method_used,
+                        "min_expected": uni_result.min_expected,
+                    }
+                )
+            else:
+                stat_payload["insufficient_sample"] = True
+            stat_results[stat_name] = stat_payload
+
+        results.append(
+            {
+                "is_lucky": is_lucky,
+                "friendship_level": friendship_level,
+                "ruleset_version": ruleset_version,
+                "n": n,
+                "floor": f,
+                "hundo_analysis": hundo_payload,
+                "statistics": stat_results,
+            }
+        )
+
+    return results

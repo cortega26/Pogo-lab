@@ -157,6 +157,34 @@ class TestDataContributionConsent:
         with pytest.raises(ValidationError):
             c.clean()
 
+    @pytest.mark.django_db
+    def test_grant_creates_audit_event(self, user):
+        from apps.audit.models import AuditEvent
+
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        events = AuditEvent.objects.filter(verb="consent_granted", actor=user)
+        assert events.count() == 1
+        assert events[0].metadata == {"scope": "community_dataset", "text_version": "1.0.0"}
+
+    @pytest.mark.django_db
+    def test_revoke_creates_audit_event(self, user):
+        from apps.audit.models import AuditEvent
+
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        DataContributionConsent.revoke_consent(user, SCOPE)
+        events = AuditEvent.objects.filter(verb="consent_revoked", actor=user)
+        assert events.count() == 1
+
+    @pytest.mark.django_db
+    def test_audit_metadata_has_no_pii_from_consent(self, user):
+        from apps.audit.models import AuditEvent
+
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        event = AuditEvent.objects.filter(verb="consent_granted").first()
+        assert event is not None
+        metadata_str = str(event.metadata)
+        assert user.email not in metadata_str
+
 
 def _serialize_version(version):
     """Serializa el dataset version para inspección de PII."""
@@ -501,7 +529,7 @@ class TestAggregateCommunityDistribution:
         lucky_group = [g for g in result if g["is_lucky"]]
         assert len(lucky_group) == 1
         assert lucky_group[0]["n"] == 2
-        assert lucky_group[0]["hundo_count"] == 1
+        assert lucky_group[0]["hundo_analysis"]["successes"] == 1
 
     @pytest.mark.django_db
     def test_empty_dataset_returns_empty_list(self, user):
@@ -554,4 +582,32 @@ class TestAggregationFromDB:
         result = aggregate_community_distribution(db_version)
         assert len(result) == 1
         assert result[0]["n"] == 2
-        assert result[0]["hundo_count"] == 1
+        assert result[0]["hundo_analysis"]["successes"] == 1
+
+
+class TestConsentViews:
+    @pytest.mark.django_db
+    def test_grant_view_redirects(self, client, user):
+        client.force_login(user)
+        response = client.post("/es/contribuciones/consentir/")
+        assert response.status_code == 302
+
+        consent = DataContributionConsent.objects.filter(user=user, scope=SCOPE).first()
+        assert consent is not None
+        assert consent.is_active is True
+
+    @pytest.mark.django_db
+    def test_revoke_view_redirects(self, client, user):
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        client.force_login(user)
+        response = client.post("/es/contribuciones/revocar/")
+        assert response.status_code == 302
+
+        consent = DataContributionConsent.objects.get(user=user, scope=SCOPE)
+        assert consent.is_active is False
+
+    @pytest.mark.django_db
+    def test_consent_views_require_login(self, client):
+        response = client.get("/es/contribuciones/consentir/")
+        assert response.status_code == 302
+        assert "login" in response.url

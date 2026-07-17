@@ -8,7 +8,6 @@ Calcula checksum SHA-256 sobre contenido anonimizado canonicalizado.
 
 import hashlib
 import json
-from collections import Counter
 from typing import Any
 
 from apps.contributions.models import DataContributionConsent, DatasetVersion
@@ -123,41 +122,15 @@ def aggregate_community_distribution(
 ) -> list[dict[str, Any]]:
     """Agregado comunitario pooled (sin owner).
 
-    Reutiliza la lógica de agrupamiento de M5 (apps/analysis/services.py):
-    agrupa por (is_lucky, friendship_level, ruleset) y resuelve el piso con
-    floor_for_ruleset — nunca hardcodeado, nunca lumpeando niveles de amistad.
-
-    Lee las filas anonimizadas del campo persistente `anonymized_rows` (para
-    funcionar con versiones cargadas de BD), con fallback al cache en memoria.
+    Delega en apps.analysis.services.compute_pooled_statistics, que reutiliza
+    la misma disciplina que run_personal_analysis (M5): agrupa por
+    (is_lucky, friendship_level, ruleset), resuelve el piso con
+    floor_for_ruleset, y ejecuta las mismas pruebas del engine.
     """
+    from apps.analysis.services import compute_pooled_statistics
+
     rows = dataset_version.anonymized_rows or getattr(dataset_version, "rows_cache", [])
     if not rows:
         return []
 
-    groups: dict[tuple, list[dict]] = {}
-    for row in rows:
-        key = (row["is_lucky"], row["friendship_level"], row.get("ruleset_version", 0))
-        groups.setdefault(key, []).append(row)
-
-    result: list[dict[str, Any]] = []
-    for (is_lucky, friendship_level, ruleset_version), group_rows in groups.items():
-        n = len(group_rows)
-        hundos = sum(1 for r in group_rows if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15)
-        atk_counts = Counter(r["atk"] for r in group_rows)
-        def_counts = Counter(r["def"] for r in group_rows)
-        hp_counts = Counter(r["hp"] for r in group_rows)
-
-        result.append(
-            {
-                "is_lucky": is_lucky,
-                "friendship_level": friendship_level,
-                "ruleset_version": ruleset_version,
-                "n": n,
-                "hundo_count": hundos,
-                "atk_distribution": {str(k): v for k, v in sorted(atk_counts.items())},
-                "def_distribution": {str(k): v for k, v in sorted(def_counts.items())},
-                "hp_distribution": {str(k): v for k, v in sorted(hp_counts.items())},
-            }
-        )
-
-    return result
+    return compute_pooled_statistics(rows)

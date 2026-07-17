@@ -75,12 +75,14 @@
               {% else %}
                 {% trans "Normal" %} — {{ group.friendship_level }}
               {% endif %}
-              {% trans "(Ruleset v" %}{{ group.ruleset_version }}
+              {% trans "(Ruleset v" %}{{ group.ruleset_version }})
             </h3>
             <p class="text-sm text-gray-600">
               n = {{ group.n }}
-              {% if group.hundo_count > 0 %}
-                · {% trans "Hundos:" %} {{ group.hundo_count }}
+              · {% trans "Piso:" %} f = {{ group.floor }}
+              {% if group.hundo_analysis.successes > 0 %}
+                · {% trans "Hundos:" %} {{ group.hundo_analysis.successes }}
+                ({{ group.hundo_analysis.observed_rate|floatformat:6 }})
               {% endif %}
             </p>
           </div>
