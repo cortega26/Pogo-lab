@@ -70,6 +70,22 @@ class RulesetUnavailableError(RuntimeError):
     """No hay ruleset publicado para trade_iv en esta fecha."""
 
 
+def _validate_floor_override(value: object) -> int:
+    """Valida y normaliza `floor_override`: debe ser un entero en [0, 15].
+
+    Lanza ValueError si el tipo es invalido o el valor cae fuera de rango.
+    Sin esta validacion un piso >= 16 produce k <= 0 (division por cero o
+    probabilidades negativas) en engine/probability.
+    """
+    try:
+        floor = int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("floor_override debe ser un entero") from exc
+    if not 0 <= floor <= 15:
+        raise ValueError("floor_override debe estar en el rango [0, 15]")
+    return floor
+
+
 def _resolve_floor(
     friendship_level: str,
     trade_type: str,
@@ -134,7 +150,7 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
     Si el usuario provee floor_override, se usa ese piso en lugar del ruleset.
     """
     if inputs.floor_override is not None:
-        floor = inputs.floor_override
+        floor = _validate_floor_override(inputs.floor_override)
         ruleset_version = None
     else:
         floor, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
@@ -150,7 +166,7 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
         assumptions = [
             "Los IVs post-intercambio siguen una distribucion uniforme en [f, 15].",
             "Los stats (Att/Def/HP) son independientes entre si (S3).",
-            f"Piso f={inputs.floor_override} definido manualmente por el usuario.",
+            f"Piso f={floor} definido manualmente por el usuario.",
         ]
     else:
         assumptions = [
@@ -243,6 +259,10 @@ def decode_share_url(encoded: str) -> CalcInput:
     if payload.get("v") != SHARE_URL_VERSION:
         raise ValueError("Version de URL no soportada")
 
+    floor_override = payload.get("fo")
+    if floor_override is not None:
+        floor_override = _validate_floor_override(floor_override)
+
     return CalcInput(
         friendship_level=payload["fl"],
         trade_type=payload["tt"],
@@ -250,5 +270,5 @@ def decode_share_url(encoded: str) -> CalcInput:
         target_kind=payload["tk"],
         threshold=payload.get("th"),
         confidence=float(payload.get("c", 0.5)),
-        floor_override=payload.get("fo"),
+        floor_override=floor_override,
     )

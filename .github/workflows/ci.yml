@@ -42,7 +42,7 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Mypy typecheck
-        run: uv run mypy config engine apps
+        run: uv run mypy config engine apps tests
 
       - name: Import linter
         run: uv run lint-imports
