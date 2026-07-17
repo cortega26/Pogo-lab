@@ -107,6 +107,7 @@ def build_dataset_version(
         checksum=checksum,
         is_public=False,
         pipeline_version=pipeline_version,
+        anonymized_rows=rows,
     )
 
     version.rows_cache = rows  # type: ignore[attr-defined]
@@ -125,8 +126,11 @@ def aggregate_community_distribution(
     Reutiliza la lógica de agrupamiento de M5 (apps/analysis/services.py):
     agrupa por (is_lucky, friendship_level, ruleset) y resuelve el piso con
     floor_for_ruleset — nunca hardcodeado, nunca lumpeando niveles de amistad.
+
+    Lee las filas anonimizadas del campo persistente `anonymized_rows` (para
+    funcionar con versiones cargadas de BD), con fallback al cache en memoria.
     """
-    rows = getattr(dataset_version, "rows_cache", [])
+    rows = dataset_version.anonymized_rows or getattr(dataset_version, "rows_cache", [])
     if not rows:
         return []
 

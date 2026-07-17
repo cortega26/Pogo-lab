@@ -104,6 +104,7 @@ class DatasetVersion(TimestampedModel):
     checksum = models.CharField(max_length=64, blank=True, default="")
     is_public = models.BooleanField(default=False)
     pipeline_version = models.CharField(max_length=32, blank=True, default="")
+    anonymized_rows = models.JSONField(null=True, blank=True, default=None)
 
     class Meta:
         verbose_name = _("versión de dataset")

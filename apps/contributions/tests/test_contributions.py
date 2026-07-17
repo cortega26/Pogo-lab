@@ -513,3 +513,45 @@ class TestAggregateCommunityDistribution:
         if version.row_count == 0:
             result = aggregate_community_distribution(version)
             assert result == []
+
+
+class TestManagementCommand:
+    @pytest.mark.django_db
+    def test_build_command_idempotent(self, user):
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        _make_obs(user, atk=10, iv_def=11, hp=12, observed_at=_utc(2026, 1, 1, 12, 0, 0))
+
+        from django.core.management import call_command
+
+        call_command("build_dataset", min_sample=1, pipeline_version="1.0.0")
+        v1 = DatasetVersion.objects.order_by("-number").first()
+        assert v1 is not None
+
+        call_command("build_dataset", min_sample=1, pipeline_version="1.0.0")
+        v2 = DatasetVersion.objects.order_by("-number").first()
+        assert v2 is not None
+        assert v2.number == v1.number + 1
+        assert v2.checksum == v1.checksum
+        assert v2.row_count == v1.row_count
+
+
+class TestAggregationFromDB:
+    """Verifica que aggregate_community_distribution funciona con versiones cargadas de BD."""
+
+    @pytest.mark.django_db
+    def test_aggregation_from_db_loaded_version(self, user):
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        _make_obs(user, atk=15, iv_def=15, hp=15, is_lucky=True, friendship_level="best")
+        _make_obs(user, atk=12, iv_def=13, hp=14, is_lucky=True, friendship_level="best")
+
+        version = build_dataset_version(criteria={"min_sample": 1})
+        assert version.anonymized_rows is not None
+        assert len(version.anonymized_rows) == 2
+
+        db_version = DatasetVersion.objects.get(pk=version.pk)
+        assert not hasattr(db_version, "rows_cache") or not getattr(db_version, "rows_cache", None)
+
+        result = aggregate_community_distribution(db_version)
+        assert len(result) == 1
+        assert result[0]["n"] == 2
+        assert result[0]["hundo_count"] == 1
