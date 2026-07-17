@@ -1,25 +1,66 @@
 {% extends "base.html" %}
-{% load i18n allauth account %}
+{% load i18n %}
 
 {% block title %}{% trans "Registrarse" %} — Pogo-lab{% endblock %}
 
 {% block content %}
-<div class="mx-auto mt-12 max-w-md rounded border bg-white p-6 shadow">
+<div class="mx-auto mt-12 max-w-md rounded border border-gray-200 bg-white p-6 shadow-sm">
   <h1 class="mb-6 text-2xl font-bold text-gray-900">{% trans "Registrarse" %}</h1>
 
   <form method="post" action="{% url 'account_signup' %}" class="space-y-4">
     {% csrf_token %}
-    {{ form.as_p }}
+
+    {% if form.non_field_errors %}
+      <div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div>
+      <label for="id_email" class="mb-1 block text-sm font-medium text-gray-700">
+        {% trans "Correo electrónico" %}
+      </label>
+      <input type="email" name="email" id="id_email" required
+             class="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+             placeholder="{% trans 'tu@correo.com' %}">
+      {% if form.email.errors %}
+        <p class="mt-1 text-sm text-red-600">{{ form.email.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <label for="id_password1" class="mb-1 block text-sm font-medium text-gray-700">
+        {% trans "Contraseña" %}
+      </label>
+      <input type="password" name="password1" id="id_password1" required
+             class="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+             placeholder="········">
+      {% if form.password1.errors %}
+        <p class="mt-1 text-sm text-red-600">{{ form.password1.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <label for="id_password2" class="mb-1 block text-sm font-medium text-gray-700">
+        {% trans "Confirmar contraseña" %}
+      </label>
+      <input type="password" name="password2" id="id_password2" required
+             class="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+             placeholder="········">
+      {% if form.password2.errors %}
+        <p class="mt-1 text-sm text-red-600">{{ form.password2.errors.0 }}</p>
+      {% endif %}
+    </div>
 
     <button type="submit"
-            class="w-full rounded bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700">
+            class="w-full rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
       {% trans "Registrarse" %}
     </button>
   </form>
 
   <p class="mt-4 text-center text-sm text-gray-600">
     {% trans "¿Ya tienes cuenta?" %}
-    <a href="{% url 'account_login' %}" class="text-blue-600 hover:underline">
+    <a href="{% url 'account_login' %}" class="ml-1 font-medium text-blue-600 hover:underline">
       {% trans "Iniciar sesión" %}
     </a>
   </p>

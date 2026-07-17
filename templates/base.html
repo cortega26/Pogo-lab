@@ -44,10 +44,10 @@
           {% trans "Mecánicas" %}
         </a>
 
-        <form action="/i18n/setlang/" method="post">
+        <form action="{% url 'set_language' %}" method="post">
           {% csrf_token %}
           <input name="next" type="hidden" value="{{ request.get_full_path }}">
-          <select name="language" id="language-selector" class="rounded border px-2 py-1 text-sm">
+          <select name="language" id="language-selector" class="rounded border px-2 py-1 text-sm" onchange="this.form.submit()">
             {% for code, name in LANGUAGES %}
               <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
                 {{ name }}
@@ -86,11 +86,5 @@
   </footer>
 
   {% block extra_js %}{% endblock %}
-
-  <script nonce="{{ request.csp_nonce }}">
-    document.getElementById("language-selector").addEventListener("change", function () {
-      this.form.submit();
-    });
-  </script>
 </body>
 </html>
