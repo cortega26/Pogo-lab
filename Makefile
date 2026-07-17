@@ -29,7 +29,7 @@ lint-fix:
 	uv run ruff format .
 
 typecheck:
-	uv run mypy config engine apps
+	uv run mypy config engine apps tests
 
 coverage:
 	uv run coverage run -m pytest

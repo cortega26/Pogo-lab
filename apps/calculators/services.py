@@ -66,6 +66,10 @@ _FLOOR_KEYS: dict[str, str] = {
 }
 
 
+class RulesetUnavailableError(RuntimeError):
+    """No hay ruleset publicado para trade_iv en esta fecha."""
+
+
 def _resolve_floor(
     friendship_level: str,
     trade_type: str,
@@ -74,11 +78,12 @@ def _resolve_floor(
     """Resuelve el piso `f` desde el ruleset publicado de trade_iv.
 
     Devuelve (f, ruleset_version). Lucky sobrescribe con floor.lucky.
+    Lanza RulesetUnavailableError si no hay ruleset publicado.
     """
     try:
         mechanic = Mechanic.objects.get(key="trade_iv", status="active")
-    except Mechanic.DoesNotExist:
-        return 1, None
+    except Mechanic.DoesNotExist as e:
+        raise RulesetUnavailableError("Mecanica trade_iv no encontrada.") from e
 
     now = timezone.now()
     qs = MechanicRuleSet.objects.filter(
@@ -94,7 +99,9 @@ def _resolve_floor(
 
     ruleset = qs.first()
     if ruleset is None:
-        return 1, None
+        raise RulesetUnavailableError(
+            "No hay ruleset publicado para trade_iv vigente en esta fecha."
+        )
 
     params = {p.key: p.value for p in ruleset.parameters.all()}
     if trade_type in ("lucky", "lucky_guaranteed"):
@@ -123,8 +130,15 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
 
     Obtiene el piso del ruleset, computa P por intercambio y P acumulada,
     y devuelve el resultado con metadatos de trazabilidad.
+
+    Si el usuario provee floor_override, se usa ese piso en lugar del ruleset.
     """
-    floor, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
+    if inputs.floor_override is not None:
+        floor = inputs.floor_override
+        ruleset_version = None
+    else:
+        floor, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
+
     target: dict[str, Any] = {"kind": inputs.target_kind}
     if inputs.threshold is not None:
         target["threshold"] = inputs.threshold
@@ -132,13 +146,20 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
     p_single = per_trade_success_prob(floor, target)
     p_cum = p_at_least_one(p_single, inputs.n)
 
-    assumptions = [
-        "Los IVs post-intercambio siguen una distribucion uniforme en [f, 15].",
-        "Los stats (Att/Def/HP) son independientes entre si (S3).",
-        "El piso f proviene de datos comunitarios verificados (M2).",
-    ]
-    if inputs.trade_type in ("lucky", "lucky_guaranteed"):
-        assumptions.append("Los intercambios Lucky usan piso 12 segun datos comunitarios.")
+    if inputs.floor_override is not None:
+        assumptions = [
+            "Los IVs post-intercambio siguen una distribucion uniforme en [f, 15].",
+            "Los stats (Att/Def/HP) son independientes entre si (S3).",
+            f"Piso f={inputs.floor_override} definido manualmente por el usuario.",
+        ]
+    else:
+        assumptions = [
+            "Los IVs post-intercambio siguen una distribucion uniforme en [f, 15].",
+            "Los stats (Att/Def/HP) son independientes entre si (S3).",
+            "El piso f proviene de datos comunitarios verificados (M2).",
+        ]
+        if inputs.trade_type in ("lucky", "lucky_guaranteed"):
+            assumptions.append("Los intercambios Lucky usan piso 12 segun datos comunitarios.")
 
     return CalcResult(
         p_per_trade=_round(p_single),
@@ -171,7 +192,10 @@ def compute_scenario_cached(inputs: CalcInput) -> CalcResult:
 
     La clave incluye inputs + ruleset_version + algorithm_version.
     """
-    _, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
+    if inputs.floor_override is not None:
+        ruleset_version = None
+    else:
+        _, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
     key = _cache_key(inputs, ruleset_version)
     result = cache.get(key)
     if result is not None:

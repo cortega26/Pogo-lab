@@ -1,5 +1,6 @@
 """Tests de integracion para apps/calculators — servicio + URL compartible."""
 
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -179,6 +180,60 @@ class TestComputeScenario:
         assert isinstance(_round(0.123456789), float)
         assert _round(0.123456789) == 0.123457
 
+    def test_floor_override_applied(self):
+        """floor_override reemplaza el piso del ruleset."""
+        inputs = CalcInput(
+            friendship_level="good",
+            trade_type="normal",
+            n=1,
+            target_kind="hundo",
+            floor_override=12,
+        )
+        result = compute_scenario(inputs)
+        assert result.floor == 12
+        assert result.ruleset_version is None
+        assert result.p_per_trade == pytest.approx(1.0 / 64.0, abs=1e-6)
+        assert any("manual" in a for a in result.assumptions)
+
+    def test_floor_override_assumptions_replace_ruleset_claim(self):
+        """Con floor_override no se afirma 'datos comunitarios verificados'."""
+        inputs = CalcInput(
+            friendship_level="best",
+            trade_type="lucky",
+            n=10,
+            target_kind="hundo",
+            floor_override=15,
+        )
+        result = compute_scenario(inputs)
+        assert not any("comunitarios" in a for a in result.assumptions)
+        assert any("manual" in a for a in result.assumptions)
+
+    def test_floor_override_in_share_url_roundtrip(self):
+        """floor_override se preserva en la URL compartible."""
+        original = CalcInput(
+            friendship_level="good",
+            trade_type="normal",
+            n=10,
+            target_kind="hundo",
+            floor_override=12,
+        )
+        encoded = encode_share_url(original)
+        decoded = decode_share_url(encoded)
+        assert decoded.floor_override == 12
+        result = compute_scenario(decoded)
+        assert result.floor == 12
+
+
+class TestRulesetUnavailableError:
+    @pytest.mark.django_db
+    def test_resolve_floor_raises_without_mechanic(self):
+        """Sin mecanica trade_iv, _resolve_floor lanza RulesetUnavailableError."""
+        Mechanic.objects.filter(key="trade_iv").delete()
+        from apps.calculators.services import RulesetUnavailableError, _resolve_floor
+
+        with pytest.raises(RulesetUnavailableError):
+            _resolve_floor("good", "normal")
+
 
 @pytest.mark.django_db
 class TestComputeScenarioCached:
@@ -305,8 +360,6 @@ class TestCalculatorViews:
         )
         assert post_resp.status_code == 200
         post_html = post_resp.content.decode()
-
-        import re
 
         match = re.search(r"share=([a-zA-Z0-9_-]+)", post_html)
         assert match is not None, "No se encontro share URL en la respuesta"

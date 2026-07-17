@@ -6,8 +6,10 @@ Casos de referencia (plan §F, §J):
   - Good friends (f=1), Great (f=2), Ultra (f=3), Best (f=5)
 """
 
+import re
 from fractions import Fraction
 from math import isclose
+from pathlib import Path
 
 import pytest
 from hypothesis import assume, given
@@ -285,31 +287,48 @@ class TestDocsExamplesAntiDrift:
     """Gate M3: ejemplos de docs/plan.md y AGENTS.md verificados contra engine.
 
     Una sola fuente de verdad: engine/probability.py.
+    Lee los valores esperados directamente de los archivos docs, para que
+    un cambio en los docs rompa el test (no hardcodea las fracciones).
     """
 
-    def test_agentes_lucky_p_hundo(self):
-        """AGENTS.md: Lucky f=12 -> k=4, p_hundo = 1/64."""
-        assert possible_values(12) == 4
-        assert p_hundo(12) == Fraction(1, 64)
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent
+    DOCS_DIR = BASE_DIR / "docs"
+    AGENTS_MD = BASE_DIR / "AGENTS.md"
+    PLAN_MD = DOCS_DIR / "plan.md"
 
-    def test_agentes_standard_p_hundo(self):
-        """AGENTS.md: estandar f=1 -> k=15, p_hundo = 1/3375."""
-        assert possible_values(1) == 15
-        assert p_hundo(1) == Fraction(1, 3375)
+    @staticmethod
+    def _extract_p_hundo(text: str) -> list[tuple[int, int, int]]:
+        """Extrae (f, numerador, denominador) de patrones 'p_hundo=n/d' en el texto.
 
-    def test_best_friends_floor_5(self):
-        """plan.md: Best f=5 -> k=11, p_hundo = 1/1331."""
-        assert possible_values(5) == 11
-        assert p_hundo(5) == Fraction(1, 1331)
+        Soporta formato plano (p_hundo=1/64) y con markdown (p_hundo=**1/64**).
+        """
+        results: list[tuple[int, int, int]] = []
+        for f_match in re.finditer(r"f=(\d+)", text):
+            f = int(f_match.group(1))
+            rest = text[f_match.end() : f_match.end() + 80]
+            p_match = re.search(r"p_hundo=\*{0,2}(\d+)\s*/\s*\*{0,2}(\d+)", rest)
+            if p_match:
+                results.append((f, int(p_match.group(1)), int(p_match.group(2))))
+        return results
 
-    def test_good_friends_floor_1(self):
-        """Seed: Good friends f=1."""
-        assert possible_values(1) == 15
+    def test_agentes_values_match_engine(self):
+        """AGENTS.md: valores de p_hundo leidos del archivo."""
+        text = self.AGENTS_MD.read_text()
+        pairs = self._extract_p_hundo(text)
+        assert len(pairs) >= 2, "No se encontraron p_hundo en AGENTS.md"
+        for f, num, den in pairs:
+            assert p_hundo(f) == Fraction(num, den), (
+                f"AGENTS.md dice f={f} -> p_hundo={num}/{den}, engine produce {p_hundo(f)}"
+            )
+            assert possible_values(f) == 16 - f
 
-    def test_great_friends_floor_2(self):
-        """Seed: Great friends f=2."""
-        assert possible_values(2) == 14
-
-    def test_ultra_friends_floor_3(self):
-        """Seed: Ultra friends f=3."""
-        assert possible_values(3) == 13
+    def test_plan_values_match_engine(self):
+        """plan.md: valores de p_hundo leidos del archivo."""
+        text = self.PLAN_MD.read_text()
+        pairs = self._extract_p_hundo(text)
+        assert len(pairs) >= 2, "No se encontraron p_hundo en plan.md"
+        for f, num, den in pairs:
+            assert p_hundo(f) == Fraction(num, den), (
+                f"plan.md dice f={f} -> p_hundo={num}/{den}, engine produce {p_hundo(f)}"
+            )
+            assert possible_values(f) == 16 - f
