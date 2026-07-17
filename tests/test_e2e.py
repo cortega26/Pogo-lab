@@ -178,3 +178,57 @@ def test_trade_dashboard_flow(live_server, _seeded_mechanic):
         assert "Normal" in content
 
         browser.close()
+
+
+@pytest.mark.skipif(True, reason="Requiere playwright install")
+def test_analysis_dashboard_flow(live_server, _seeded_mechanic):
+    """Usuario registra intercambios y consulta panel de analisis."""
+    from datetime import UTC, datetime
+
+    from django.contrib.auth import get_user_model
+    from playwright.sync_api import sync_playwright
+
+    from apps.trades.services import register_observation
+
+    user_model = get_user_model()
+    user = user_model.objects.create_user(email="test@example.com", password="pass123")
+
+    for i in range(10):
+        register_observation(
+            owner_id=user.pk,
+            observed_at=datetime(2026, 7, 17, tzinfo=UTC),
+            friendship_level="best",
+            trade_type="lucky",
+            atk=12 + (i % 4),
+            def_=12 + ((i + 1) % 4),
+            hp=12 + ((i + 2) % 4),
+        )
+    for i in range(5):
+        register_observation(
+            owner_id=user.pk,
+            observed_at=datetime(2026, 7, 17, tzinfo=UTC),
+            friendship_level="good",
+            trade_type="normal",
+            atk=i % 16,
+            def_=(i + 3) % 16,
+            hp=(i + 7) % 16,
+        )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        page.goto(f"{live_server.url}/es/cuenta/login/")
+        page.fill("input[name=login]", "test@example.com")
+        page.fill("input[name=password]", "pass123")
+        page.click("button[type=submit]")
+
+        page.goto(f"{live_server.url}/es/analisis/")
+        page.wait_for_selector("text=Análisis", timeout=5000)
+
+        content = page.text_content("body")
+        assert content is not None
+        assert "Observaciones" in content
+        assert "p-valor" in content or "Muestra insuficiente" in content
+
+        browser.close()

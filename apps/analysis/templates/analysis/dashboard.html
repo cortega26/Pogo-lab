@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{% translate "Análisis personal" %}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">{% translate "Análisis de intercambios" %}</h1>
+
+  {% if has_results %}
+    {% for entry in results_with_rows %}
+    {% with result=entry.result payload=entry.result.payload %}
+    <section class="mb-8 p-4 bg-white rounded shadow">
+      <h2 class="text-lg font-semibold mb-3">{{ result.metric_key }}</h2>
+
+      <dl class="grid grid-cols-2 gap-2 text-sm">
+        <dt class="font-medium text-gray-600">{% translate "Observaciones" %}</dt>
+        <dd>{{ payload.n }}</dd>
+
+        {% if payload.successes is not None %}
+        <dt class="font-medium text-gray-600">{% translate "Éxitos" %}</dt>
+        <dd>{{ payload.successes }} / {{ payload.n }}</dd>
+        {% endif %}
+
+        {% if payload.p_value is not None %}
+        <dt class="font-medium text-gray-600">{% translate "p-valor" %}</dt>
+        <dd>{{ payload.p_value|floatformat:4 }}</dd>
+        {% endif %}
+
+        {% if payload.effect_size is not None %}
+        <dt class="font-medium text-gray-600">{% translate "Tamaño de efecto" %}</dt>
+        <dd>{{ payload.effect_size|floatformat:4 }}</dd>
+        {% endif %}
+
+        {% if payload.ci_lo is not None %}
+        <dt class="font-medium text-gray-600">{% translate "IC (Wilson)" %}</dt>
+        <dd>[{{ payload.ci_lo|floatformat:4 }}, {{ payload.ci_hi|floatformat:4 }}]</dd>
+        {% endif %}
+
+        {% if payload.method_used %}
+        <dt class="font-medium text-gray-600">{% translate "Método" %}</dt>
+        <dd>{{ payload.method_used }}</dd>
+        {% endif %}
+
+        {% if payload.insufficient_sample %}
+        <dt class="font-medium text-amber-600">{% translate "Advertencia" %}</dt>
+        <dd class="text-amber-600">{% translate "Muestra insuficiente para inferencia" %}</dd>
+        {% endif %}
+      </dl>
+
+      {% if "stat_uniformity_" in result.metric_key or "sum_uniformity-" in result.metric_key %}
+      <div class="mt-4">
+        <canvas id="chart-{{ forloop.counter0 }}"
+                data-counts="{{ result.payload.counts|safe }}"
+                data-values="{{ result.payload.values|safe }}">
+        </canvas>
+        <noscript>
+          <table class="mt-2 w-full text-xs border">
+            <thead><tr><th class="border px-2 py-1">{% translate "Valor" %}</th><th class="border px-2 py-1">{% translate "Conteo" %}</th></tr></thead>
+            <tbody>
+            {% for pair in entry.distribution_rows %}
+            <tr>
+              <td class="border px-2 py-1">{{ pair.value }}</td>
+              <td class="border px-2 py-1">{{ pair.count }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </noscript>
+      </div>
+      {% endif %}
+    </section>
+    {% endwith %}
+    {% endfor %}
+
+    {% if recommendations %}
+    <section class="mb-8 p-4 bg-amber-50 rounded shadow border border-amber-200">
+      <h2 class="text-lg font-semibold mb-3">{% translate "Recomendaciones" %}</h2>
+      <ul class="space-y-2 text-sm">
+        {% for rec in recommendations %}
+        <li class="flex items-start gap-2">
+          <span class="{% if rec.severity == 'warning' %}text-amber-600{% elif rec.severity == 'critical' %}text-red-600{% else %}text-blue-600{% endif %} font-bold">
+            {% if rec.severity == 'warning' %}&#9888;{% elif rec.severity == 'critical' %}&#128308;{% else %}&#8505;{% endif %}
+          </span>
+          <span>
+            <strong>{{ rec.message_key }}</strong>
+            <span class="text-gray-500">({{ rec.rule_key }}@{{ rec.rule_version }})</span>
+            {% if rec.params %}
+            <span class="text-gray-400 text-xs">{% for k, v in rec.params.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+            {% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+  {% else %}
+    <div class="p-6 bg-blue-50 rounded shadow text-sm text-blue-800">
+      {% translate "Registra intercambios para ver tu análisis estadístico." %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('[id^="chart-"]').forEach(function(canvas) {
+    try {
+      var counts = JSON.parse(canvas.dataset.counts || '[]');
+      var values = JSON.parse(canvas.dataset.values || '[]');
+      new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: values.map(String),
+          datasets: [{
+            label: '{% translate "Conteo" %}',
+            data: counts,
+            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 1
+          }]
+        },
+      });
+    } catch(e) {}
+  });
+</script>
+{% endblock %}
