@@ -28,8 +28,8 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="{{ LANGUAGE_CODE }}">
 
-  <link rel="stylesheet" href="{% static 'css/output.css' %}">
-  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <link rel="stylesheet" href="{% static 'css/output.css' %}" nonce="{{ request.csp_nonce }}">
+  <script src="{% static 'vendor/htmx.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased">
   <header class="border-b border-gray-200 bg-white">
@@ -47,7 +47,7 @@
         <form action="/i18n/setlang/" method="post">
           {% csrf_token %}
           <input name="next" type="hidden" value="{{ request.get_full_path }}">
-          <select name="language" onchange="this.form.submit()" class="rounded border px-2 py-1 text-sm">
+          <select name="language" id="language-selector" class="rounded border px-2 py-1 text-sm">
             {% for code, name in LANGUAGES %}
               <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
                 {{ name }}
@@ -86,5 +86,11 @@
   </footer>
 
   {% block extra_js %}{% endblock %}
+
+  <script nonce="{{ request.csp_nonce }}">
+    document.getElementById("language-selector").addEventListener("change", function () {
+      this.form.submit();
+    });
+  </script>
 </body>
 </html>

@@ -42,6 +42,7 @@ class TestURLResolution:
         assert url == "/i18n/setlang/"
 
 
+@pytest.mark.django_db
 class TestHealthz:
     """Health endpoint returns correct response."""
 
@@ -59,6 +60,7 @@ class TestHealthz:
         assert "pogo-lab" in html
 
 
+@pytest.mark.django_db
 class TestI18n:
     """i18n_patterns work for all configured languages."""
 
@@ -92,6 +94,7 @@ class TestI18n:
         assert response.status_code == 404
 
 
+@pytest.mark.django_db
 class TestMiddlewares:
     """Core middlewares function correctly."""
 

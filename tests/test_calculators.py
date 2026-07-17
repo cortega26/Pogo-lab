@@ -23,7 +23,7 @@ def _utc(year, month, day):
 
 
 @pytest.fixture(autouse=True)
-def _seeded_mechanic(db):  # noqa: ARG001
+def _seeded_mechanic(db):
     """Crea la mecanica trade_iv con un ruleset publicado para tests de calculadora."""
     Mechanic.objects.create(
         slug="iv-en-intercambios",

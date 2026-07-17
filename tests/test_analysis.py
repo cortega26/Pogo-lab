@@ -18,12 +18,12 @@ User = get_user_model()
 
 
 @pytest.fixture
-def user(db):  # noqa: ARG001
+def user(db):
     return User.objects.create_user(email="test@example.com", password="pass")
 
 
 @pytest.fixture(autouse=True)
-def mechanics(db):  # noqa: ARG001
+def mechanics(db):
     mechanic = Mechanic.objects.create(
         slug="iv-en-intercambios",
         key="trade_iv",
@@ -289,3 +289,51 @@ class TestPooledFloorPerRulesetVersion:
         floors = {g["ruleset_version"]: g["floor"] for g in result}
         assert floors[1] == 5, "v1 debe usar su propio piso (5)"
         assert floors[2] == 7, "v2 debe usar SU piso (7), no el del ruleset vigente"
+
+
+@pytest.mark.django_db
+class TestPooledDeterminism:
+    """El agregado pooled es determinista: mismo dataset → mismos p_values."""
+
+    def test_same_data_produces_same_p_values(self):
+        from apps.analysis.services import compute_pooled_statistics
+
+        rows = [
+            {
+                "atk": i % 16,
+                "def": (i * 3) % 16,
+                "hp": (i * 7) % 16,
+                "friendship_level": "best",
+                "trade_type": "normal",
+                "is_lucky": False,
+                "ruleset_version": 1,
+                "observed_month": "2026-01",
+            }
+            for i in range(200)
+        ]
+
+        result1 = compute_pooled_statistics(rows)
+        result2 = compute_pooled_statistics(rows)
+
+        assert len(result1) == len(result2)
+
+        for g1, g2 in zip(result1, result2, strict=False):
+            assert g1["is_lucky"] == g2["is_lucky"]
+            assert g1["friendship_level"] == g2["friendship_level"]
+            assert g1["ruleset_version"] == g2["ruleset_version"]
+            assert g1["n"] == g2["n"]
+            assert g1["floor"] == g2["floor"]
+
+            ho1 = g1["hundo_analysis"]
+            ho2 = g2["hundo_analysis"]
+            for key in ("n", "successes", "p0", "floor", "observed_rate", "p_value"):
+                assert ho1[key] == ho2[key], f"hundo_analysis/{key} difiere"
+
+            for stat_name in ("atk", "def", "hp"):
+                s1 = g1["statistics"][stat_name]
+                s2 = g2["statistics"][stat_name]
+                assert s1["p_value"] == s2["p_value"], (
+                    f"p_value de {stat_name} difiere: {s1['p_value']} != {s2['p_value']}"
+                )
+                assert s1["counts"] == s2["counts"]
+                assert s1["values"] == s2["values"]

@@ -15,6 +15,8 @@ dependencies = [
     "whitenoise>=6.9.0",
     "fido2>=1.2.0",
     "import-linter>=2.0.0",
+    "django-csp>=4.0.0",
+    "django-ratelimit>=4.1.0",
     "scipy>=1.15.0",
 ]
 
@@ -29,6 +31,11 @@ select = [
 ]
 ignore = ["E501"]
 exclude = ["*/migrations/*", "apps/accounts/signals.py"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["ARG001", "ARG002"]
+"apps/*/tests/*.py" = ["ARG001", "ARG002"]
+"config/settings/prod.py" = ["F405"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -116,10 +123,13 @@ dev = [
     "django-stubs[compatible-mypy]>=6.0.7",
     "hypothesis>=6.156.6",
     "mypy>=2.3.0",
+    "pip-audit>=2.9.0",
+    "playwright>=1.55.0",
     "pre-commit>=4.6.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.12.0",
+    "pytest-playwright>=0.7.0",
     "pytest-randomly>=4.1.0",
     "ruff>=0.15.22",
     "types-python-dateutil>=2.9.0.20260716",

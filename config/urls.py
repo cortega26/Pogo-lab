@@ -5,6 +5,8 @@ from django.urls import URLPattern, URLResolver, include, path
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
 
+from apps.accounts.allauth_views import RateLimitedLoginView, RateLimitedSignupView
+
 from .sitemaps import sitemaps_dict
 
 urlpatterns: list[URLPattern | URLResolver] = [
@@ -29,6 +31,16 @@ urlpatterns: list[URLPattern | URLResolver] = [
 ]
 
 urlpatterns += i18n_patterns(
+    path(
+        _("cuenta/login/"),
+        RateLimitedLoginView.as_view(),
+        name="account_login",
+    ),
+    path(
+        _("cuenta/signup/"),
+        RateLimitedSignupView.as_view(),
+        name="account_signup",
+    ),
     path(_("cuenta/"), include("allauth.urls")),
     path(_("cuenta/"), include("apps.accounts.urls")),
     path("", include("apps.core.urls")),

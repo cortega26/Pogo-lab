@@ -266,7 +266,7 @@ class TestMechanicViews:
         resp = client.get("/es/mecanicas/no-existe/")
         assert resp.status_code == 404
 
-    def test_mechanic_detail_shows_ruleset(self, client, published_ruleset):  # noqa: ARG002
+    def test_mechanic_detail_shows_ruleset(self, client, published_ruleset):
         resp = client.get("/es/mecanicas/iv-en-intercambios/")
         assert resp.status_code == 200
         html = resp.content.decode()
@@ -287,20 +287,20 @@ class TestContentPageViews:
 
 @pytest.mark.django_db
 class TestResolveTradeFloor:
-    def test_resolve_with_published_ruleset(self, published_ruleset):  # noqa: ARG002
+    def test_resolve_with_published_ruleset(self, published_ruleset):
         from apps.mechanics.services import resolve_trade_floor
 
         floor, version = resolve_trade_floor("good", "normal")
         assert floor == 1
         assert version == 1
 
-    def test_resolve_lucky_uses_lucky_floor(self, published_ruleset):  # noqa: ARG002
+    def test_resolve_lucky_uses_lucky_floor(self, published_ruleset):
         from apps.mechanics.services import resolve_trade_floor
 
         floor, _version = resolve_trade_floor("best", "lucky")
         assert floor == 12
 
-    def test_resolve_raises_without_ruleset(self, trade_mechanic):  # noqa: ARG002
+    def test_resolve_raises_without_ruleset(self, trade_mechanic):
         from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
 
         with pytest.raises(RulesetUnavailableError):
@@ -323,7 +323,7 @@ class TestResolveTradeFloor:
         resp = client.get("/es/guias/no-existe/")
         assert resp.status_code == 404
 
-    def test_content_page_renders_with_seo(self, client, seed_content_pages):  # noqa: ARG002
+    def test_content_page_renders_with_seo(self, client, seed_content_pages):
         resp = client.get("/es/guias/no-afiliacion/")
         assert resp.status_code == 200
         html = resp.content.decode()

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Cuenta eliminada" %} — Pogo-lab{% endblock %}
+
+{% block content %}
+  <div class="mx-auto max-w-md">
+    <h1 class="mb-4 text-2xl font-bold">{% trans "Cuenta eliminada" %}</h1>
+    <div class="rounded-lg border bg-white p-6">
+      <p class="mb-4 text-gray-600">
+        {% trans "Tu cuenta y todos tus datos han sido eliminados." %}
+      </p>
+      <a href="/" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+        {% trans "Volver al inicio" %}
+      </a>
+    </div>
+  </div>
+{% endblock %}
