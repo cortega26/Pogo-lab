@@ -56,6 +56,9 @@ node_modules/
 .continue/skills/
 skills-lock.json
 
+# === Prompts de handoff (artefactos de trabajo transitorios, no versionados) ===
+docs/handoffs/
+
 # === SO / editores ===
 .DS_Store
 Thumbs.db
