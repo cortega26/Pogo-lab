@@ -249,3 +249,43 @@ def _client(user):
     c = Client()
     c.force_login(user)
     return c
+
+
+@pytest.mark.django_db
+class TestPooledFloorPerRulesetVersion:
+    """Regresión M6-1: el agregado pooled resuelve el piso del ruleset_version
+    del grupo (floor_for_ruleset), no del ruleset vigente."""
+
+    def test_floor_read_from_group_version_not_active(self):
+        from apps.analysis.services import compute_pooled_statistics
+
+        # La fixture autouse crea v1 (best=5, vigente). Añadimos v2 (best=7,
+        # con fecha futura → NO vigente): si el agregado usara el ruleset activo,
+        # el grupo de v2 tomaría 5; con el fix toma 7 (su propia versión).
+        mech = Mechanic.objects.get(key="trade_iv")
+        rs2 = MechanicRuleSet.objects.create(
+            mechanic=mech,
+            version=2,
+            name="v2",
+            effective_from=datetime(2027, 1, 1, tzinfo=UTC),
+            is_published=True,
+        )
+        for key, value in [("floor.friendship.best", 7), ("floor.lucky", 12)]:
+            RuleParameter.objects.create(ruleset=rs2, key=key, value=value, data_type="integer")
+
+        def _row(version):
+            return {
+                "atk": 10,
+                "def": 10,
+                "hp": 10,
+                "friendship_level": "best",
+                "trade_type": "normal",
+                "is_lucky": False,
+                "ruleset_version": version,
+                "observed_month": "2026-01",
+            }
+
+        result = compute_pooled_statistics([_row(1), _row(2)])
+        floors = {g["ruleset_version"]: g["floor"] for g in result}
+        assert floors[1] == 5, "v1 debe usar su propio piso (5)"
+        assert floors[2] == 7, "v2 debe usar SU piso (7), no el del ruleset vigente"

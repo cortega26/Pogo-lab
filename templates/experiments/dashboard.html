@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Dataset Comunitario" %} — Pogo-lab{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="mb-6 text-3xl font-bold">{% trans "Dataset Comunitario de Intercambios" %}</h1>
+
+  {# Advertencia de sesgo de selección — PROMINENTE #}
+  <div class="mb-8 rounded-lg border-2 border-amber-300 bg-amber-50 p-4" role="alert">
+    <h2 class="mb-2 font-bold text-amber-900">{% trans "Advertencia sobre los datos" %}</h2>
+    <p class="text-sm text-amber-800">
+      {% trans "Este dataset NO es una muestra aleatoria de la población de jugadores. Los datos provienen de entrenadores que eligen voluntariamente contribuir sus observaciones (auto-selección). Esto puede introducir sesgos: jugadores más activos, con más hundos, o con comportamientos atípicos pueden estar sobrerrepresentados. Interpreta los resultados con cautela." %}
+    </p>
+  </div>
+
+  {% if dataset_version %}
+    {# Resumen #}
+    <section class="mb-8">
+      <h2 class="mb-4 text-xl font-semibold">{% trans "Resumen" %}</h2>
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="rounded-lg border bg-white p-4">
+          <dt class="text-sm text-gray-500">{% trans "Total de observaciones" %}</dt>
+          <dd class="text-2xl font-bold text-blue-600">{{ total_observations }}</dd>
+        </div>
+        <div class="rounded-lg border bg-white p-4">
+          <dt class="text-sm text-gray-500">{% trans "Afortunados (Lucky)" %}</dt>
+          <dd class="text-2xl font-bold text-yellow-600">{{ lucky_total }}</dd>
+        </div>
+        <div class="rounded-lg border bg-white p-4">
+          <dt class="text-sm text-gray-500">{% trans "Normales" %}</dt>
+          <dd class="text-2xl font-bold text-gray-600">{{ normal_total }}</dd>
+        </div>
+        <div class="rounded-lg border bg-white p-4">
+          <dt class="text-sm text-gray-500">{% trans "Versión del dataset" %}</dt>
+          <dd class="text-xl font-bold">v{{ dataset_version.number }}</dd>
+        </div>
+        <div class="rounded-lg border bg-white p-4">
+          <dt class="text-sm text-gray-500">{% trans "Fecha de construcción" %}</dt>
+          <dd class="text-xl font-bold">{{ build_date|date:"Y-m-d" }}</dd>
+        </div>
+        <div class="rounded-lg border bg-white p-4">
+          <dt class="text-sm text-gray-500">{% trans "Muestra mínima requerida" %}</dt>
+          <dd class="text-xl font-bold">
+            {% if dataset_version.min_sample_met %}
+              <span class="text-green-600">{% trans "Alcanzada" %}</span>
+            {% else %}
+              <span class="text-red-600">{% trans "No alcanzada" %}</span>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    {# Rulesets incluidos #}
+    <section class="mb-8">
+      <h2 class="mb-4 text-xl font-semibold">{% trans "Versiones de ruleset incluidas" %}</h2>
+      <ul class="list-inside list-disc space-y-1 text-sm text-gray-700">
+        {% for rv in ruleset_versions %}
+          <li>Ruleset v{{ rv }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    {# Distribución agregada #}
+    <section class="mb-8">
+      <h2 class="mb-4 text-xl font-semibold">{% trans "Distribución agregada" %}</h2>
+      {% if aggregation %}
+        {% for group in aggregation %}
+          <div class="mb-6 rounded-lg border bg-white p-4">
+            <h3 class="mb-2 font-semibold">
+              {% if group.is_lucky %}
+                {% trans "Lucky" %} — {{ group.friendship_level }}
+              {% else %}
+                {% trans "Normal" %} — {{ group.friendship_level }}
+              {% endif %}
+              {% trans "(Ruleset v" %}{{ group.ruleset_version }})
+            </h3>
+            <p class="text-sm text-gray-600">
+              n = {{ group.n }}
+              · {% trans "Piso:" %} f = {{ group.floor }}
+              {% if group.hundo_analysis.successes > 0 %}
+                · {% trans "Hundos:" %} {{ group.hundo_analysis.successes }}
+                ({{ group.hundo_analysis.observed_rate|floatformat:6 }})
+              {% endif %}
+            </p>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-sm text-gray-500">{% trans "No hay datos agregados disponibles." %}</p>
+      {% endif %}
+    </section>
+
+    {# Metodología y limitaciones #}
+    <section class="mb-8">
+      <h2 class="mb-4 text-xl font-semibold">{% trans "Metodología y limitaciones" %}</h2>
+      <div class="prose max-w-none rounded-lg border bg-white p-4 text-sm text-gray-700">
+        <p>{% trans "Los datos provienen de intercambios registrados por entrenadores que han dado su consentimiento explícito para contribuir de forma anonimizada al dataset comunitario." %}</p>
+        <ul class="mt-2 list-inside list-disc space-y-1">
+          <li>{% trans "Solo se incluyen observaciones marcadas como válidas." %}</li>
+          <li>{% trans "Cada entrenador otorga consentimiento explícito (revocable en cualquier momento)." %}</li>
+          <li>{% trans "Los datos están anonimizados: sin nombre de entrenador, correo, ubicación precisa ni marcas de tiempo exactas." %}</li>
+          <li>{% trans "Los IV se agrupan por tipo de intercambio (Lucky/normal) y nivel de amistad — nunca se mezclan pisos distintos." %}</li>
+          <li>{% trans "No se incluye país por fila. Cualquier agregado geográfico usa supresión de celdas pequeñas." %}</li>
+          <li>{% trans "Sesgo de selección: los contribuyentes no son una muestra aleatoria (ver advertencia arriba)." %}</li>
+        </ul>
+      </div>
+    </section>
+
+    {# Descarga — DESACTIVADA por defecto #}
+    <section class="mb-8">
+      <h2 class="mb-4 text-xl font-semibold">{% trans "Descarga" %}</h2>
+      {% if can_download %}
+        <p class="text-sm text-gray-600">
+          {% trans "La descarga pública del dataset está disponible." %}
+        </p>
+      {% else %}
+        <div class="rounded-lg border border-gray-300 bg-gray-50 p-4">
+          <p class="text-sm text-gray-500">
+            {% trans "La descarga pública del dataset no está habilitada en este momento." %}
+          </p>
+          <p class="mt-1 text-xs text-gray-400">
+            {% trans "Habilitar la descarga pública requiere revisión legal de la licencia del dataset y que se alcance la muestra mínima." %}
+          </p>
+        </div>
+      {% endif %}
+    </section>
+
+  {% else %}
+    {# Sin dataset #}
+    <div class="rounded-lg border bg-gray-50 p-8 text-center">
+      <p class="mb-4 text-lg text-gray-600">
+        {% trans "Aún no se ha construido ninguna versión del dataset comunitario." %}
+      </p>
+      <p class="text-sm text-gray-400">
+        {% trans "Cuando haya suficientes contribuciones, aquí aparecerá el dashboard comunitario." %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
