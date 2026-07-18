@@ -29,29 +29,32 @@ def seeded_mechanic():
     mechanic.status = "active"
     mechanic.save()
 
-    rs, _ = MechanicRuleSet.objects.get_or_create(
+    rs, created = MechanicRuleSet.objects.get_or_create(
         mechanic=mechanic,
         version=1,
         defaults={
             "name": "Ruleset E2E",
             "effective_from": datetime(2026, 1, 1, tzinfo=UTC),
-            "is_published": True,
+            "is_published": False,
         },
     )
-    params = [
-        ("floor.friendship.good", 1),
-        ("floor.friendship.great", 2),
-        ("floor.friendship.ultra", 3),
-        ("floor.friendship.best", 5),
-        ("floor.lucky", 12),
-    ]
-    for key, value in params:
-        RuleParameter.objects.get_or_create(
-            ruleset=rs,
-            key=key,
-            value=value,
-            data_type="integer",
-        )
+    if created:
+        params = [
+            ("floor.friendship.good", 1),
+            ("floor.friendship.great", 2),
+            ("floor.friendship.ultra", 3),
+            ("floor.friendship.best", 5),
+            ("floor.lucky", 12),
+        ]
+        for key, value in params:
+            RuleParameter.objects.get_or_create(
+                ruleset=rs,
+                key=key,
+                value=value,
+                data_type="integer",
+            )
+        rs.is_published = True
+        rs.save(update_fields=["is_published", "updated_at"])
 
 
 # ═══════════════════════════════════════════════════════════════════

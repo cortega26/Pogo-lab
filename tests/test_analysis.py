@@ -36,7 +36,7 @@ def mechanics(db):
         version=1,
         name="Ruleset test",
         effective_from=datetime(2026, 1, 1, tzinfo=UTC),
-        is_published=True,
+        is_published=False,
     )
     for pd in [
         {"key": "floor.friendship.good", "value": 1, "data_type": "integer"},
@@ -46,6 +46,8 @@ def mechanics(db):
         {"key": "floor.lucky", "value": 12, "data_type": "integer"},
     ]:
         RuleParameter.objects.create(ruleset=rs, **pd)
+    rs.is_published = True
+    rs.save(update_fields=["is_published", "updated_at"])
     return mechanic
 
 
@@ -367,10 +369,12 @@ class TestPooledFloorPerRulesetVersion:
             version=2,
             name="v2",
             effective_from=datetime(2027, 1, 1, tzinfo=UTC),
-            is_published=True,
+            is_published=False,
         )
         for key, value in [("floor.friendship.best", 7), ("floor.lucky", 12)]:
             RuleParameter.objects.create(ruleset=rs2, key=key, value=value, data_type="integer")
+        rs2.is_published = True
+        rs2.save(update_fields=["is_published", "updated_at"])
 
         def _row(version):
             return {

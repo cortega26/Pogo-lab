@@ -34,7 +34,7 @@ def _seeded_mechanic(db):
         version=1,
         name="Ruleset de prueba",
         effective_from=_utc(2026, 1, 1),
-        is_published=True,
+        is_published=False,
     )
     for key, value in [
         ("floor.friendship.good", 1),
@@ -44,6 +44,8 @@ def _seeded_mechanic(db):
         ("floor.lucky", 12),
     ]:
         RuleParameter.objects.create(ruleset=rs, key=key, value=value, data_type="integer")
+    rs.is_published = True
+    rs.save(update_fields=["is_published", "updated_at"])
 
 
 @pytest.fixture

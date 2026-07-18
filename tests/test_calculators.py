@@ -37,7 +37,7 @@ def _seeded_mechanic(db):
         version=1,
         name="Ruleset de prueba",
         effective_from=_utc(2026, 1, 1),
-        is_published=True,
+        is_published=False,
     )
     params_data = [
         {"key": "floor.friendship.good", "value": 1, "data_type": "integer", "unit": "int"},
@@ -48,6 +48,8 @@ def _seeded_mechanic(db):
     ]
     for pd in params_data:
         RuleParameter.objects.create(ruleset=rs, **pd)
+    rs.is_published = True
+    rs.save(update_fields=["is_published", "updated_at"])
 
 
 class TestCalcInput:

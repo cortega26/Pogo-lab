@@ -70,13 +70,15 @@ class Command(BaseCommand):
                 name="Ruleset base de intercambios",
                 effective_from=SEED_DATE,
                 effective_to=None,
-                is_published=True,
+                is_published=False,
                 confidence_level="high",
             )
+            self._create_parameters(ruleset)
+            ruleset.is_published = True
+            ruleset.save(update_fields=["is_published", "updated_at"])
             self.stdout.write(f"  Ruleset v{ruleset.version} publicado: {ruleset.name}")
         else:
             self.stdout.write(f"  Ruleset v{ruleset.version} ya existe (inmutable); se reutiliza.")
-        self._create_parameters(ruleset)
         self._create_sources_and_claims(ruleset)
         mechanic.current_ruleset = ruleset
         mechanic.save(update_fields=["current_ruleset"])

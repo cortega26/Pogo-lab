@@ -125,5 +125,25 @@ class RuleParameter(TimestampedModel):
             models.Index(fields=["key"]),
         ]
 
+    def clean(self):
+        if self.ruleset_id and self.ruleset.is_published:
+            raise ValidationError(
+                _(
+                    "No se pueden modificar los parámetros de un ruleset ya publicado. "
+                    "Crea una nueva versión del ruleset."
+                )
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.ruleset_id and self.ruleset.is_published:
+            raise ValidationError(
+                _("No se pueden eliminar los parámetros de un ruleset publicado.")
+            )
+        return super().delete(*args, **kwargs)
+
     def __str__(self):
         return f"{self.key} = {self.value} ({self.data_type})"

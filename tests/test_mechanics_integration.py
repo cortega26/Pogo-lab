@@ -207,6 +207,40 @@ class TestRuleParameter:
         )
         assert param.value["a"] == 1
 
+    def test_cannot_add_parameter_to_published_ruleset(self, published_ruleset):
+        with pytest.raises(ValidationError, match="No se pueden modificar los parámetros"):
+            RuleParameter.objects.create(
+                ruleset=published_ruleset,
+                key="floor.test",
+                value=99,
+                data_type="integer",
+            )
+
+    def test_cannot_edit_parameter_of_published_ruleset(self, published_ruleset):
+        param = published_ruleset.parameters.first()
+        param.value = 999
+        with pytest.raises(ValidationError, match="No se pueden modificar los parámetros"):
+            param.save()
+
+    def test_cannot_delete_parameter_of_published_ruleset(self, published_ruleset):
+        param = published_ruleset.parameters.first()
+        with pytest.raises(ValidationError, match="No se pueden eliminar los parámetros"):
+            param.delete()
+
+    def test_can_still_author_parameters_before_publish(self, draft_ruleset):
+        param = RuleParameter.objects.create(
+            ruleset=draft_ruleset,
+            key="floor.test",
+            value=99,
+            data_type="integer",
+        )
+        assert param.value == 99
+        param.value = 100
+        param.save()
+        assert param.value == 100
+        param.delete()
+        assert not RuleParameter.objects.filter(pk=param.pk).exists()
+
 
 @pytest.mark.django_db
 class TestSourceReference:
