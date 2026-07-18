@@ -64,6 +64,9 @@ skills-lock.json
 # === Prompts de handoff (artefactos de trabajo transitorios, no versionados) ===
 docs/handoffs/
 
+# === Planes de /improve (artefactos de trabajo del advisor, no versionados) ===
+plans/
+
 # === SO / editores ===
 .DS_Store
 Thumbs.db
