@@ -1,0 +1,39 @@
+# Control de versiones
+.git
+.gitignore
+
+# Secretos / entorno (NUNCA en la imagen)
+.env
+.env.*
+!.env.example
+.env-oci
+infra/keys/
+
+# Entornos virtuales / dependencias locales
+.venv/
+node_modules/
+
+# Caché de tests / type checking / lint / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+htmlcov/
+.coverage
+.coverage.*
+__pycache__/
+*.py[cod]
+
+# Artefactos de Playwright / reportes
+/test-results/
+/playwright-report/
+/blob-report/
+
+# Índice local de CodeGraph
+.codegraph/
+
+# Artefactos de trabajo / skills locales
+plans/
+skills-lock.json
+.agents/
+.claude/
