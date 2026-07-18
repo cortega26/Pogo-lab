@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 
 from apps.accounts.models import UserProfile
 from apps.contributions.models import DataContributionConsent, DatasetVersion
@@ -632,3 +633,29 @@ class TestConsentViews:
         response = client.get("/es/contribuciones/consentir/")
         assert response.status_code == 302
         assert "login" in response.url
+
+    @pytest.mark.django_db
+    def test_grant_consent_rejects_get(self, client, user):
+        client.force_login(user)
+        response = client.get(reverse("contributions:grant"))
+        assert response.status_code == 405
+        assert not DataContributionConsent.objects.filter(user=user, scope=SCOPE).exists()
+
+    @pytest.mark.django_db
+    def test_revoke_consent_rejects_get(self, client, user):
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        client.force_login(user)
+        response = client.get(reverse("contributions:revoke"))
+        assert response.status_code == 405
+        consent = DataContributionConsent.objects.get(user=user, scope=SCOPE)
+        assert consent.is_active is True
+
+    @pytest.mark.django_db
+    def test_consent_redirect_ignores_external_referer(self, client, user):
+        client.force_login(user)
+        response = client.post(
+            reverse("contributions:grant"),
+            HTTP_REFERER="https://evil.example.com/steal",
+        )
+        assert response.status_code == 302
+        assert response.url == "/"
