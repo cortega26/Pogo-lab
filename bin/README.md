@@ -31,7 +31,7 @@ El script pide confirmación antes de sobrescribir.
 
 ## PENDIENTE-HUMANO
 
-- [ ] Verificar la restauración en el entorno de producción real.
-- [ ] Configurar backups automáticos diarios (cron, systemd timer, o scheduler del PaaS).
-- [ ] Subir backups a almacenamiento externo (S3, GCS, Backblaze B2).
+- [ ] Verificar la restauración en OCI (entorno de producción).
+- [ ] Configurar backups automáticos diarios en OCI (cron o systemd timer).
+- [ ] Subir backups a OCI Object Storage (capa gratuita, 10 GB).
 - [ ] Probar el procedimiento completo de disaster recovery al menos una vez.

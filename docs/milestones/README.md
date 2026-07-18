@@ -29,6 +29,12 @@ milestone en curso (no el plan completo), lo que mantiene el contexto pequeño y
 | [M6 — Community Dataset](M6-community-dataset.md) | Contribución opt-in anonimizada + moderación + dashboard | L | M5 | PR-17…19 | ✅ |
 | [M7 — Hardening y beta](M7-hardening-beta.md) | E2E, a11y, seguridad, backup/restore, despliegue, beta | M | M1…M6 | PR-20, 21 | 🟨 |
 
+## Post-MVP
+
+| Roadmap | Objetivo | Estado |
+|---|---|:--:|
+| [Fase 2 — Expansión](fase-2.md) | Combate/captura/recursos: roadmap + compuerta de verificación (Gate 0). Se descompone en M8+. Entrada: [research pack sin verificar](../research/README.md). | ⬜ |
+
 ## Cómo usar estas hojas
 
 1. Al iniciar una sesión de implementación, abre **solo** la hoja del milestone en curso.

@@ -1,0 +1,155 @@
+{
+  "_meta": {
+    "status": "UNVERIFIED research map — not a spec",
+    "warning": "Estos vectores NO están verificados contra fuente primaria y contienen errores conocidos (p. ej. Pikachu CP, daño PvE, daño PvP, Medicham CP). Ver docs/research/README.md y docs/milestones/fase-2.md (Gate 0). La fuente de verdad son las fixtures del engine/ calculadas a mano.",
+    "verified_by": null
+  },
+  "stat_conversion": [
+    {
+      "species": "Mewtwo",
+      "msg_stats": {
+        "hp": 106,
+        "atk": 110,
+        "def": 90,
+        "sp_atk": 154,
+        "sp_def": 90,
+        "speed": 130
+      },
+      "expected_raw_go_stats": {
+        "atk": 330,
+        "def": 200,
+        "stam": 235
+      },
+      "expected_nerfed_go_stats": {
+        "atk": 300,
+        "def": 182,
+        "stam": 214
+      },
+      "nerf_applied": true,
+      "notes": "Mewtwo supera los 4000 CP proyectados a L40, por lo que se le aplica el nerf del 9% a sus estadísticas base."
+    },
+    {
+      "species": "Pikachu",
+      "msg_stats": {
+        "hp": 35,
+        "atk": 55,
+        "def": 40,
+        "sp_atk": 50,
+        "sp_def": 50,
+        "speed": 90
+      },
+      "expected_raw_go_stats": {
+        "atk": 112,
+        "def": 96,
+        "stam": 111
+      },
+      "nerf_applied": false,
+      "notes": "Pikachu no supera el umbral de 4000 CP a L40, por lo que sus estadísticas base quedan intactas."
+    }
+  ],
+  "cp_and_hp": [
+    {
+      "species": "Mewtwo",
+      "level": 40.0,
+      "cpm": 0.790300,
+      "ivs": {
+        "atk": 15,
+        "def": 15,
+        "stam": 15
+      },
+      "base_stats": {
+        "atk": 300,
+        "def": 182,
+        "stam": 214
+      },
+      "expected_cp": 4178,
+      "expected_hp": 180
+    },
+    {
+      "species": "Pikachu",
+      "level": 15.0,
+      "cpm": 0.517393,
+      "ivs": {
+        "atk": 10,
+        "def": 10,
+        "stam": 10
+      },
+      "base_stats": {
+        "atk": 112,
+        "def": 96,
+        "stam": 111
+      },
+      "expected_cp": 387,
+      "expected_hp": 62
+    }
+  ],
+  "catch_probability": [
+    {
+      "species": "Charmander",
+      "bcr": 0.20,
+      "cpm": 0.517393,
+      "modifiers": {
+        "ball": 1.0,
+        "berry": 1.5,
+        "curveball": 1.7,
+        "medal": 1.3,
+        "throw": 1.15
+      },
+      "expected_total_multiplier": 3.81225,
+      "expected_catch_probability": 0.55889
+    },
+    {
+      "species": "Raid Legendary Boss",
+      "bcr": 0.02,
+      "cpm": 0.597400,
+      "modifiers": {
+        "ball": 1.0,
+        "berry": 2.5,
+        "curveball": 1.7,
+        "medal": 1.4,
+        "throw": 1.85
+      },
+      "expected_total_multiplier": 11.0075,
+      "expected_catch_probability": 0.16912
+    }
+  ],
+  "pve_damage": [
+    {
+      "attacker": {
+        "atk_effective": 315.0,
+        "shadow_bonus": 1.2,
+        "mega_bonus": 1.0
+      },
+      "defender": {
+        "def_effective": 197.0
+      },
+      "move": {
+        "power": 110,
+        "stab": 1.2,
+        "effectiveness": 1.6,
+        "weather": 1.2
+      },
+      "expected_damage": 139,
+      "notes": "floor(0.5 * 110 * (315 * 1.2 / 197) * 1.2 * 1.6 * 1.2) + 1 = floor(138.38) + 1 = 139"
+    }
+  ],
+  "pvp_damage": [
+    {
+      "attacker": {
+        "atk_effective": 150.0,
+        "stage_modifier": 1.25,
+        "shadow_bonus": 1.0
+      },
+      "defender": {
+        "def_effective": 120.0
+      },
+      "move": {
+        "power": 100,
+        "stab": 1.2,
+        "effectiveness": 0.625
+      },
+      "expected_damage": 74,
+      "notes": "floor(0.5 * 100 * (150 * 1.25 / 120) * 1.2 * 0.625 * 1.3) + 1 = floor(73.535) + 1 = 74"
+    }
+  ]
+}

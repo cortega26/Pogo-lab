@@ -8,32 +8,39 @@ on:
       - "docs/**"
       - "**.md"
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}/pogo-lab
-
 jobs:
-  build-and-push:
+  deploy-oci:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Build image
-        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
-      - name: Push to registry
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.IMAGE_NAME }}:latest
+      - name: Deploy to OCI
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/pogo-lab
+            git pull origin main
+            docker compose -f compose.prod.yaml up -d --build --remove-orphans
+            docker compose -f compose.prod.yaml exec -T web python manage.py migrate --noinput
+            docker compose -f compose.prod.yaml exec -T web python manage.py collectstatic --noinput
+            docker system prune -f
+            echo "Despliegue completado en $(date -Iseconds)"
 
-# PENDIENTE-HUMANO: Configurar el despliegue en el PaaS elegido (Fly.io, Railway, Render, o VPS).
-# Pasos necesarios:
-# 1. Elegir plataforma de hosting y crear cuenta.
-# 2. Configurar DATABASE_URL, SECRET_KEY, ALLOWED_HOSTS como secretos/variables de entorno en el PaaS.
-# 3. Apuntar el dominio (DNS) a la plataforma.
-# 4. Configurar SSL/TLS (Let's Encrypt o el que provea el PaaS).
-# 5. Verificar que el health check (/healthz) responde correctamente en producción.
-# 6. Configurar backups automáticos de la base de datos (ver bin/backup.sh).
+# Setup inicial en OCI (una sola vez):
+# 1. Crear VM ARM Ampere A1 (4 OCPU, 24 GB) en la capa gratuita de OCI:
+#    https://cloud.oracle.com/compute/instances
+# 2. Instalar Docker + Docker Compose en la VM:
+#    curl -fsSL https://get.docker.com | sh
+#    sudo usermod -aG docker $USER
+# 3. Clonar el repo: git clone <repo-url> /opt/pogo-lab
+# 4. Crear .env.prod a partir de .env.prod.example y configurar valores reales.
+# 5. Configurar secretos en GitHub (Settings > Secrets and variables > Actions):
+#    - OCI_HOST: IP pública de la VM
+#    - OCI_USER: usuario SSH (ubuntu en Oracle Linux)
+#    - OCI_SSH_KEY: clave privada SSH (~/.ssh/id_rsa sin passphrase o deploy key)
+# 6. Ejecutar docker compose -f compose.prod.yaml up -d --build la primera vez.
+# 7. Configurar DNS (A record) apuntando al dominio.
+# 8. Configurar backup automático vía cron/systemd timer con bin/backup.sh.
+# 9. Opcional: configurar firewall de OCI (puertos 80/443 abiertos).

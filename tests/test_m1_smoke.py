@@ -237,3 +237,62 @@ class TestUserProfile:
         profile_id = user.profile.id
         user.delete()
         assert not UserProfile.objects.filter(id=profile_id).exists()
+
+
+@pytest.mark.django_db
+class TestLegalViews:
+    """Legal pages (ToS, privacy, disclaimer) render correctly."""
+
+    def test_disclaimer_200(self):
+        response = Client().get("/es/aviso-legal/")
+        assert response.status_code == 200
+
+    def test_disclaimer_200_en(self):
+        response = Client().get("/en/aviso-legal/")
+        assert response.status_code == 200
+
+    def test_disclaimer_contains_no_affiliation(self):
+        response = Client().get("/es/aviso-legal/")
+        html = response.content.decode()
+        assert "No afiliación" in html
+        assert "Niantic" in html
+
+    def test_disclaimer_contains_no_affiliation_en(self):
+        response = Client().get("/en/aviso-legal/")
+        html = response.content.decode()
+        assert "No affiliation" in html or "No afiliación" in html
+        assert "Niantic" in html
+
+    def test_privacy_200(self):
+        response = Client().get("/es/privacidad/")
+        assert response.status_code == 200
+
+    def test_privacy_200_en(self):
+        response = Client().get("/en/privacidad/")
+        assert response.status_code == 200
+
+    def test_privacy_contains_key_content(self):
+        response = Client().get("/es/privacidad/")
+        html = response.content.decode()
+        assert "recopilamos" in html.lower()
+
+    def test_tos_200(self):
+        response = Client().get("/es/terminos/")
+        assert response.status_code == 200
+
+    def test_tos_200_en(self):
+        response = Client().get("/en/terminos/")
+        assert response.status_code == 200
+
+    def test_tos_contains_key_content(self):
+        response = Client().get("/es/terminos/")
+        html = response.content.decode()
+        assert "términos" in html.lower() or "Términos" in html
+
+    def test_healthcheck_json_no_i18n(self):
+        """healthcheck.json is accessible without locale prefix for monitoring."""
+        response = Client().get("/healthcheck.json")
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert data["status"] == "ok"

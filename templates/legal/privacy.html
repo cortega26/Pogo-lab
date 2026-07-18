@@ -8,10 +8,12 @@
     <h1>{% trans "Política de privacidad" %}</h1>
 
     <p class="text-sm text-gray-500 italic">
-      {% trans "Última actualización: por definir." %}
+      {% trans "Última actualización: 2026-07-18." %}
     </p>
 
     {# PENDIENTE-HUMANO: Revisión legal requerida antes de publicación. #}
+    {# Este documento es un placeholder sustantivo pero no constituye asesoría legal. #}
+    {# Un profesional debe revisarlo antes de abrir la beta al público. #}
 
     <h2>{% trans "Datos que recopilamos" %}</h2>
     <p>
@@ -66,14 +68,14 @@
     <ul>
       <li>
         {% trans "Exportar tus datos:" %}
-        <a href="{% url 'export_data' %}">{% trans "descargar copia" %}</a>
+        <a href="{% url 'account_export' %}">{% trans "descargar copia" %}</a>
       </li>
       <li>
         {% trans "Revocar tu consentimiento para datasets públicos en cualquier momento." %}
       </li>
       <li>
         {% trans "Solicitar la eliminación de tu cuenta y todos tus datos asociados:" %}
-        <a href="{% url 'delete_account' %}">{% trans "eliminar cuenta" %}</a>
+        <a href="{% url 'account_delete' %}">{% trans "eliminar cuenta" %}</a>
       </li>
     </ul>
 

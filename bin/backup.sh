@@ -29,5 +29,5 @@ echo "==> Iniciando backup en: ${OUTPUT}"
 pg_dump "${DATABASE_URL}" | gzip > "${OUTPUT}"
 echo "==> Backup completado: ${OUTPUT}"
 
-# PENDIENTE-HUMANO: Configurar backups automáticos diarios (cron, systemd timer,
-# o el scheduler del PaaS). Subir el backup a un bucket S3 o similar.
+# PENDIENTE-HUMANO: Configurar backups automáticos diarios en OCI (cron o systemd
+# timer). Subir el backup a OCI Object Storage (capa gratuita, 10 GB).

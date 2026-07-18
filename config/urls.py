@@ -6,11 +6,13 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
 
 from apps.accounts.allauth_views import RateLimitedLoginView, RateLimitedSignupView
+from apps.core.views import healthz_json
 
 from .sitemaps import sitemaps_dict
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("admin/", admin.site.urls),
+    path("healthcheck.json", healthz_json, name="healthcheck_json"),
     path("i18n/", include("django.conf.urls.i18n")),
     path(
         "robots.txt",
