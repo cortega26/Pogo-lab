@@ -135,17 +135,10 @@ def _floor_for_version(
     return f
 
 
-def _hundo_rate_analysis(
-    observations: models.QuerySet,
-    f: int,
-) -> dict[str, Any]:
-    """Análisis de tasa de hundos con prueba binomial exacta."""
-    n = observations.count()
-    successes = observations.filter(atk=15, iv_def=15, hp=15).count()
+def _hundo_payload(n: int, successes: int, f: int) -> dict[str, Any]:
+    """Igual que _hundo_rate_analysis pero con n/successes ya calculados."""
     p0 = float(p_hundo(f))
-
     min_n = min_sample_for("hundo_rate")
-
     payload: dict[str, Any] = {
         "n": n,
         "successes": successes,
@@ -154,7 +147,6 @@ def _hundo_rate_analysis(
         "observed_rate": successes / n if n > 0 else 0.0,
         "min_sample": min_n,
     }
-
     if n >= min_n:
         result = exact_binomial_test(successes, n, p0)
         lo, hi = wilson_interval(successes, n)
@@ -170,35 +162,25 @@ def _hundo_rate_analysis(
         )
     else:
         payload["insufficient_sample"] = True
-
     return payload
 
 
-def _stat_uniformity_analysis(
-    observations: models.QuerySet,
-    f: int,
-    seed: int | None,
-) -> dict[str, Any]:
-    """Análisis de uniformidad por stat (Att, Def, HP)."""
-    n = observations.count()
+def _stat_uniformity_payloads(
+    counts_by_stat: dict[str, list[int]], n: int, f: int, seed: int | None
+) -> dict[str, dict[str, Any]]:
+    """Igual que _stat_uniformity_analysis pero con counts ya calculados por stat."""
     k = 16 - f
     values = list(range(f, 16))
+    probs = [1.0 / k] * k
     min_n = min_sample_for("stat_uniformity")
-
     results: dict[str, dict[str, Any]] = {}
-
-    for stat_name, field in [("atk", "atk"), ("def", "iv_def"), ("hp", "hp")]:
-        counter = Counter(getattr(obs, field) for obs in observations)
-        counts = [counter.get(v, 0) for v in values]
-        probs = [1.0 / k] * k
-
+    for stat_name, counts in counts_by_stat.items():
         payload: dict[str, Any] = {
             "n": n,
             "min_sample": min_n,
             "counts": counts,
             "values": values,
         }
-
         if n >= min_n:
             result = uniformity_test(counts, probs, seed=seed)
             payload.update(
@@ -212,38 +194,27 @@ def _stat_uniformity_analysis(
             )
         else:
             payload["insufficient_sample"] = True
-
         results[stat_name] = payload
-
     return results
 
 
-def _sum_uniformity_analysis(
-    observations: models.QuerySet,
-    f: int,
+def _sum_uniformity_payload(
+    sum_counts: list[int],
+    sum_values: list[int],
+    sum_probs: list[float],
+    n: int,
     seed: int | None,
 ) -> dict[str, Any]:
-    """Análisis de uniformidad de la suma de IV."""
-    from engine.probability import iv_sum_distribution
-
-    n = observations.count()
-    dist = iv_sum_distribution(f)
+    """Igual que _sum_uniformity_analysis pero con counts/values/probs ya calculados."""
     min_n = min_sample_for("sum_uniformity")
-
-    counter = Counter(obs.atk + obs.iv_def + obs.hp for obs in observations)
-    values = sorted(dist.keys())
-    counts = [counter.get(v, 0) for v in values]
-    probs = [float(dist[v]) for v in values]
-
     payload: dict[str, Any] = {
         "n": n,
         "min_sample": min_n,
-        "counts": counts,
-        "values": values,
+        "counts": sum_counts,
+        "values": sum_values,
     }
-
     if n >= min_n:
-        result = uniformity_test(counts, probs, seed=seed)
+        result = uniformity_test(sum_counts, sum_probs, seed=seed)
         payload.update(
             {
                 "stat": result.stat,
@@ -255,8 +226,50 @@ def _sum_uniformity_analysis(
         )
     else:
         payload["insufficient_sample"] = True
-
     return payload
+
+
+def _hundo_rate_analysis(
+    observations: models.QuerySet,
+    f: int,
+) -> dict[str, Any]:
+    """Análisis de tasa de hundos con prueba binomial exacta."""
+    n = observations.count()
+    successes = observations.filter(atk=15, iv_def=15, hp=15).count()
+    return _hundo_payload(n, successes, f)
+
+
+def _stat_uniformity_analysis(
+    observations: models.QuerySet,
+    f: int,
+    seed: int | None,
+) -> dict[str, Any]:
+    """Análisis de uniformidad por stat (Att, Def, HP)."""
+    obs_list = list(observations)
+    n = len(obs_list)
+    counts_by_stat: dict[str, list[int]] = {}
+    for stat_name, field in [("atk", "atk"), ("def", "iv_def"), ("hp", "hp")]:
+        counter: Counter = Counter(getattr(o, field) for o in obs_list)
+        counts_by_stat[stat_name] = [counter.get(v, 0) for v in range(f, 16)]
+    return _stat_uniformity_payloads(counts_by_stat, n, f, seed)
+
+
+def _sum_uniformity_analysis(
+    observations: models.QuerySet,
+    f: int,
+    seed: int | None,
+) -> dict[str, Any]:
+    """Análisis de uniformidad de la suma de IV."""
+    from engine.probability import iv_sum_distribution
+
+    obs_list = list(observations)
+    n = len(obs_list)
+    dist = iv_sum_distribution(f)
+    counter: Counter = Counter(o.atk + o.iv_def + o.hp for o in obs_list)
+    sum_values = sorted(dist.keys())
+    sum_counts = [counter.get(v, 0) for v in sum_values]
+    sum_probs = [float(dist[v]) for v in sum_values]
+    return _sum_uniformity_payload(sum_counts, sum_values, sum_probs, n, seed)
 
 
 def _detect_mixing(qs: models.QuerySet) -> dict[str, bool]:
@@ -428,12 +441,15 @@ def compute_pooled_statistics(
     - Agrupa por (is_lucky, friendship_level, ruleset_version).
     - Resuelve el piso con floor_for_ruleset desde el ruleset de ESA versión
       (nunca hardcodeado, nunca del ruleset activo indiscriminadamente).
-    - Ejecuta prueba binomial exacta para hundo_rate y uniformity_test por stat.
-    - Las mismas funciones del engine que M5 ya tiene testeadas.
+    - Llama a los mismos builders que la ruta personal (`_hundo_payload`,
+      `_stat_uniformity_payloads`, `_sum_uniformity_payload`) para que ningún
+      métrico diverja entre M5 y M6.
 
     Recibe filas anonimizadas en el formato de build_dataset_version:
         {atk, def, hp, friendship_level, trade_type, is_lucky, ruleset_version, observed_month}
     """
+    from engine.probability import iv_sum_distribution
+
     groups: dict[tuple, list[dict]] = {}
     for row in anonymized_rows:
         key = (row["is_lucky"], row["friendship_level"], row.get("ruleset_version", 0))
@@ -449,63 +465,23 @@ def compute_pooled_statistics(
         if f is None:
             continue
 
-        hundos = sum(1 for r in group_rows if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15)
+        successes = sum(
+            1 for r in group_rows
+            if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15
+        )
 
-        hundo_payload: dict[str, Any] = {
-            "n": n,
-            "successes": hundos,
-            "p0": float(p_hundo(f)),
-            "floor": f,
-            "observed_rate": hundos / n if n > 0 else 0.0,
-            "min_sample": min_sample_for("hundo_rate"),
-        }
-        min_n = min_sample_for("hundo_rate")
-        if n >= min_n:
-            hundo_result = exact_binomial_test(hundos, n, float(p_hundo(f)))
-            lo, hi = wilson_interval(hundos, n)
-            hundo_payload.update(
-                {
-                    "stat": hundo_result.stat,
-                    "p_value": hundo_result.p_value,
-                    "effect_size": hundo_result.effect_size,
-                    "method_used": hundo_result.method_used,
-                    "ci_lo": lo,
-                    "ci_hi": hi,
-                }
-            )
-        else:
-            hundo_payload["insufficient_sample"] = True
+        counts_by_stat: dict[str, list[int]] = {}
+        for stat_name, field in [("atk", "atk"), ("def", "def"), ("hp", "hp")]:
+            counter: Counter = Counter(r[field] for r in group_rows)
+            counts_by_stat[stat_name] = [counter.get(v, 0) for v in range(f, 16)]
 
-        atk_counts = Counter(r["atk"] for r in group_rows)
-        def_counts = Counter(r["def"] for r in group_rows)
-        hp_counts = Counter(r["hp"] for r in group_rows)
-        k = 16 - f
-        values = list(range(f, 16))
-        expected_probs = [1.0 / k] * k
-
-        stat_results: dict[str, dict[str, Any]] = {}
-        for stat_name, counter in [("atk", atk_counts), ("def", def_counts), ("hp", hp_counts)]:
-            counts = [counter.get(v, 0) for v in values]
-            stat_payload: dict[str, Any] = {
-                "n": n,
-                "min_sample": min_sample_for("stat_uniformity"),
-                "counts": counts,
-                "values": values,
-            }
-            if n >= min_sample_for("stat_uniformity"):
-                uni_result = uniformity_test(counts, expected_probs, seed=dataset_seed)
-                stat_payload.update(
-                    {
-                        "stat": uni_result.stat,
-                        "p_value": uni_result.p_value,
-                        "effect_size": uni_result.effect_size,
-                        "method_used": uni_result.method_used,
-                        "min_expected": uni_result.min_expected,
-                    }
-                )
-            else:
-                stat_payload["insufficient_sample"] = True
-            stat_results[stat_name] = stat_payload
+        dist = iv_sum_distribution(f)
+        sum_counter: Counter = Counter(
+            r["atk"] + r["def"] + r["hp"] for r in group_rows
+        )
+        sum_values = sorted(dist.keys())
+        sum_counts = [sum_counter.get(v, 0) for v in sum_values]
+        sum_probs = [float(dist[v]) for v in sum_values]
 
         results.append(
             {
@@ -514,8 +490,13 @@ def compute_pooled_statistics(
                 "ruleset_version": ruleset_version,
                 "n": n,
                 "floor": f,
-                "hundo_analysis": hundo_payload,
-                "statistics": stat_results,
+                "hundo_analysis": _hundo_payload(n, successes, f),
+                "statistics": _stat_uniformity_payloads(
+                    counts_by_stat, n, f, dataset_seed
+                ),
+                "sum_analysis": _sum_uniformity_payload(
+                    sum_counts, sum_values, sum_probs, n, dataset_seed
+                ),
             }
         )
 

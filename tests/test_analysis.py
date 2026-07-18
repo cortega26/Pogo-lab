@@ -278,6 +278,77 @@ def _client(user):
 
 
 @pytest.mark.django_db
+class TestPersonalPooledParity:
+    """M5 y M6 producen las mismas familias de métricas para los mismos datos."""
+
+    def test_metric_families_match_and_both_have_sum(self, user):
+        from apps.analysis.services import compute_pooled_statistics, run_personal_analysis
+
+        rs = MechanicRuleSet.objects.get(mechanic__key="trade_iv", is_published=True)
+        for i in range(200):
+            _create_observation(
+                user,
+                is_lucky=True,
+                trade_type="lucky",
+                friendship_level="best",
+                atk=(i * 7) % 4 + 12,  # valores en [12,15], piso Lucky=12
+                def_=(i * 3) % 4 + 12,
+                hp=(i * 11) % 4 + 12,
+                ruleset=rs,
+            )
+
+        run = run_personal_analysis(user.pk, seed=42)
+        personal = {r.metric_key: r.payload for r in run.results.all()}
+
+        hundo_key = next(k for k in personal if k.startswith("hundo_rate-lucky"))
+        stat_keys = [k for k in personal if k.startswith("stat_uniformity_") and "lucky" in k]
+        sum_key = next(k for k in personal if k.startswith("sum_uniformity-lucky"))
+
+        anonymized = [
+            {
+                "atk": o.atk,
+                "def": o.iv_def,
+                "hp": o.hp,
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "is_lucky": True,
+                "ruleset_version": 1,
+                "observed_month": "2026-01",
+            }
+            for o in user.trade_observations.filter(state="valid")
+        ]
+        pooled = compute_pooled_statistics(anonymized)
+        assert len(pooled) == 1
+        p = pooled[0]
+
+        # hundo_analysis keys coinciden
+        for key in ("n", "successes", "p0", "floor", "observed_rate", "min_sample"):
+            assert personal[hundo_key][key] == p["hundo_analysis"][key], (
+                f"hundo_analysis/{key} difiere"
+            )
+        assert personal[hundo_key].get("insufficient_sample") == p["hundo_analysis"].get("insufficient_sample")
+
+        # per-stat estructura equivalente (n puede ser < min_sample → solo
+        # insufficient_sample; si es suficiente, method_used debe coincidir)
+        for sk in stat_keys:
+            suffix = sk.split("stat_uniformity_", 1)[1]
+            stat_name = suffix.split("-", 1)[0]
+            ps = personal[sk]
+            cs = p["statistics"][stat_name]
+            assert ps["n"] == cs["n"]
+            assert ps["min_sample"] == cs["min_sample"]
+            assert ps.get("insufficient_sample") == cs.get("insufficient_sample")
+            if not ps.get("insufficient_sample"):
+                assert ps["method_used"] == cs["method_used"], (
+                    f"method_used difiere para {stat_name}"
+                )
+
+        # ambos caminos exponen sum_analysis
+        assert "sum_analysis" in p, "Pooled debe exponer sum_analysis (paridad con M5)"
+        assert personal[sum_key]["n"] == p["sum_analysis"]["n"]
+
+
+@pytest.mark.django_db
 class TestPooledFloorPerRulesetVersion:
     """Regresión M6-1: el agregado pooled resuelve el piso del ruleset_version
     del grupo (floor_for_ruleset), no del ruleset vigente."""
@@ -363,3 +434,13 @@ class TestPooledDeterminism:
                 )
                 assert s1["counts"] == s2["counts"]
                 assert s1["values"] == s2["values"]
+
+            # sum_analysis ahora presente y determinista
+            assert "sum_analysis" in g1, "sum_analysis debe estar presente (paridad M5)"
+            assert "sum_analysis" in g2, "sum_analysis debe estar presente (paridad M5)"
+            su1 = g1["sum_analysis"]
+            su2 = g2["sum_analysis"]
+            assert su1["n"] == su2["n"]
+            assert su1["p_value"] == su2["p_value"]
+            assert su1["counts"] == su2["counts"]
+            assert su1["values"] == su2["values"]

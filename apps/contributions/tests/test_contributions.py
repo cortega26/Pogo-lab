@@ -552,6 +552,9 @@ class TestAggregateCommunityDistribution:
         assert len(lucky_group) == 1
         assert lucky_group[0]["n"] == 2
         assert lucky_group[0]["hundo_analysis"]["successes"] == 1
+        assert "sum_analysis" in lucky_group[0], (
+            "Pooled debe exponer sum_analysis (paridad M5)"
+        )
 
     @pytest.mark.django_db
     def test_empty_dataset_returns_empty_list(self, user):
@@ -605,6 +608,9 @@ class TestAggregationFromDB:
         assert len(result) == 1
         assert result[0]["n"] == 2
         assert result[0]["hundo_analysis"]["successes"] == 1
+        assert "sum_analysis" in result[0], (
+            "Pooled desde BD debe exponer sum_analysis (paridad M5)"
+        )
 
 
 class TestConsentViews:
