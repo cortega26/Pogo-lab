@@ -217,7 +217,9 @@ def test_user_opt_in_and_revoke(live_server):
         page.click("button[type=submit]")
         page.wait_for_load_state("networkidle")
 
-        # POST a consentir
+        # Navegar a la calculadora, que siempre tiene un formulario con CSRF
+        page.goto(f"{live_server.url}/es/calculadora/")
+        page.wait_for_load_state("networkidle")
         csrf_token = page.evaluate(
             "() => document.querySelector('input[name=csrfmiddlewaretoken]').value"
         )
@@ -251,6 +253,8 @@ def test_user_opt_in_and_revoke(live_server):
         page.click("button[type=submit]")
         page.wait_for_load_state("networkidle")
 
+        page.goto(f"{live_server.url}/es/calculadora/")
+        page.wait_for_load_state("networkidle")
         csrf_token = page.evaluate(
             "() => document.querySelector('input[name=csrfmiddlewaretoken]').value"
         )

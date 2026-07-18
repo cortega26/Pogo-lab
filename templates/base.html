@@ -44,19 +44,14 @@
           {% trans "Mecánicas" %}
         </a>
 
-        <form action="{% url 'set_language' %}" method="post">
-          {% csrf_token %}
-          {% with path=request.get_full_path %}
-          <input name="next" type="hidden" value="{% if path|length > 4 %}{{ path|slice:'4:' }}{% else %}/{% endif %}">
-          {% endwith %}
-          <select name="language" id="language-selector" class="rounded border px-2 py-1 text-sm" onchange="this.form.submit()">
-            {% for code, name in LANGUAGES %}
-              <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
-                {{ name }}
-              </option>
-            {% endfor %}
-          </select>
-        </form>
+        <select id="language-selector" class="rounded border px-2 py-1 text-sm"
+                onchange="if(this.selectedOptions[0].dataset.url){window.location.href=this.selectedOptions[0].dataset.url}">
+          {% for code, name in LANGUAGES %}
+            <option value="{{ code }}" data-url="{% change_lang code %}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
+              {{ name }}
+            </option>
+          {% endfor %}
+        </select>
 
         {% if user.is_authenticated %}
           <a href="{% url 'account_logout' %}" class="text-sm text-gray-600 hover:text-gray-900">

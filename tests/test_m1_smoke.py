@@ -130,11 +130,21 @@ class TestAuthSmoke:
         assert response.status_code == 302
 
     def test_export_page_en_redirects_when_anon(self):
-        response = Client().get("/en/cuenta/exportar/")
+        from django.urls import reverse
+        from django.utils import translation
+
+        with translation.override("en"):
+            url = reverse("account_export")
+        response = Client().get(url)
         assert response.status_code == 302
 
     def test_delete_page_en_redirects_when_anon(self):
-        response = Client().get("/en/cuenta/eliminar/")
+        from django.urls import reverse
+        from django.utils import translation
+
+        with translation.override("en"):
+            url = reverse("account_delete")
+        response = Client().get(url)
         assert response.status_code == 302
 
     def test_export_page_200_when_logged_in(self):

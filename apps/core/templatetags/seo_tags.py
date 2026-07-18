@@ -1,27 +1,15 @@
 """Template tags para SEO multilingue."""
 
 from django import template
-from django.urls import resolve, reverse
+from django.urls import translate_url
 
 register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
 def change_lang(context, lang: str) -> str:
-    """Devuelve la URL actual en otro idioma.
-
-    Uso: {% change_lang "en" %} -> /en/ruta/actual/
-    """
+    """Devuelve la URL actual traducida a otro idioma (p. ej. /en/calculator/)."""
     request = context.get("request")
     if not request:
         return f"/{lang}/"
-    try:
-        url_parts = resolve(request.path_info)
-        url = reverse(
-            url_parts.view_name,
-            args=url_parts.args,
-            kwargs=url_parts.kwargs,
-        )
-        return f"/{lang}{url}"
-    except Exception:
-        return request.path
+    return translate_url(request.get_full_path(), lang)
