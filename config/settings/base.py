@@ -132,7 +132,8 @@ ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_CONFIG = env.email_url("EMAIL_URL", default="consolemail://")
+vars().update(EMAIL_CONFIG)
 
 CACHES = {
     "default": {

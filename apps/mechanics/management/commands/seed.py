@@ -14,6 +14,7 @@ como PENDIENTES de verificación (status=en_revision), no como confirmadas.
 from datetime import UTC, datetime
 from typing import Any
 
+from django.contrib.sites.models import Site
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -35,9 +36,28 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):  # noqa: ARG002
+        self._create_site()
         self._create_trade_iv()
         self._create_content_pages()
         self.stdout.write(self.style.SUCCESS("Seed completado exitosamente."))
+
+    def _create_site(self):
+        """Configura el Site con el dominio actual desde ALLOWED_HOSTS."""
+        from django.conf import settings
+
+        hosts = getattr(settings, "ALLOWED_HOSTS", [])
+        domain = next(
+            (h for h in hosts if h not in ("localhost", "127.0.0.1", ".localhost")),
+            hosts[0] if hosts else "localhost",
+        )
+        _, created = Site.objects.update_or_create(
+            id=settings.SITE_ID,
+            defaults={"domain": domain, "name": "Pogo-lab"},
+        )
+        if created:
+            self.stdout.write(f"  Creado Site: {domain}")
+        else:
+            self.stdout.write(f"  Site actualizado: {domain}")
 
     def _create_trade_iv(self):
         mechanic, created = Mechanic.objects.update_or_create(
