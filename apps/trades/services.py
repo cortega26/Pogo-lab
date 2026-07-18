@@ -74,18 +74,23 @@ def _determine_state(
     _observed_at: datetime,
     _species: str,
     dedup_hash: str,
+    resolved_floor: int | None = None,
 ) -> tuple[str, str]:
     """Determina el estado y motivo de una observacion segun la tabla §6.
 
     Devuelve (state, exclusion_reason).
+    Si se provee resolved_floor, se usa directamente en lugar de resolver.
     """
     if not (0 <= atk <= 15 and 0 <= def_ <= 15 and 0 <= hp <= 15):
         return ("excluded", "IV fuera de rango [0,15]")
 
-    try:
-        f, _ruleset_version = resolve_trade_floor(friendship_level, trade_type)
-    except RulesetUnavailableError:
-        f = 0
+    if resolved_floor is not None:
+        f = resolved_floor
+    else:
+        try:
+            f, _ruleset_version = resolve_trade_floor(friendship_level, trade_type)
+        except RulesetUnavailableError:
+            f = 0
 
     if not ivs_consistent_with_floor(f, atk, def_, hp):
         return (
@@ -128,6 +133,7 @@ def register_observation(
     notes: str = "",
     state: str | None = None,
     exclusion_reason: str = "",
+    resolved: dict | None = None,
 ) -> TradeObservation:
     """Registra una observacion con validacion y dedup.
 
@@ -166,20 +172,24 @@ def register_observation(
             observed_at,
             species,
             dedup_hash,
+            resolved_floor=resolved["floor"] if resolved else None,
         )
 
-    try:
-        _f_ruleset, ruleset_version = resolve_trade_floor(friendship_level, trade_type)
-        if ruleset_version is not None:
-            ruleset = MechanicRuleSetModel.objects.filter(
-                version=ruleset_version,
-                mechanic__key="trade_iv",
-                is_published=True,
-            ).first()
-        else:
+    if resolved is not None:
+        ruleset = resolved["ruleset"]
+    else:
+        try:
+            _f_ruleset, ruleset_version = resolve_trade_floor(friendship_level, trade_type)
+            if ruleset_version is not None:
+                ruleset = MechanicRuleSetModel.objects.filter(
+                    version=ruleset_version,
+                    mechanic__key="trade_iv",
+                    is_published=True,
+                ).first()
+            else:
+                ruleset = None
+        except RulesetUnavailableError:
             ruleset = None
-    except RulesetUnavailableError:
-        ruleset = None
 
     obs = TradeObservation.objects.create(
         session=session,
@@ -215,12 +225,38 @@ def bulk_create_observations(
 
     Cada dict debe tener al menos: owner_id, observed_at, friendship_level,
     trade_type, atk, def_, hp.
+
+    Resuelve el piso y ruleset una unica vez por combinacion distinta de
+    (friendship_level, trade_type) en lugar de una vez por fila.
     """
+    resolved_cache: dict[tuple[str, str], dict] = {}
+
+    def _resolve(friendship_level: str, trade_type: str) -> dict:
+        key = (friendship_level, trade_type)
+        if key not in resolved_cache:
+            try:
+                f, ruleset_version = resolve_trade_floor(friendship_level, trade_type)
+            except RulesetUnavailableError:
+                f, ruleset_version = 0, None
+            ruleset = None
+            if ruleset_version is not None:
+                ruleset = MechanicRuleSetModel.objects.filter(
+                    version=ruleset_version,
+                    mechanic__key="trade_iv",
+                    is_published=True,
+                ).first()
+            resolved_cache[key] = {
+                "floor": f,
+                "ruleset_version": ruleset_version,
+                "ruleset": ruleset,
+            }
+        return resolved_cache[key]
+
     results: list[TradeObservation] = []
     with transaction.atomic():
         for data in observations:
-            obs = register_observation(**data)
-            results.append(obs)
+            resolved = _resolve(data["friendship_level"], data["trade_type"])
+            results.append(register_observation(**data, resolved=resolved))
     return results
 
 

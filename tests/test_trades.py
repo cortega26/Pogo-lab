@@ -355,6 +355,64 @@ class TestBulkCreate:
         )
         assert len(r1) == 1
 
+    @pytest.mark.django_db
+    def test_bulk_import_query_count_is_near_linear(self, django_assert_max_num_queries, user):
+        rows = [
+            {
+                "owner_id": user.pk,
+                "observed_at": _utc(2026, 7, 17),
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "atk": 12,
+                "def_": 15,
+                "hp": 13,
+            }
+        ] * 10
+        with django_assert_max_num_queries(4 + 3 * 10):
+            bulk_create_observations(rows)
+
+    @pytest.mark.django_db
+    def test_bulk_import_results_unchanged(self, user):
+        rows = [
+            {
+                "owner_id": user.pk,
+                "observed_at": _utc(2026, 7, 17),
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "atk": 12,
+                "def_": 15,
+                "hp": 13,
+            },
+            {
+                "owner_id": user.pk,
+                "observed_at": _utc(2026, 7, 18),
+                "friendship_level": "good",
+                "trade_type": "normal",
+                "atk": 5,
+                "def_": 5,
+                "hp": 5,
+            },
+            {
+                "owner_id": user.pk,
+                "observed_at": _utc(2026, 7, 19),
+                "friendship_level": "good",
+                "trade_type": "lucky",
+                "atk": 11,
+                "def_": 15,
+                "hp": 15,
+            },
+        ]
+        result = bulk_create_observations(rows)
+        assert len(result) == 3
+        assert result[0].state == "valid"
+        assert result[0].is_lucky is True
+        assert result[0].ruleset is not None
+        assert result[0].ruleset.version == 1
+        assert result[1].state == "valid"
+        assert result[1].is_lucky is False
+        assert result[2].state == "suspicious"
+        assert result[2].is_lucky is True
+
 
 class TestCSVImport:
     @pytest.mark.django_db
