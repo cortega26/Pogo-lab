@@ -22,7 +22,7 @@ breaks.)
 | 006 | Make analysis dashboard idempotent (no run-per-GET) | P2 | M | MED | 001 | DONE |
 | 007 | Trade write-views: handle malformed input (no 500) | P3 | S | LOW | 001 | DONE |
 | 008 | Fix CSV/bulk import N+1 + add query-count guards | P3 | M | LOW-MED | 001 | DONE |
-| 009 | Unify personal (M5) & pooled (M6) aggregators + parity test | P3 | M | MED | 001, 006 | TODO |
+| 009 | Unify personal (M5) & pooled (M6) aggregators + parity test | P3 | M | MED | 001, 006 | DONE |
 | 010 | Enforce published-ruleset immutability on `RuleParameter` | P3 | M | MED | 001 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
