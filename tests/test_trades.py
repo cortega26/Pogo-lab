@@ -212,6 +212,34 @@ class TestRegisterObservation:
         assert obs.ruleset.version == 1
 
     @pytest.mark.django_db
+    def test_register_observation_rejects_bad_friendship(self, user):
+        with pytest.raises(ValueError, match="friendship_level inválido"):
+            register_observation(
+                owner_id=user.pk,
+                observed_at=_utc(2026, 7, 17),
+                friendship_level="lolz",
+                trade_type="normal",
+                atk=10,
+                def_=10,
+                hp=10,
+            )
+        assert TradeObservation.objects.count() == 0
+
+    @pytest.mark.django_db
+    def test_register_observation_rejects_bad_trade_type(self, user):
+        with pytest.raises(ValueError, match="trade_type inválido"):
+            register_observation(
+                owner_id=user.pk,
+                observed_at=_utc(2026, 7, 17),
+                friendship_level="good",
+                trade_type="bogus",
+                atk=10,
+                def_=10,
+                hp=10,
+            )
+        assert TradeObservation.objects.count() == 0
+
+    @pytest.mark.django_db
     def test_explicit_state_not_overridden(self, user):
         obs = register_observation(
             owner_id=user.pk,
@@ -282,6 +310,33 @@ class TestBulkCreate:
         assert len(result) == 2
         assert result[0].state == "valid"
         assert result[1].state == "suspicious"
+
+    @pytest.mark.django_db
+    def test_bulk_create_rejects_and_rolls_back(self, user):
+        with pytest.raises(ValueError, match="friendship_level inválido"):
+            bulk_create_observations(
+                [
+                    {
+                        "owner_id": user.pk,
+                        "observed_at": _utc(2026, 7, 17),
+                        "friendship_level": "best",
+                        "trade_type": "lucky",
+                        "atk": 12,
+                        "def_": 15,
+                        "hp": 13,
+                    },
+                    {
+                        "owner_id": user.pk,
+                        "observed_at": _utc(2026, 7, 18),
+                        "friendship_level": "lolz",
+                        "trade_type": "normal",
+                        "atk": 5,
+                        "def_": 5,
+                        "hp": 5,
+                    },
+                ]
+            )
+        assert TradeObservation.objects.count() == 0
 
     @pytest.mark.django_db
     def test_bulk_create_atomic(self, user):

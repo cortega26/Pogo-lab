@@ -17,6 +17,9 @@ from engine.observations import ivs_consistent_with_floor
 
 from .models import TradeObservation, TradeSession
 
+FRIENDSHIP_LEVELS = ("good", "great", "ultra", "best")
+TRADE_TYPES = ("normal", "lucky", "lucky_guaranteed")
+
 DEDUP_SEPARATOR = "|"
 
 
@@ -130,6 +133,15 @@ def register_observation(
 
     Si no se provee state, se determina automaticamente segun la tabla §6.
     """
+    if friendship_level not in FRIENDSHIP_LEVELS:
+        raise ValueError(
+            f"friendship_level inválido: {friendship_level!r}"
+        )
+    if trade_type not in TRADE_TYPES:
+        raise ValueError(
+            f"trade_type inválido: {trade_type!r}"
+        )
+
     is_lucky = _derive_is_lucky(trade_type)
 
     dedup_hash = _compute_dedup_hash(
@@ -228,11 +240,11 @@ def parse_csv_row(
         return f"Fila {row_num}: observed_at invalido"
 
     friendship_level = row.get("friendship_level", "").strip()
-    if friendship_level not in ("good", "great", "ultra", "best"):
+    if friendship_level not in FRIENDSHIP_LEVELS:
         return f"Fila {row_num}: friendship_level invalido: {friendship_level}"
 
     trade_type = row.get("trade_type", "").strip()
-    if trade_type not in ("normal", "lucky", "lucky_guaranteed"):
+    if trade_type not in TRADE_TYPES:
         return f"Fila {row_num}: trade_type invalido: {trade_type}"
 
     try:
