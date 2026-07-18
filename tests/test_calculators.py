@@ -4,6 +4,7 @@ import re
 from datetime import UTC, datetime
 
 import pytest
+from django.urls import reverse
 
 from apps.calculators.services import (
     CalcInput,
@@ -285,10 +286,10 @@ class TestFloorOverrideValidation:
 
     @pytest.mark.django_db
     def test_view_share_out_of_range_floor_shows_error_not_500(self, client):
-        """La vista responde 200 con error, no 500, ante fo fuera de rango."""
+        """La vista responde 400 con error, no 500, ante fo fuera de rango."""
         crafted = encode_share_url(self._base_input(16))
         resp = client.get(f"/es/calculadora/?share={crafted}")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
         assert "[0, 15]" in resp.content.decode()
 
 
@@ -442,3 +443,59 @@ class TestCalculatorViews:
         html = resp.content.decode()
         assert "Resultados" in html
         assert "<html" not in html  # Es partial, no pagina completa
+
+    def test_post_non_numeric_n_returns_400_not_500(self, client):
+        resp = client.post(
+            reverse("calculator"),
+            {
+                "friendship_level": "good",
+                "trade_type": "normal",
+                "n": "abc",
+                "target_kind": "hundo",
+                "confidence": "0.5",
+            },
+        )
+        assert resp.status_code == 400
+        assert "debe ser un número entero" in resp.content.decode()
+
+    def test_post_confidence_out_of_range_400(self, client):
+        resp = client.post(
+            reverse("calculator"),
+            {
+                "friendship_level": "good",
+                "trade_type": "normal",
+                "n": "1",
+                "target_kind": "hundo",
+                "confidence": "5",
+            },
+        )
+        assert resp.status_code == 400
+        assert "entre 0 y 1" in resp.content.decode()
+
+    def test_post_valid_input_still_ok(self, client):
+        resp = client.post(
+            reverse("calculator"),
+            {
+                "friendship_level": "good",
+                "trade_type": "normal",
+                "n": "1",
+                "target_kind": "hundo",
+                "confidence": "0.5",
+            },
+        )
+        assert resp.status_code == 200
+        assert "Resultados" in resp.content.decode()
+
+    def test_post_huge_n_clamped_or_rejected(self, client):
+        resp = client.post(
+            reverse("calculator"),
+            {
+                "friendship_level": "good",
+                "trade_type": "normal",
+                "n": "999999999",
+                "target_kind": "hundo",
+                "confidence": "0.5",
+            },
+        )
+        assert resp.status_code == 400
+        assert "debe estar entre" in resp.content.decode()
