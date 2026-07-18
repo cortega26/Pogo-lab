@@ -829,6 +829,65 @@ class TestCSVParsingSadPaths:
         assert "observed_at invalido" in result
 
 
+class TestTradeViewsMalformedInput:
+    @pytest.mark.django_db
+    def test_observation_create_bad_date_returns_400_not_500(self, client, user):
+        client.force_login(user)
+        resp = client.post(
+            "/es/intercambios/observar/",
+            {
+                "observed_at": "not-a-date",
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "atk": "12",
+                "def": "15",
+                "hp": "13",
+            },
+        )
+        assert resp.status_code == 400
+        assert TradeObservation.objects.count() == 0
+
+    @pytest.mark.django_db
+    def test_observation_create_non_numeric_iv_400(self, client, user):
+        client.force_login(user)
+        resp = client.post(
+            "/es/intercambios/observar/",
+            {
+                "friendship_level": "best",
+                "trade_type": "lucky",
+                "atk": "x",
+                "def": "15",
+                "hp": "13",
+            },
+        )
+        assert resp.status_code == 400
+        assert TradeObservation.objects.count() == 0
+
+    @pytest.mark.django_db
+    def test_bulk_add_non_list_json_400(self, client, user):
+        client.force_login(user)
+        resp = client.post(
+            "/es/intercambios/lotes/",
+            {"observations_json": '{"a":1}'},
+        )
+        assert resp.status_code == 400
+        assert "Se esperaba una lista" in resp.content.decode()
+        assert TradeObservation.objects.count() == 0
+
+    @pytest.mark.django_db
+    def test_csv_import_binary_file_shows_error(self, client, user):
+        import io
+
+        client.force_login(user)
+        resp = client.post(
+            "/es/intercambios/csv/importar/",
+            {"csv_file": io.BytesIO(b"\xff\xfe\x00")},
+        )
+        assert resp.status_code == 200
+        assert "UTF-8" in resp.content.decode()
+        assert TradeObservation.objects.count() == 0
+
+
 class TestTradeViews:
     @pytest.mark.django_db
     def test_session_list_requires_login(self, client):

@@ -68,34 +68,40 @@ def observation_create(request: HttpRequest) -> HttpResponse:
         owner_id = request.user.pk
         assert owner_id is not None
 
-        observed_at_str = request.POST.get("observed_at", "")
-        if observed_at_str:
-            observed_at = datetime.datetime.fromisoformat(observed_at_str)
-        else:
-            observed_at = datetime.datetime.now(tz=datetime.UTC)
+        try:
+            observed_at_str = request.POST.get("observed_at", "")
+            if observed_at_str:
+                observed_at = datetime.datetime.fromisoformat(observed_at_str)
+            else:
+                observed_at = datetime.datetime.now(tz=datetime.UTC)
 
-        friendship_level = request.POST.get("friendship_level", "good")
-        trade_type = request.POST.get("trade_type", "normal")
-        atk = int(request.POST.get("atk", 0))
-        def_ = int(request.POST.get("def", 0))
-        hp = int(request.POST.get("hp", 0))
-        species = request.POST.get("species", "")
+            friendship_level = request.POST.get("friendship_level", "good")
+            trade_type = request.POST.get("trade_type", "normal")
+            atk = int(request.POST.get("atk", 0))
+            def_ = int(request.POST.get("def", 0))
+            hp = int(request.POST.get("hp", 0))
+            species = request.POST.get("species", "")
 
-        profile = getattr(request.user, "profile", None)
-        contribution_optin = profile is not None and profile.default_contribution_optin
+            profile = getattr(request.user, "profile", None)
+            contribution_optin = profile is not None and profile.default_contribution_optin
 
-        obs = register_observation(
-            owner_id=owner_id,
-            observed_at=observed_at,
-            friendship_level=friendship_level,
-            trade_type=trade_type,
-            atk=atk,
-            def_=def_,
-            hp=hp,
-            species=species,
-            input_method="manual",
-            contribution_optin=contribution_optin,
-        )
+            obs = register_observation(
+                owner_id=owner_id,
+                observed_at=observed_at,
+                friendship_level=friendship_level,
+                trade_type=trade_type,
+                atk=atk,
+                def_=def_,
+                hp=hp,
+                species=species,
+                input_method="manual",
+                contribution_optin=contribution_optin,
+            )
+        except (ValueError, TypeError) as exc:
+            ctx = {"error": str(exc) or "Datos inválidos"}
+            if request.headers.get("HX-Request"):
+                return render(request, "trades/observation_create.html", ctx, status=200)
+            return render(request, "trades/observation_create.html", ctx, status=400)
 
         if request.headers.get("HX-Request"):
             return render(request, "trades/_observation_row.html", {"obs": obs})
@@ -126,27 +132,43 @@ def bulk_add(request: HttpRequest) -> HttpResponse:
                 {"error": "JSON invalido"},
             )
 
+        if not isinstance(data, list):
+            return render(
+                request,
+                "trades/bulk_add.html",
+                {"error": "Se esperaba una lista de observaciones"},
+                status=400,
+            )
+
         observations = []
         for item in data:
-            observed_at_str = item.get("observed_at", "")
-            if observed_at_str:
-                observed_at = datetime.datetime.fromisoformat(observed_at_str)
-            else:
-                observed_at = datetime.datetime.now(tz=datetime.UTC)
+            try:
+                observed_at_str = item.get("observed_at", "")
+                if observed_at_str:
+                    observed_at = datetime.datetime.fromisoformat(observed_at_str)
+                else:
+                    observed_at = datetime.datetime.now(tz=datetime.UTC)
 
-            observations.append(
-                {
-                    "owner_id": owner_id,
-                    "observed_at": observed_at,
-                    "friendship_level": item.get("friendship_level", "good"),
-                    "trade_type": item.get("trade_type", "normal"),
-                    "atk": int(item.get("atk", 0)),
-                    "def_": int(item.get("def", 0)),
-                    "hp": int(item.get("hp", 0)),
-                    "species": item.get("species", ""),
-                    "input_method": "batch",
-                }
-            )
+                observations.append(
+                    {
+                        "owner_id": owner_id,
+                        "observed_at": observed_at,
+                        "friendship_level": item.get("friendship_level", "good"),
+                        "trade_type": item.get("trade_type", "normal"),
+                        "atk": int(item.get("atk", 0)),
+                        "def_": int(item.get("def", 0)),
+                        "hp": int(item.get("hp", 0)),
+                        "species": item.get("species", ""),
+                        "input_method": "batch",
+                    }
+                )
+            except (ValueError, TypeError) as exc:
+                return render(
+                    request,
+                    "trades/bulk_add.html",
+                    {"error": str(exc) or "Datos inválidos en un elemento"},
+                    status=400,
+                )
 
         created = bulk_create_observations(observations)
         return render(
@@ -176,18 +198,22 @@ def csv_import(request: HttpRequest) -> HttpResponse:
         if uploaded is None:
             error = "Selecciona un archivo CSV"
         else:
-            content = uploaded.read().decode("utf-8-sig")
-            result = import_csv(content, owner_id)
-            preview = result
-            if result["error_count"] == 0:
-                error = f"Importados {result['valid_count']} registros correctamente."
+            try:
+                content = uploaded.read().decode("utf-8-sig")
+            except UnicodeDecodeError:
+                error = "El archivo no es un CSV de texto UTF-8 válido."
             else:
-                error_lines = "\n".join(result["errors"][:10])
-                error = (
-                    f"Procesados {result['total']} filas. "
-                    f"{result['valid_count']} validas, {result['error_count']} errores.\n"
-                    f"Errores:\n{error_lines}"
-                )
+                result = import_csv(content, owner_id)
+                preview = result
+                if result["error_count"] == 0:
+                    error = f"Importados {result['valid_count']} registros correctamente."
+                else:
+                    error_lines = "\n".join(result["errors"][:10])
+                    error = (
+                        f"Procesados {result['total']} filas. "
+                        f"{result['valid_count']} validas, {result['error_count']} errores.\n"
+                        f"Errores:\n{error_lines}"
+                    )
 
     return render(
         request,
