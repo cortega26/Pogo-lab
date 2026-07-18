@@ -16,7 +16,7 @@ breaks.)
 |------|-------|----------|--------|------|------------|--------|
 | 001 | Green CI baseline: fix language switcher (+ hreflang) + stale EN smoke tests | P1 | S | LOW | — | DONE |
 | 002 | Add `.dockerignore` (secrets out of the image) | P1 | S | LOW | — | DONE |
-| 003 | Consent grant/revoke POST-only + validated redirect | P2 | S | LOW | 001 | TODO |
+| 003 | Consent grant/revoke POST-only + validated redirect | P2 | S | LOW | 001 | DONE |
 | 004 | Validate calculator POST input (no public 500s) | P2 | S | LOW | 001 | TODO |
 | 005 | Validate friendship/trade-type enums in `register_observation` | P2 | S | LOW | 001 | TODO |
 | 006 | Make analysis dashboard idempotent (no run-per-GET) | P2 | M | MED | 001 | TODO |
