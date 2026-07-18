@@ -20,7 +20,7 @@ breaks.)
 | 004 | Validate calculator POST input (no public 500s) | P2 | S | LOW | 001 | DONE |
 | 005 | Validate friendship/trade-type enums in `register_observation` | P2 | S | LOW | 001 | DONE |
 | 006 | Make analysis dashboard idempotent (no run-per-GET) | P2 | M | MED | 001 | DONE |
-| 007 | Trade write-views: handle malformed input (no 500) | P3 | S | LOW | 001 | TODO |
+| 007 | Trade write-views: handle malformed input (no 500) | P3 | S | LOW | 001 | DONE |
 | 008 | Fix CSV/bulk import N+1 + add query-count guards | P3 | M | LOW-MED | 001 | TODO |
 | 009 | Unify personal (M5) & pooled (M6) aggregators + parity test | P3 | M | MED | 001, 006 | TODO |
 | 010 | Enforce published-ruleset immutability on `RuleParameter` | P3 | M | MED | 001 | TODO |
