@@ -427,7 +427,10 @@ def get_or_run_personal_analysis(
     if existing is not None:
         return existing
     return run_personal_analysis(
-        owner_id, filters=filters, seed=seed, code_sha=code_sha,
+        owner_id,
+        filters=filters,
+        seed=seed,
+        code_sha=code_sha,
         input_fingerprint=fingerprint,
     )
 
@@ -466,8 +469,7 @@ def compute_pooled_statistics(
             continue
 
         successes = sum(
-            1 for r in group_rows
-            if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15
+            1 for r in group_rows if r["atk"] == 15 and r["def"] == 15 and r["hp"] == 15
         )
 
         counts_by_stat: dict[str, list[int]] = {}
@@ -476,9 +478,7 @@ def compute_pooled_statistics(
             counts_by_stat[stat_name] = [counter.get(v, 0) for v in range(f, 16)]
 
         dist = iv_sum_distribution(f)
-        sum_counter: Counter = Counter(
-            r["atk"] + r["def"] + r["hp"] for r in group_rows
-        )
+        sum_counter: Counter = Counter(r["atk"] + r["def"] + r["hp"] for r in group_rows)
         sum_values = sorted(dist.keys())
         sum_counts = [sum_counter.get(v, 0) for v in sum_values]
         sum_probs = [float(dist[v]) for v in sum_values]
@@ -491,9 +491,7 @@ def compute_pooled_statistics(
                 "n": n,
                 "floor": f,
                 "hundo_analysis": _hundo_payload(n, successes, f),
-                "statistics": _stat_uniformity_payloads(
-                    counts_by_stat, n, f, dataset_seed
-                ),
+                "statistics": _stat_uniformity_payloads(counts_by_stat, n, f, dataset_seed),
                 "sum_analysis": _sum_uniformity_payload(
                     sum_counts, sum_values, sum_probs, n, dataset_seed
                 ),

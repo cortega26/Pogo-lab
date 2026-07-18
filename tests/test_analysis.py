@@ -326,7 +326,9 @@ class TestPersonalPooledParity:
             assert personal[hundo_key][key] == p["hundo_analysis"][key], (
                 f"hundo_analysis/{key} difiere"
             )
-        assert personal[hundo_key].get("insufficient_sample") == p["hundo_analysis"].get("insufficient_sample")
+        assert personal[hundo_key].get("insufficient_sample") == p["hundo_analysis"].get(
+            "insufficient_sample"
+        )
 
         # per-stat estructura equivalente (n puede ser < min_sample → solo
         # insufficient_sample; si es suficiente, method_used debe coincidir)

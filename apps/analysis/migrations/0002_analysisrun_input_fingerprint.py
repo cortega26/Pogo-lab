@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("analysis", "0001_initial"),
     ]
@@ -13,8 +12,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="analysisrun",
             name="input_fingerprint",
-            field=models.CharField(
-                blank=True, db_index=True, default="", max_length=64
-            ),
+            field=models.CharField(blank=True, db_index=True, default="", max_length=64),
         ),
     ]

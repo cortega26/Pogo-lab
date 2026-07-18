@@ -140,13 +140,9 @@ def register_observation(
     Si no se provee state, se determina automaticamente segun la tabla §6.
     """
     if friendship_level not in FRIENDSHIP_LEVELS:
-        raise ValueError(
-            f"friendship_level inválido: {friendship_level!r}"
-        )
+        raise ValueError(f"friendship_level inválido: {friendship_level!r}")
     if trade_type not in TRADE_TYPES:
-        raise ValueError(
-            f"trade_type inválido: {trade_type!r}"
-        )
+        raise ValueError(f"trade_type inválido: {trade_type!r}")
 
     is_lucky = _derive_is_lucky(trade_type)
 
