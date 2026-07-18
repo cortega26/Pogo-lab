@@ -11,7 +11,8 @@ from datetime import UTC, datetime
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.analysis.services import run_personal_analysis
+from apps.analysis.models import AnalysisRun
+from apps.analysis.services import get_or_run_personal_analysis, run_personal_analysis
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
 
 User = get_user_model()
@@ -241,6 +242,31 @@ class TestAnalysisView:
         client = Client()
         resp = client.get("/es/analisis/")
         assert resp.status_code == 302
+
+    def test_dashboard_get_is_idempotent(self, user):
+        """Dos GETs con datos sin cambios crean un solo AnalysisRun."""
+        _create_observation(user, atk=12, def_=13, hp=14)
+        client = _client(user)
+        client.get("/es/analisis/")
+        client.get("/es/analisis/")
+        assert AnalysisRun.objects.filter(owner=user).count() == 1
+
+    def test_new_observation_creates_new_run(self, user):
+        """Una observación nueva tras el primer GET fuerza un nuevo run."""
+        _create_observation(user, atk=12, def_=13, hp=14)
+        client = _client(user)
+        client.get("/es/analisis/")
+        assert AnalysisRun.objects.filter(owner=user).count() == 1
+        _create_observation(user, atk=15, def_=15, hp=15)
+        client.get("/es/analisis/")
+        assert AnalysisRun.objects.filter(owner=user).count() == 2
+
+    def test_get_or_run_reuses_same_run(self, user):
+        """get_or_run_personal_analysis con misma entrada devuelve mismo pk."""
+        _create_observation(user, atk=12, def_=13, hp=14)
+        run1 = get_or_run_personal_analysis(user.pk)
+        run2 = get_or_run_personal_analysis(user.pk)
+        assert run1.pk == run2.pk
 
 
 def _client(user):

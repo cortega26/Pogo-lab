@@ -10,7 +10,7 @@ from django.shortcuts import render
 
 from engine.decisions import AnalysisContext, evaluate
 
-from .services import run_personal_analysis
+from .services import get_or_run_personal_analysis
 
 
 @login_required
@@ -24,7 +24,7 @@ def analysis_dashboard(request):
     if request.GET.get("trade_type"):
         filters["trade_type"] = request.GET["trade_type"]
 
-    run = run_personal_analysis(owner.pk, filters=filters)
+    run = get_or_run_personal_analysis(owner.pk, filters=filters)
     results = run.results.all()
 
     recs = []

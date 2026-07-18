@@ -272,6 +272,26 @@ def _detect_mixing(qs: models.QuerySet) -> dict[str, bool]:
     }
 
 
+def _input_fingerprint(owner_id: int, filters: dict[str, Any] | None) -> str:
+    """Hash determinista de owner + filtros + algoritmo + datos observados.
+
+    Cambia cuando se añaden, editan o eliminan observaciones válidas que
+    coinciden con los filtros, garantizando que una ejecución previa se
+    reutiliza solo si la entrada es idéntica.
+    """
+    qs = _valid_observations(owner_id, filters)
+    agg = qs.aggregate(c=models.Count("id"), m=models.Max("updated_at"))
+    signature = {
+        "owner_id": owner_id,
+        "filters": filters or {},
+        "algorithm_version": ALGORITHM_VERSION,
+        "count": agg["c"] or 0,
+        "max_updated": agg["m"].isoformat() if agg["m"] else None,
+    }
+    raw = json.dumps(signature, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def _deterministic_seed_from_data(data: Any) -> int:
     """Deriva una semilla determinista del hash SHA256 de los datos.
 
@@ -299,6 +319,7 @@ def run_personal_analysis(
     filters: dict[str, Any] | None = None,
     seed: int | None = None,
     code_sha: str = "",
+    input_fingerprint: str | None = None,
 ) -> AnalysisRun:
     """Ejecuta análisis estadístico personal sobre observaciones válidas.
 
@@ -310,12 +331,15 @@ def run_personal_analysis(
         filters: Filtros opcionales (friendship_level, trade_type, fechas).
         seed: Semilla para Monte Carlo (None → determinista a partir de owner_id+filters).
         code_sha: SHA del código para trazabilidad.
+        input_fingerprint: Hash de la entrada; si no se pasa se calcula.
 
     Returns:
         AnalysisRun creado.
     """
     if seed is None:
         seed = _deterministic_seed_from_data({"owner_id": owner_id, "filters": filters})
+    if input_fingerprint is None:
+        input_fingerprint = _input_fingerprint(owner_id, filters)
 
     run = AnalysisRun.objects.create(
         owner_id=owner_id,
@@ -323,6 +347,7 @@ def run_personal_analysis(
         algorithm_version=ALGORITHM_VERSION,
         random_seed=seed,
         code_sha=code_sha,
+        input_fingerprint=input_fingerprint,
     )
 
     base_qs = _valid_observations(owner_id, filters)
@@ -371,6 +396,27 @@ def run_personal_analysis(
             )
 
     return run
+
+
+def get_or_run_personal_analysis(
+    owner_id: int,
+    filters: dict[str, Any] | None = None,
+    seed: int | None = None,
+    code_sha: str = "",
+) -> AnalysisRun:
+    """Reutiliza un AnalysisRun si la entrada (owner+filtros+datos) no cambió."""
+    fingerprint = _input_fingerprint(owner_id, filters)
+    existing = (
+        AnalysisRun.objects.filter(owner_id=owner_id, input_fingerprint=fingerprint)
+        .order_by("-created_at")
+        .first()
+    )
+    if existing is not None:
+        return existing
+    return run_personal_analysis(
+        owner_id, filters=filters, seed=seed, code_sha=code_sha,
+        input_fingerprint=fingerprint,
+    )
 
 
 def compute_pooled_statistics(

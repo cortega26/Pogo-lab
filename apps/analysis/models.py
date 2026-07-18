@@ -26,6 +26,7 @@ class AnalysisRun(TimestampedModel):
     method_params = models.JSONField(default=dict, blank=True)
     random_seed = models.IntegerField(null=True, blank=True)
     code_sha = models.CharField(max_length=64, blank=True, default="")
+    input_fingerprint = models.CharField(max_length=64, blank=True, default="", db_index=True)
     mixing_flags = models.JSONField(default=dict, blank=True)
 
     class Meta:
