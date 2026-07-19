@@ -94,9 +94,11 @@ swap. Ficheros ya provistos: `compose.micro.yaml` + `bin/setup-swap.sh`.
 2. Copia el connection string. **Debe** llevar SSL:
    `postgres://USER:PASS@HOST/DB?sslmode=require`
 3. En la VM, en `/opt/pogo-lab/.env.prod`, añade la línea:
-   ```
+
+   ```dotenv
    DATABASE_URL=postgres://USER:PASS@HOST/DB?sslmode=require
    ```
+
    (`config.settings.base` lee `DATABASE_URL` vía `env.db()` — cambio de una línea, sin tocar código.)
 
 ### B.2 — Swap (imprescindible en 1 GB)

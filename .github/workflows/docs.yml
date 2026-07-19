@@ -17,7 +17,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DavidAnson/markdownlint-cli2-action@v19
         with:
-          globs: "**/*.md"
+          # Los informes de investigación son insumos históricos no verificados,
+          # no documentación mantenida del producto.
+          globs: |
+            **/*.md
+            #docs/research/**
+            #docs/investigacion.md
 
   links:
     runs-on: ubuntu-latest

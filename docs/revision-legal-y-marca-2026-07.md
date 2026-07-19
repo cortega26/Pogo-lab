@@ -40,6 +40,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
 ## BLOQUEANTES — resolver antes de la beta
 
 ### B1 · Sin identidad del responsable + derechos ejercidos por issue público
+
 - **Documentos:** [privacy.html:55](../templates/legal/privacy.html#L55) y
   [tos.html:51](../templates/legal/tos.html#L51).
 - **Texto exacto:** *"Para ejercer tus derechos de privacidad, abre un issue en el repositorio del proyecto."*
@@ -52,6 +53,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
   (p. ej. `privacidad@pogo-lab.com`). Reemplazar "abre un issue" por ese correo en privacidad **y** en ToS.
 
 ### B2 · Contradicción de licencia: "código abierto" vs. repo sin licencia y código privado
+
 - **Documentos:** [tos.html:45](../templates/legal/tos.html#L45), [README.md](../README.md) (§Licencias),
   [pyproject.toml:8](../pyproject.toml#L8) (`license = { text = "Por definir" }`).
 - **Texto exacto:** *"El código fuente de Pogo-lab es abierto... sujetos a la licencia del repositorio."*
@@ -66,6 +68,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
   `pyproject.toml`. Decidir explícitamente repo público-visible vs. privado.
 
 ### B3 · Afirmación de seguridad inexacta (Argon2 declarado, PBKDF2 en uso)
+
 - **Documento:** [privacy.html:49](../templates/legal/privacy.html#L49).
 - **Texto exacto:** *"...hashing seguro de contraseñas (Argon2), cabeceras de seguridad (CSP, HSTS)..."*
 - **Evidencia:** `PASSWORD_HASHERS` solo se define en [test.py](../config/settings/test.py); ni `base.py` ni
@@ -84,12 +87,14 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
 ## ALTOS
 
 ### A1 · Falta ley aplicable y jurisdicción en el ToS
+
 - El ToS no tiene cláusula de **ley aplicable**, **foro/resolución de disputas**, **divisibilidad** ni **acuerdo
   completo**. Para un ToS real conviene añadirlas.
 - **Fix:** sección "Ley aplicable y jurisdicción" → ley chilena y tribunales competentes de Chile; cláusula de
   divisibilidad.
 
 ### A2 · Encuadre normativo desalineado con la operación
+
 - La política encabeza los derechos bajo **"GDPR"** ([privacy.html:26](../templates/legal/privacy.html#L26),
   [39](../templates/legal/privacy.html#L39)), pero el responsable es una persona en **Chile** y el mercado es LatAm.
 - La ley líder es la **Ley 19.628** (vigente) y, de forma inminente, la **Ley 21.719** (publicada 12/2024; entra en
@@ -100,6 +105,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
   hecho. *Confirmar con abogado* la fecha exacta de entrada en vigor y las obligaciones concretas de la 21.719.
 
 ### A3 · Menores: gate de 13 años no aplicado y sin sección en privacidad
+
 - **ToS:** [tos.html:25](../templates/legal/tos.html#L25) — *"Debes tener al menos 13 años..."* pero **no hay campo
   de edad** en el registro (no existe `apps/accounts/forms.py` con validación de edad, ni fecha de nacimiento en el
   template de signup). La regla se **afirma pero no se aplica**.
@@ -111,6 +117,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
   autoafirmación es débil, pero es mejor que la regla puramente declarativa actual).
 
 ### A4 · Licencia de salida del dataset comunitario "por definir"
+
 - **ToS:** [tos.html:39](../templates/legal/tos.html#L39) otorga a Pogo-lab licencia para usar las contribuciones en
   datasets públicos, pero la licencia **bajo la que se publica** el dataset no está definida (README:
   "CC BY / CC0 a decidir").
@@ -124,6 +131,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
 ## MEDIOS
 
 ### M1 · Bases legales solapadas (consentimiento vs. interés legítimo)
+
 - [privacy.html:29-30](../templates/legal/privacy.html#L29-L30) lista *consentimiento* para el dataset comunitario y
   *interés legítimo* para "análisis agregados". Si ambos son el **mismo** tratamiento, mezclar bases es problemático.
 - Es defendible **si** son tratamientos distintos: dashboard/análisis del propio usuario (ejecución del contrato) vs.
@@ -131,11 +139,13 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
 - **Fix:** que la política lo **explicite** en esos términos. (Recomendación de redacción, no error rotundo.)
 
 ### M2 · Ubicación de datos / transferencias no mencionada
+
 - La política no dice dónde se alojan los datos. Como el hosting es **OCI Santiago (Chile)** y el mercado es LatAm,
   **no** hay transferencia internacional problemática — es incluso un punto a favor.
 - **Fix:** añadir una línea *"Tus datos se alojan en servidores en Chile"*; actualizar si en el futuro se mueve fuera.
 
 ### M3 · Coherencia del derecho de supresión con snapshots inmutables
+
 - [privacy.html:37](../templates/legal/privacy.html#L37): *"...se eliminan irreversiblemente"* + *"las contribuciones
   ya agregadas no son reversibles"*. Esto es sostenible **solo si** el dataset publicado está **verdaderamente
   anonimizado** (irreversible), no seudonimizado. El [ADR-0005](adr/0005-separacion-datos-privados-publicos.md) y la
@@ -166,6 +176,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
 ## Marca / propiedad intelectual
 
 ### Lo que está bien hecho
+
 - **Descargo de afiliación completo y consistente** en tres lugares: [disclaimer.html:12](../templates/legal/disclaimer.html#L12)
   (Niantic, The Pokémon Company, Nintendo, Creatures Inc.), footer [base.html:208](../templates/base.html#L208) y
   README. Es un uso **nominativo/referencial** correcto.
@@ -176,6 +187,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
   defensiva correcta.
 
 ### Riesgos a vigilar
+
 - **El nombre del producto "Pogo-lab":** "Pogo" es la abreviatura comunitaria de "Pokémon GO", que contiene la marca
   registrada **"Pokémon"**. Un producto **nombrado** con una alusión a la marca tiene **más exposición** que el uso
   nominativo en el cuerpo del texto. No es infractor per se (muchas herramientas comunitarias lo hacen), pero es la
@@ -191,6 +203,7 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
 ## Plan de acción priorizado
 
 **Antes de la beta (bloqueantes, arreglo rápido):**
+
 1. B1 — Nombrar responsable + correo de contacto privado; quitar "abre un issue" de privacidad y ToS.
 2. B2 — Quitar "código abierto" del ToS; añadir nota de copyright; `pyproject` → Proprietary; decidir repo
    público-visible vs. privado.

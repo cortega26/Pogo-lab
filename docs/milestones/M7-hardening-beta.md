@@ -72,6 +72,6 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 | Fecha | Estado | Nota |
 |---|---|---|
 | 2026-07-16 | ⬜ | Hoja creada. |
-| 2026-07-17 | 🟨 | PR-20 hardening completo. Hosting decidido: OCI Santiago (AMD Micro, 1 GB). Desplegado en http://146.181.47.12. Pendiente: GitHub Actions secrets, SSL/Lets Encrypt, backup automático, revisión legal. |
+| 2026-07-17 | 🟨 | PR-20 hardening completo. Hosting decidido: OCI Santiago (AMD Micro, 1 GB). Desplegado en <http://146.181.47.12>. Pendiente: GitHub Actions secrets, SSL/Lets Encrypt, backup automático, revisión legal. |
 | 2026-07-18 | 🟨 | PR-21: deploy.yml + compose.prod/micro + OCI scripts + ADR-0009 + backup/restore. Legal templates pulidos (ToS/privacy/disclaimer). healthcheck.json fuera de i18n. Tests de vistas legales (11 nuevos, 491 total). Pendiente humano: revisión legal, smoke deploy, restore verify. |
 | 2026-07-19 | 🟨 | Smoke live verificado en `146.181.47.12`: health+DB, es/en, mecánicas, calculadora, comunidad y páginas legales. Backup real restaurado en DB aislada (30 tablas/44 migraciones) y eliminado después; timer diario instalado con retención de 14 días. Secrets OCI configurados. Pendiente: dominio/certificado TLS, revisión legal/licencias y apertura de beta. |
