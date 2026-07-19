@@ -115,6 +115,9 @@ def observation_create(request: HttpRequest) -> HttpResponse:
     return render(request, "trades/observation_create.html")
 
 
+MAX_BULK_ITEMS = 500
+
+
 @login_required
 def bulk_add(request: HttpRequest) -> HttpResponse:
     """Alta por lotes: varias observaciones en una operacion."""
@@ -137,6 +140,14 @@ def bulk_add(request: HttpRequest) -> HttpResponse:
                 request,
                 "trades/bulk_add.html",
                 {"error": "Se esperaba una lista de observaciones"},
+                status=400,
+            )
+
+        if len(data) > MAX_BULK_ITEMS:
+            return render(
+                request,
+                "trades/bulk_add.html",
+                {"error": f"Máximo {MAX_BULK_ITEMS} observaciones por lote"},
                 status=400,
             )
 
@@ -198,6 +209,19 @@ def csv_import(request: HttpRequest) -> HttpResponse:
         if uploaded is None:
             error = "Selecciona un archivo CSV"
         else:
+            content_type = (getattr(uploaded, "content_type", None) or "").lower()
+            if content_type and content_type not in (
+                "text/csv",
+                "text/plain",
+                "application/vnd.ms-excel",
+                "application/octet-stream",
+            ):
+                error = "Tipo de archivo no permitido. Sube un archivo CSV."
+                return render(
+                    request,
+                    "trades/csv_import.html",
+                    {"preview": preview, "error": error},
+                )
             try:
                 content = uploaded.read().decode("utf-8-sig")
             except UnicodeDecodeError:

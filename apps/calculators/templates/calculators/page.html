@@ -7,102 +7,122 @@
 <meta name="description" content="{% trans "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de Pokémon GO." %}">
 <meta property="og:title" content="{% trans "Calculadora de IV — Pogo-lab" %}">
 <meta property="og:description" content="{% trans "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de Pokémon GO." %}">
+<meta property="og:type" content="tool">
+{% endblock %}
+
+{% block json_ld %}
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Pogo-lab", "item": "{{ request.scheme }}://{{ request.get_host }}{% url 'healthz' %}"},
+    {"@type": "ListItem", "position": 2, "name": "{% trans "Calculadora" %}", "item": "{{ request.build_absolute_uri }}" }
+  ]
+}
+</script>
 {% endblock %}
 
 {% block content %}
-<h1 class="mb-6 text-3xl font-bold">{% trans "Calculadora de probabilidad de IV" %}</h1>
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Calculadora de probabilidad de IV" %}</h1>
 
-<form id="calc-form"
-      hx-post="{% url 'calculator' %}"
-      hx-target="#calc-results"
-      hx-swap="innerHTML"
-      class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
+  <form id="calc-form"
+        hx-post="{% url 'calculator' %}"
+        hx-target="#calc-results"
+        hx-swap="innerHTML"
+        hx-indicator="#calc-results"
+        class="card p-6 mb-8">
 
-  {% csrf_token %}
+    {% csrf_token %}
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <div>
-      <label class="mb-1 block text-sm font-medium text-gray-700" for="friendship_level">
-        {% trans "Nivel de amistad" %}
-      </label>
-      <select name="friendship_level" id="friendship_level"
-              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-        {% for val, label in friendship_choices %}
-          <option value="{{ val }}">{{ label }}</option>
-        {% endfor %}
-      </select>
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div>
+        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="friendship_level">
+          {% trans "Nivel de amistad" %}
+        </label>
+        <select name="friendship_level" id="friendship_level"
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+          {% for val, label in friendship_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="trade_type">
+          {% trans "Tipo de intercambio" %}
+        </label>
+        <select name="trade_type" id="trade_type"
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+          {% for val, label in trade_type_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="n">
+          {% trans "Número de intercambios (n)" %}
+        </label>
+        <input type="number" name="n" id="n" value="1" min="1" max="100000"
+               class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+      </div>
+
+      <div>
+        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="target_kind">
+          {% trans "Objetivo" %}
+        </label>
+        <select name="target_kind" id="target_kind"
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+          {% for val, label in target_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="threshold-group" class="hidden">
+        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="threshold">
+          {% trans "Umbral" %}
+        </label>
+        <input type="number" name="threshold" id="threshold" value="42" min="0" max="45"
+               class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+      </div>
+
+      <div>
+        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="confidence">
+          {% trans "Nivel de confianza" %}
+        </label>
+        <select name="confidence" id="confidence"
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+          <option value="0.5">50%</option>
+          <option value="0.75">75%</option>
+          <option value="0.9">90%</option>
+          <option value="0.95">95%</option>
+          <option value="0.99">99%</option>
+        </select>
+      </div>
     </div>
 
-    <div>
-      <label class="mb-1 block text-sm font-medium text-gray-700" for="trade_type">
-        {% trans "Tipo de intercambio" %}
-      </label>
-      <select name="trade_type" id="trade_type"
-              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-        {% for val, label in trade_type_choices %}
-          <option value="{{ val }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    <button type="submit"
+            class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6"/>
+      </svg>
+      {% trans "Calcular" %}
+    </button>
+  </form>
 
-    <div>
-      <label class="mb-1 block text-sm font-medium text-gray-700" for="n">
-        {% trans "Número de intercambios (n)" %}
-      </label>
-      <input type="number" name="n" id="n" value="1" min="1" max="100000"
-             class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-    </div>
-
-    <div>
-      <label class="mb-1 block text-sm font-medium text-gray-700" for="target_kind">
-        {% trans "Objetivo" %}
-      </label>
-      <select name="target_kind" id="target_kind"
-              onchange="document.getElementById('threshold-group').style.display = this.value === 'hundo' ? 'none' : 'block'"
-              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-        {% for val, label in target_choices %}
-          <option value="{{ val }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div id="threshold-group" style="display:none">
-      <label class="mb-1 block text-sm font-medium text-gray-700" for="threshold">
-        {% trans "Umbral" %}
-      </label>
-      <input type="number" name="threshold" id="threshold" value="42" min="0" max="45"
-             class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-    </div>
-
-    <div>
-      <label class="mb-1 block text-sm font-medium text-gray-700" for="confidence">
-        {% trans "Nivel de confianza" %}
-      </label>
-      <select name="confidence" id="confidence"
-              class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-        <option value="0.5">50%</option>
-        <option value="0.75">75%</option>
-        <option value="0.9">90%</option>
-        <option value="0.95">95%</option>
-        <option value="0.99">99%</option>
-      </select>
-    </div>
+  <div id="calc-results">
+    {% if error %}
+      <div class="rounded-xl border border-danger-50 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
+        <span class="font-semibold">{% trans "Error:" %}</span> {{ error }}
+      </div>
+    {% elif result %}
+      {% include "calculators/_result.html" %}
+    {% else %}
+      <div class="hidden htmx-spinner mx-auto my-8 h-6 w-6 rounded-full border-2 border-brand-500 border-t-transparent" role="status" aria-label="{% trans "Calculando..." %}"></div>
+    {% endif %}
   </div>
-
-  <button type="submit"
-          class="mt-4 rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700">
-    {% trans "Calcular" %}
-  </button>
-</form>
-
-<div id="calc-results">
-  {% if error %}
-    <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-      {{ error }}
-    </div>
-  {% elif result %}
-    {% include "calculators/_result.html" %}
-  {% endif %}
 </div>
-
 {% endblock %}

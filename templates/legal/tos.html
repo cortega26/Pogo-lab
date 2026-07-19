@@ -4,36 +4,21 @@
 {% block title %}Pogo-lab — {% trans "Términos de servicio" %}{% endblock %}
 
 {% block content %}
-  <article class="prose prose-gray max-w-none">
-    <h1>{% trans "Términos de servicio" %}</h1>
+<article class="mx-auto max-w-3xl">
+  <h1 class="section-title">{% trans "Términos de servicio" %}</h1>
 
-    <p class="text-sm text-gray-500 italic">
-      {% trans "Última actualización: 2026-07-18." %}
-    </p>
+  <p class="mb-8 text-sm italic text-slate-500 dark:text-slate-400">
+    {% trans "Última actualización: 2026-07-18." %}
+  </p>
 
-    {# PENDIENTE-HUMANO: Revisión legal requerida antes de publicación. #}
-    {# Este documento es un placeholder sustantivo pero no constituye asesoría legal. #}
-    {# Un profesional debe revisarlo antes de abrir la beta al público. #}
+  <div class="prose-custom">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Aceptación de los términos" %}</h2>
+    <p>{% blocktrans %}Al acceder y usar Pogo-lab, aceptas estos términos de servicio en su totalidad. Si no estás de acuerdo, por favor no uses el servicio.{% endblocktrans %}</p>
 
-    <h2>{% trans "Aceptación de los términos" %}</h2>
-    <p>
-      {% blocktrans %}
-      Al acceder y usar Pogo-lab, aceptas estos términos de servicio en su totalidad.
-      Si no estás de acuerdo, por favor no uses el servicio.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Descripción del servicio" %}</h2>
+    <p>{% blocktrans %}Pogo-lab es una plataforma educativa y analítica que ayuda a entender las mecánicas de Pokémon GO (probabilidades de IV, intercambios Lucky, y temas relacionados). Ofrece herramientas de cálculo, registro de observaciones, análisis estadísticos y datasets comunitarios anonimizados.{% endblocktrans %}</p>
 
-    <h2>{% trans "Descripción del servicio" %}</h2>
-    <p>
-      {% blocktrans %}
-      Pogo-lab es una plataforma educativa y analítica que ayuda a entender las
-      mecánicas de Pokémon GO (probabilidades de IV, intercambios Lucky, y temas
-      relacionados). Ofrece herramientas de cálculo, registro de observaciones,
-      análisis estadísticos y datasets comunitarios anonimizados.
-      {% endblocktrans %}
-    </p>
-
-    <h2>{% trans "Registro y cuentas" %}</h2>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Registro y cuentas" %}</h2>
     <ul>
       <li>{% trans "Debes proporcionar información veraz durante el registro." %}</li>
       <li>{% trans "Eres responsable de mantener la confidencialidad de tu contraseña." %}</li>
@@ -41,7 +26,7 @@
       <li>{% trans "Nos reservamos el derecho de suspender cuentas que violen estos términos." %}</li>
     </ul>
 
-    <h2>{% trans "Conducta del usuario" %}</h2>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Conducta del usuario" %}</h2>
     <p>{% trans "Al usar el servicio, te comprometes a:" %}</p>
     <ul>
       <li>{% trans "No falsificar datos de observaciones a propósito." %}</li>
@@ -50,46 +35,20 @@
       <li>{% trans "No sobrecargar la infraestructura con solicitudes automatizadas excesivas." %}</li>
     </ul>
 
-    <h2>{% trans "Datos y contribuciones" %}</h2>
-    <p>
-      {% blocktrans %}
-      Al registrar observaciones de intercambios, conservas la propiedad de tus datos.
-      Nos otorgas una licencia no exclusiva para usarlos de forma anonimizada y agregada
-      en los análisis y datasets públicos del proyecto, siempre que hayas dado tu
-      consentimiento explícito.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Datos y contribuciones" %}</h2>
+    <p>{% blocktrans %}Al registrar observaciones de intercambios, conservas la propiedad de tus datos. Nos otorgas una licencia no exclusiva para usarlos de forma anonimizada y agregada en los análisis y datasets públicos del proyecto, siempre que hayas dado tu consentimiento explícito.{% endblocktrans %}</p>
 
-    <h2>{% trans "Limitación de responsabilidad" %}</h2>
-    <p>
-      {% blocktrans %}
-      Pogo-lab se proporciona "tal cual", sin garantías de ningún tipo. No nos hacemos
-      responsables de decisiones tomadas basándose en los análisis o recomendaciones
-      del sitio, ni de pérdidas en el juego derivadas del uso de nuestras herramientas.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Limitación de responsabilidad" %}</h2>
+    <p>{% blocktrans %}Pogo-lab se proporciona "tal cual", sin garantías de ningún tipo. No nos hacemos responsables de decisiones tomadas basándose en los análisis o recomendaciones del sitio, ni de pérdidas en el juego derivadas del uso de nuestras herramientas.{% endblocktrans %}</p>
 
-    <h2>{% trans "Propiedad intelectual" %}</h2>
-    <p>
-      {% blocktrans %}
-      El código fuente de Pogo-lab es abierto. Los análisis, textos y gráficos
-      originales producidos por el proyecto están sujetos a la licencia del repositorio.
-      Pokémon, Pokémon GO y marcas relacionadas son propiedad de sus respectivos titulares.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Propiedad intelectual" %}</h2>
+    <p>{% blocktrans %}El código fuente, los análisis, textos y gráficos originales de Pogo-lab son propiedad de sus autores y están protegidos por derechos de autor (© 2026, todos los derechos reservados). No se otorga ninguna licencia de uso, copia, modificación o distribución salvo autorización expresa por escrito. Pokémon, Pokémon GO y marcas relacionadas son propiedad de sus respectivos titulares.{% endblocktrans %}</p>
 
-    <h2>{% trans "Modificaciones" %}</h2>
-    <p>
-      {% blocktrans %}
-      Nos reservamos el derecho de modificar estos términos en cualquier momento.
-      Los cambios entrarán en vigor al ser publicados. El uso continuado del servicio
-      constituye la aceptación de los nuevos términos.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Modificaciones" %}</h2>
+    <p>{% blocktrans %}Nos reservamos el derecho de modificar estos términos en cualquier momento. Los cambios entrarán en vigor al ser publicados. El uso continuado del servicio constituye la aceptación de los nuevos términos.{% endblocktrans %}</p>
 
-    <h2>{% trans "Contacto" %}</h2>
-    <p>
-      {% trans "Para consultas sobre estos términos, abre un issue en el repositorio del proyecto." %}
-    </p>
-  </article>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Contacto" %}</h2>
+    <p>{% trans "Para consultas sobre estos términos, escríbenos a contacto@pogo-lab.com." %}</p>
+  </div>
+</article>
 {% endblock %}

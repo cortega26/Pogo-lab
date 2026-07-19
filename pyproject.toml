@@ -5,7 +5,7 @@ description = "Mechanics Lab + Decision Planner para Pokémon GO"
 readme = "README.md"
 requires-python = ">=3.13"
 authors = [{ name = "Pogo-lab Team" }]
-license = { text = "Por definir" }
+license = { text = "Proprietary" }
 dependencies = [
     "django~=5.2.0",
     "django-environ>=0.12.0",
@@ -17,6 +17,7 @@ dependencies = [
     "import-linter>=2.0.0",
     "django-csp>=4.0.0",
     "django-ratelimit>=4.1.0",
+    "argon2-cffi>=23.1.0",
     "scipy>=1.15.0",
 ]
 
@@ -35,7 +36,11 @@ exclude = ["*/migrations/*", "apps/accounts/signals.py"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = ["ARG001", "ARG002"]
 "apps/*/tests/*.py" = ["ARG001", "ARG002"]
-"config/settings/prod.py" = ["F405"]
+"config/settings/prod.py" = ["F403", "F405"]
+"config/settings/dev.py" = ["F403", "F405"]
+"config/settings/test.py" = ["F403", "F405"]
+"apps/accounts/apps.py" = ["F401"]
+"apps/*/admin.py" = ["RUF012"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -78,7 +83,7 @@ django_settings_module = "config.settings.test"
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 testpaths = ["engine/tests", "apps", "tests"]
-norecursedirs = [".venv", ".codegraph", "node_modules"]
+norecursedirs = [".venv", ".codegraph", ".hypothesis", "node_modules"]
 addopts = "--randomly-seed=0"
 filterwarnings = ["ignore::DeprecationWarning"]
 

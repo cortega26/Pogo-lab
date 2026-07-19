@@ -1,0 +1,11 @@
+[Unit]
+Description=Ejecuta el backup diario de Pogo-lab
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=pogo-lab-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,16 +1,22 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% translate "Demasiadas solicitudes" %}{% endblock %}
+{% block title %}{% translate "Demasiadas solicitudes" %} — Pogo-lab{% endblock %}
 
 {% block content %}
-<main class="mx-auto max-w-2xl px-4 py-16 text-center">
-  <h1 class="mb-4 text-4xl font-bold text-gray-800">429</h1>
-  <p class="mb-8 text-lg text-gray-600">
+<div class="mx-auto max-w-2xl px-4 py-16 text-center">
+  <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-accent-50 text-accent-500 dark:bg-accent-500/20 dark:text-accent-300">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+    </svg>
+  </div>
+  <h1 class="mb-2 text-5xl font-bold text-slate-800 dark:text-slate-100">429</h1>
+  <p class="mb-8 text-lg text-slate-600 dark:text-slate-400">
     {% translate "Has hecho demasiadas solicitudes. Por favor, espera unos minutos e inténtalo de nuevo." %}
   </p>
-  <a href="/" class="text-blue-600 underline hover:text-blue-800">
+  <a href="{% url 'healthz' %}"
+     class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
     {% translate "Volver al inicio" %}
   </a>
-</main>
+</div>
 {% endblock %}

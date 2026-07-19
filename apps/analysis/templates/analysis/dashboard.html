@@ -1,115 +1,157 @@
 {% extends "base.html" %}
-{% load i18n %}
-{% load static %}
+{% load i18n static %}
 
-{% block title %}{% translate "Análisis personal" %}{% endblock %}
+{% block title %}{% translate "Análisis personal" %} — Pogo-lab{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8">
-  <h1 class="text-2xl font-bold mb-6">{% translate "Análisis de intercambios" %}</h1>
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% translate "Análisis de intercambios" %}</h1>
 
   {% if has_results %}
-    {% for entry in results_with_rows %}
-    {% with result=entry.result payload=entry.result.payload %}
-    <section class="mb-8 p-4 bg-white rounded shadow">
-      <h2 class="text-lg font-semibold mb-3">{{ result.metric_key }}</h2>
+    <div class="space-y-6">
+      {% for entry in results_with_rows %}
+      {% with result=entry.result payload=entry.result.payload %}
+      <div class="rounded-xl border border-slate-200 bg-white shadow-card overflow-hidden dark:border-slate-800 dark:bg-slate-900">
+        <div class="border-b border-slate-200 bg-gradient-to-r from-brand-50 to-white px-6 py-4 dark:border-slate-800 dark:from-brand-800/30 dark:to-slate-900">
+          <h2 class="text-base font-bold text-slate-800 dark:text-slate-100">{{ result.metric_key }}</h2>
+        </div>
 
-      <dl class="grid grid-cols-2 gap-2 text-sm">
-        <dt class="font-medium text-gray-600">{% translate "Observaciones" %}</dt>
-        <dd>{{ payload.n }}</dd>
+        <div class="p-6">
+          <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Observaciones" %}</dt>
+              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">{{ payload.n }}</dd>
+            </div>
 
-        {% if payload.successes is not None %}
-        <dt class="font-medium text-gray-600">{% translate "Éxitos" %}</dt>
-        <dd>{{ payload.successes }} / {{ payload.n }}</dd>
-        {% endif %}
+            {% if payload.successes is not None %}
+            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Éxitos" %}</dt>
+              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">{{ payload.successes }} / {{ payload.n }}</dd>
+            </div>
+            {% endif %}
 
-        {% if payload.p_value is not None %}
-        <dt class="font-medium text-gray-600">{% translate "p-valor" %}</dt>
-        <dd>{{ payload.p_value|floatformat:4 }}</dd>
-        {% endif %}
+            {% if payload.p_value is not None %}
+            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "p-valor" %}</dt>
+              <dd class="mt-1 text-2xl font-bold font-mono {% if payload.p_value < 0.05 %}text-hundo-500{% else %}text-slate-800 dark:text-slate-100{% endif %}">
+                {{ payload.p_value|floatformat:4 }}
+              </dd>
+            </div>
+            {% endif %}
 
-        {% if payload.effect_size is not None %}
-        <dt class="font-medium text-gray-600">{% translate "Tamaño de efecto" %}</dt>
-        <dd>{{ payload.effect_size|floatformat:4 }}</dd>
-        {% endif %}
+            {% if payload.effect_size is not None %}
+            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Tamaño de efecto" %}</dt>
+              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">{{ payload.effect_size|floatformat:4 }}</dd>
+            </div>
+            {% endif %}
 
-        {% if payload.ci_lo is not None %}
-        <dt class="font-medium text-gray-600">{% translate "IC (Wilson)" %}</dt>
-        <dd>[{{ payload.ci_lo|floatformat:4 }}, {{ payload.ci_hi|floatformat:4 }}]</dd>
-        {% endif %}
+            {% if payload.ci_lo is not None %}
+            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "IC (Wilson)" %}</dt>
+              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">
+                [{{ payload.ci_lo|floatformat:4 }}, {{ payload.ci_hi|floatformat:4 }}]
+              </dd>
+            </div>
+            {% endif %}
 
-        {% if payload.method_used %}
-        <dt class="font-medium text-gray-600">{% translate "Método" %}</dt>
-        <dd>{{ payload.method_used }}</dd>
-        {% endif %}
+            {% if payload.method_used %}
+            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Método" %}</dt>
+              <dd class="mt-1 text-lg font-bold text-slate-800 dark:text-slate-100">{{ payload.method_used }}</dd>
+            </div>
+            {% endif %}
 
-        {% if payload.insufficient_sample %}
-        <dt class="font-medium text-amber-600">{% translate "Advertencia" %}</dt>
-        <dd class="text-amber-600">{% translate "Muestra insuficiente para inferencia" %}</dd>
-        {% endif %}
-      </dl>
+            {% if payload.insufficient_sample %}
+            <div class="sm:col-span-2 lg:col-span-3 rounded-lg bg-accent-50 p-4 dark:bg-accent-500/10">
+              <dt class="text-xs font-medium tracking-wide uppercase text-accent-600 dark:text-accent-400">{% translate "Advertencia" %}</dt>
+              <dd class="mt-1 text-sm font-medium text-accent-700 dark:text-accent-300">{% translate "Muestra insuficiente para inferencia" %}</dd>
+            </div>
+            {% endif %}
+          </dl>
 
-      {% if "stat_uniformity_" in result.metric_key or "sum_uniformity-" in result.metric_key %}
-      <div class="mt-4">
-        <canvas id="chart-{{ forloop.counter0 }}"
-                data-counts="{{ result.payload.counts|safe }}"
-                data-values="{{ result.payload.values|safe }}">
-        </canvas>
-        <noscript>
-          <table class="mt-2 w-full text-xs border">
-            <thead><tr><th class="border px-2 py-1">{% translate "Valor" %}</th><th class="border px-2 py-1">{% translate "Conteo" %}</th></tr></thead>
-            <tbody>
-            {% for pair in entry.distribution_rows %}
-            <tr>
-              <td class="border px-2 py-1">{{ pair.value }}</td>
-              <td class="border px-2 py-1">{{ pair.count }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </noscript>
+          {% if "stat_uniformity_" in result.metric_key or "sum_uniformity-" in result.metric_key %}
+          <div class="mt-6">
+            <canvas id="chart-{{ forloop.counter0 }}" class="max-h-64"></canvas>
+            {% with cid=forloop.counter0|stringformat:"s" %}
+            {% with counts_id="chart-vals-"|add:cid  values_id="chart-labs-"|add:cid %}
+            {{ result.payload.counts|json_script:counts_id }}
+            {{ result.payload.values|json_script:values_id }}
+            {% endwith %}{% endwith %}
+            <noscript>
+              <div class="mt-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                <table class="min-w-full text-xs">
+                  <thead class="bg-slate-100 dark:bg-slate-800">
+                    <tr>
+                      <th class="border-r border-slate-200 px-2 py-1 text-left text-xs font-semibold uppercase text-slate-500 dark:border-slate-700 dark:text-slate-400">{% translate "Valor" %}</th>
+                      <th class="px-2 py-1 text-left text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">{% translate "Conteo" %}</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                  {% for pair in entry.distribution_rows %}
+                    <tr>
+                      <td class="border-r border-slate-100 px-2 py-1 font-mono dark:border-slate-800">{{ pair.value }}</td>
+                      <td class="px-2 py-1 font-mono">{{ pair.count }}</td>
+                    </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </noscript>
+          </div>
+          {% endif %}
+        </div>
       </div>
-      {% endif %}
-    </section>
-    {% endwith %}
-    {% endfor %}
+      {% endwith %}
+      {% endfor %}
+    </div>
 
     {% if recommendations %}
-    <section class="mb-8 p-4 bg-amber-50 rounded shadow border border-amber-200">
-      <h2 class="text-lg font-semibold mb-3">{% translate "Recomendaciones" %}</h2>
-      <ul class="space-y-2 text-sm">
+    <div class="mt-8 rounded-xl border border-accent-50 bg-accent-50 shadow-card dark:border-accent-500/20 dark:bg-accent-500/10">
+      <div class="border-b border-accent-100 px-6 py-4 dark:border-accent-500/20">
+        <h2 class="text-base font-bold text-accent-800 dark:text-accent-300">{% translate "Recomendaciones" %}</h2>
+      </div>
+      <div class="divide-y divide-accent-100 dark:divide-accent-500/10">
         {% for rec in recommendations %}
-        <li class="flex items-start gap-2">
-          <span class="{% if rec.severity == 'warning' %}text-amber-600{% elif rec.severity == 'critical' %}text-red-600{% else %}text-blue-600{% endif %} font-bold">
-            {% if rec.severity == 'warning' %}&#9888;{% elif rec.severity == 'critical' %}&#128308;{% else %}&#8505;{% endif %}
+        <div class="flex items-start gap-3 p-5">
+          <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
+            {% if rec.severity == 'warning' %}bg-accent-500
+            {% elif rec.severity == 'critical' %}bg-danger-500
+            {% else %}bg-brand-500{% endif %}">
+            {% if rec.severity == 'critical' %}!{% elif rec.severity == 'warning' %}?{% else %}i{% endif %}
           </span>
-          <span>
-            <strong>{{ rec.message_key }}</strong>
-            <span class="text-gray-500">({{ rec.rule_key }}@{{ rec.rule_version }})</span>
+          <div class="min-w-0">
+            <strong class="text-sm text-slate-800 dark:text-slate-100">{{ rec.message_key }}</strong>
+            <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">({{ rec.rule_key }}@{{ rec.rule_version }})</span>
             {% if rec.params %}
-            <span class="text-gray-400 text-xs">{% for k, v in rec.params.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {% for k, v in rec.params.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </p>
             {% endif %}
-          </span>
-        </li>
+          </div>
+        </div>
         {% endfor %}
-      </ul>
-    </section>
+      </div>
+    </div>
     {% endif %}
 
   {% else %}
-    <div class="p-6 bg-blue-50 rounded shadow text-sm text-blue-800">
-      {% translate "Registra intercambios para ver tu análisis estadístico." %}
-    </div>
+    {% url 'trades:session_list' as session_list_url %}
+    {% include "includes/_empty_state.html" with title=_("Sin datos para analizar") message=_("Registra intercambios para ver tu análisis estadístico.") cta_url=session_list_url cta_label=_("Ir a sesiones") %}
   {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  document.querySelectorAll('[id^="chart-"]').forEach(function(canvas) {
+<script src="{% static 'vendor/chart.min.js' %}" nonce="{{ request.csp_nonce }}"></script>
+<script nonce="{{ request.csp_nonce }}">
+  document.querySelectorAll('canvas[id^="chart-"]').forEach(function(canvas) {
     try {
-      var counts = JSON.parse(canvas.dataset.counts || '[]');
-      var values = JSON.parse(canvas.dataset.values || '[]');
+      var idx = canvas.id.replace('chart-', '');
+      var countsEl = document.getElementById('chart-vals-' + idx);
+      var valuesEl = document.getElementById('chart-labs-' + idx);
+      var counts = countsEl ? JSON.parse(countsEl.textContent) : [];
+      var values = valuesEl ? JSON.parse(valuesEl.textContent) : [];
       new Chart(canvas, {
         type: 'bar',
         data: {
@@ -122,8 +164,24 @@
             borderWidth: 1
           }]
         },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(0,0,0,0.05)' }
+            },
+            x: {
+              grid: { display: false }
+            }
+          }
+        }
       });
-    } catch(e) {}
+    } catch(e) { console.warn('Chart render failed:', e); }
   });
 </script>
 {% endblock %}

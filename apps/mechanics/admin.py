@@ -29,8 +29,8 @@ class MechanicAdmin(admin.ModelAdmin):
     list_editable = ("sort_order",)
     list_filter = ("status",)
     search_fields = ("key", "name", "slug")
-    prepopulated_fields = {"slug": ("name",)}  # noqa: RUF012
-    inlines = [MechanicRuleSetInline]  # noqa: RUF012
+    prepopulated_fields = {"slug": ("name",)}
+    inlines = [MechanicRuleSetInline]
 
 
 @admin.register(MechanicRuleSet)
@@ -46,14 +46,14 @@ class MechanicRuleSetAdmin(admin.ModelAdmin):
     )
     list_filter = ("is_published", "mechanic", "confidence_level")
     search_fields = ("name", "mechanic__key")
-    inlines = [RuleParameterInline]  # noqa: RUF012
+    inlines = [RuleParameterInline]
     fieldsets = (
         (None, {"fields": ("mechanic", "version", "name")}),
         ("Fechas", {"fields": ("effective_from", "effective_to")}),
         ("Estado", {"fields": ("is_published", "confidence_level", "notes")}),
     )
     readonly_fields = ("is_published",)
-    actions = ["publish_ruleset"]  # noqa: RUF012
+    actions = ["publish_ruleset"]
 
     @admin.action(description="Publicar ruleset seleccionado (inmutable)")
     def publish_ruleset(self, request, queryset):

@@ -14,8 +14,8 @@ class ContentPageAdmin(admin.ModelAdmin):
     list_display = ("slug", "page_type", "status", "mechanic", "review_date")
     list_filter = ("page_type", "status")
     search_fields = ("slug",)
-    prepopulated_fields = {"slug": ("page_type",)}  # noqa: RUF012
-    inlines = [ContentPageTranslationInline]  # noqa: RUF012
+    prepopulated_fields = {"slug": ("page_type",)}
+    inlines = [ContentPageTranslationInline]
     fieldsets = (
         (None, {"fields": ("slug", "page_type", "status")}),
         ("Relaciones", {"fields": ("mechanic",)}),

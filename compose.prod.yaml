@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: pogo
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me-in-production}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       POSTGRES_DB: pogo
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -22,7 +22,7 @@ services:
       - .env.prod
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
-      DATABASE_URL: postgres://pogo:${DB_PASSWORD:-change-me-in-production}@db:5432/pogo
+      DATABASE_URL: postgres://pogo:${DB_PASSWORD:?DB_PASSWORD is required}@db:5432/pogo
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -38,6 +38,7 @@ services:
     image: nginx:alpine
     volumes:
       - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
     ports:

@@ -7,6 +7,7 @@ from django.contrib import sitemaps
 from django.urls import reverse
 
 from apps.content.models import ContentPage
+from engine.dps_data import ALL_TYPES
 
 
 class StaticViewSitemap(sitemaps.Sitemap):
@@ -16,7 +17,7 @@ class StaticViewSitemap(sitemaps.Sitemap):
     changefreq = "weekly"
 
     def items(self):
-        return ["calculator"]
+        return ["calculator", "dps_browser"]
 
     def location(self, item):
         return reverse(item)
@@ -35,7 +36,21 @@ class ContentPageSitemap(sitemaps.Sitemap):
         return obj.updated_at
 
 
+class DpsTypeSitemap(sitemaps.Sitemap):
+    """Sitemap para paginas de ranking DPS por tipo."""
+
+    priority = 0.7
+    changefreq = "weekly"
+
+    def items(self):
+        return ALL_TYPES
+
+    def location(self, item):
+        return reverse("dps_by_type", args=[item])
+
+
 sitemaps_dict = {
     "static": StaticViewSitemap,
     "content": ContentPageSitemap,
+    "dps_types": DpsTypeSitemap,
 }

@@ -373,7 +373,7 @@ def independence_test(
     else:
         raise ValueError(f"Método desconocido: {method}")
 
-    cramers_v = _compute_cramers_v(observed_g, n_obs, len(sorted_rows))
+    cramers_v = _compute_cramers_v(observed_g, n_obs, min(len(sorted_rows), len(sorted_cols)))
 
     return TestResult(
         stat=observed_g,

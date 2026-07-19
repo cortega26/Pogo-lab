@@ -426,3 +426,13 @@ class TestContentModels:
                 body="dup",
                 is_published=True,
             )
+
+
+@pytest.mark.django_db
+def test_seed_command_creates_initial_data():
+    from django.core.management import call_command
+
+    call_command("seed", verbosity=0)
+    from apps.mechanics.models import Mechanic
+
+    assert Mechanic.objects.filter(key="trade_iv").exists()

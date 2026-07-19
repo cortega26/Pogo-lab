@@ -4,116 +4,58 @@
 {% block title %}Pogo-lab — {% trans "Política de privacidad" %}{% endblock %}
 
 {% block content %}
-  <article class="prose prose-gray max-w-none">
-    <h1>{% trans "Política de privacidad" %}</h1>
+<article class="mx-auto max-w-3xl">
+  <h1 class="section-title">{% trans "Política de privacidad" %}</h1>
 
-    <p class="text-sm text-gray-500 italic">
-      {% trans "Última actualización: 2026-07-18." %}
-    </p>
+  <p class="mb-8 text-sm italic text-slate-500 dark:text-slate-400">
+    {% trans "Última actualización: 2026-07-18." %}
+  </p>
 
-    {# PENDIENTE-HUMANO: Revisión legal requerida antes de publicación. #}
-    {# Este documento es un placeholder sustantivo pero no constituye asesoría legal. #}
-    {# Un profesional debe revisarlo antes de abrir la beta al público. #}
+  <div class="prose-custom">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Responsable del tratamiento" %}</h2>
+    <p>{% blocktrans %}El responsable del tratamiento de tus datos personales es [RESPONSABLE: nombre del operador], persona natural con domicilio en Chile. Para cualquier asunto de privacidad puedes escribir a privacidad@pogo-lab.com.{% endblocktrans %}</p>
 
-    <h2>{% trans "Datos que recopilamos" %}</h2>
-    <p>
-      {% blocktrans %}
-      Para proporcionar el servicio, recopilamos la siguiente información mínima:
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Datos que recopilamos" %}</h2>
+    <p>{% blocktrans %}Recopilamos los siguientes datos cuando creas una cuenta: correo electrónico (necesario para la autenticación), nombre de usuario (público). Cuando registras observaciones de intercambios, almacenamos los IVs, tipo de intercambio, nivel de amistad, especie y marca de tiempo.{% endblocktrans %}</p>
+
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Datos que NO recopilamos" %}</h2>
     <ul>
-      <li>{% trans "Nombre de usuario y dirección de correo electrónico (para autenticación)." %}</li>
-      <li>
-        {% blocktrans %}
-        Datos de intercambios de Pokémon GO que tú registras voluntariamente:
-        IVs (Ataque/Defensa/HP), nivel de amistad, tipo de intercambio, especie, y otros
-        atributos del juego.
-        {% endblocktrans %}
-      </li>
-      <li>{% trans "País de residencia (agregado, sin ubicación precisa)." %}</li>
+      <li>{% trans "Nombre real del entrenador" %}</li>
+      <li>{% trans "Ubicación precisa (solo país agregado opcional)" %}</li>
+      <li>{% trans "Identificadores de dispositivo" %}</li>
+      <li>{% trans "Contenido de notas privadas" %}</li>
     </ul>
 
-    <h3>{% trans "Lo que NO recopilamos" %}</h3>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Base legal (GDPR)" %}</h2>
     <ul>
-      <li>{% trans "Ubicación precisa (GPS, coordenadas)." %}</li>
-      <li>{% trans "Nombre de entrenador de Pokémon GO." %}</li>
-      <li>{% trans "Datos personales de terceros." %}</li>
+      <li>{% trans "Ejecución de un contrato: la creación y gestión de tu cuenta." %}</li>
+      <li>{% trans "Consentimiento explícito: para contribuir al dataset comunitario anonimizado." %}</li>
+      <li>{% trans "Interés legítimo: análisis agregados para entender las mecánicas del juego." %}</li>
     </ul>
 
-    <h2>{% trans "Uso de los datos" %}</h2>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Cookies" %}</h2>
+    <p>{% trans "Usamos cookies estrictamente necesarias para la sesión (sessionid, csrftoken). No usamos cookies de rastreo, publicidad ni análisis de terceros." %}</p>
+
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Conservación de datos" %}</h2>
+    <p>{% trans "Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, todos tus datos personales se eliminan irreversiblemente. Las contribuciones al dataset comunitario ya agregadas no son reversibles, pero tu consentimiento para futuros builds puede revocarse en cualquier momento." %}</p>
+
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Tus derechos (GDPR)" %}</h2>
     <ul>
-      <li>{% trans "Proveer y mantener el servicio." %}</li>
-      <li>{% trans "Generar análisis estadísticos agregados de las mecánicas del juego." %}</li>
-      <li>{% trans "Publicar datasets anonimizados e inmutables (con tu consentimiento explícito)." %}</li>
-      <li>{% trans "Notificarte sobre cambios en el servicio (solo correo transaccional)." %}</li>
+      <li>{% trans "Acceso: exporta tus datos desde la sección de configuración de tu cuenta." %}</li>
+      <li>{% trans "Rectificación: corrige tu información en cualquier momento." %}</li>
+      <li>{% trans "Supresión: elimina tu cuenta y todos tus datos asociados." %}</li>
+      <li>{% trans "Portabilidad: exporta tus observaciones en formato CSV." %}</li>
+      <li>{% trans "Revocación del consentimiento: desmarca la contribución al dataset en cualquier momento." %}</li>
     </ul>
 
-    <h2>{% trans "Datos compartidos" %}</h2>
-    <p>
-      {% blocktrans %}
-      No vendemos, compartimos ni transferimos tus datos personales a terceros. Los datasets
-      públicos son snapshots anonimizados que no contienen información personal identificable.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Seguridad" %}</h2>
+    <p>{% blocktrans %}Implementamos medidas técnicas y organizativas para proteger tus datos: cifrado en tránsito (HTTPS), hashing seguro de contraseñas (Argon2), cabeceras de seguridad (CSP, HSTS), y dependencias auditadas regularmente.{% endblocktrans %}</p>
 
-    <h2>{% trans "Notas privadas" %}</h2>
-    <p>
-      {% blocktrans %}
-      El campo "notas" de cada observación es privado y nunca se incluye en análisis
-      agregados ni datasets públicos.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Cambios a esta política" %}</h2>
+    <p>{% trans "Actualizaremos esta política cuando sea necesario. Los cambios sustanciales se notificarán mediante un aviso en el sitio." %}</p>
 
-    <h2>{% trans "Tus derechos" %}</h2>
-    <ul>
-      <li>
-        {% trans "Exportar tus datos:" %}
-        <a href="{% url 'account_export' %}">{% trans "descargar copia" %}</a>
-      </li>
-      <li>
-        {% trans "Revocar tu consentimiento para datasets públicos en cualquier momento." %}
-      </li>
-      <li>
-        {% trans "Solicitar la eliminación de tu cuenta y todos tus datos asociados:" %}
-        <a href="{% url 'account_delete' %}">{% trans "eliminar cuenta" %}</a>
-      </li>
-    </ul>
-
-    <h2>{% trans "Cookies" %}</h2>
-    <p>
-      {% blocktrans %}
-      Utilizamos cookies estrictamente necesarias para la sesión y la autenticación.
-      No usamos cookies de seguimiento ni publicidad de terceros.
-      {% endblocktrans %}
-    </p>
-
-    <h2>{% trans "Almacenamiento y seguridad" %}</h2>
-    <p>
-      {% blocktrans %}
-      Los datos se almacenan en PostgreSQL con cifrado en reposo según la configuración del
-      proveedor de hosting. Las contraseñas se almacenan con hash (nunca en texto plano).
-      {% endblocktrans %}
-    </p>
-
-    <h2>{% trans "Menores de edad" %}</h2>
-    <p>
-      {% blocktrans %}
-      Este servicio no está dirigido a menores de 13 años. No recopilamos intencionadamente
-      datos de menores sin consentimiento parental verificable.
-      {% endblocktrans %}
-    </p>
-
-    <h2>{% trans "Cambios a esta política" %}</h2>
-    <p>
-      {% blocktrans %}
-      Notificaremos cualquier cambio material a través del sitio o por correo electrónico
-      antes de que entre en vigor.
-      {% endblocktrans %}
-    </p>
-
-    <h2>{% trans "Contacto" %}</h2>
-    <p>
-      {% trans "Para ejercer tus derechos o consultar sobre esta política, abre un issue en el repositorio del proyecto o contacta al mantenedor." %}
-    </p>
-  </article>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Contacto" %}</h2>
+    <p>{% blocktrans %}Para ejercer tus derechos de privacidad (acceso, rectificación, supresión, portabilidad o revocación del consentimiento), escríbenos a privacidad@pogo-lab.com. Responderemos dentro de los plazos que exija la ley aplicable.{% endblocktrans %}</p>
+  </div>
+</article>
 {% endblock %}

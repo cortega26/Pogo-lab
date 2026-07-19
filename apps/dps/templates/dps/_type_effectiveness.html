@@ -1,0 +1,21 @@
+{% load i18n seo_tags %}
+<div class="mb-4">
+  <h2 class="text-lg font-semibold text-slate-700 dark:text-slate-300">
+    {% blocktrans with type=attack_type_name %}Efectividad de {{ type }}{% endblocktrans %}
+  </h2>
+</div>
+<div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+  {% for def_type, multiplier in effectiveness.items %}
+  <div class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
+    <span class="inline-block h-3 w-3 rounded-full" style="background-color: {{ def_type|type_color }}"></span>
+    <span class="text-xs text-slate-600 dark:text-slate-400">{{ def_type|capfirst }}</span>
+    <span class="ml-auto text-xs font-mono font-semibold
+      {% if multiplier > 1.0 %}text-green-600 dark:text-green-400
+      {% elif multiplier < 1.0 and multiplier >= 0.5 %}text-amber-600 dark:text-amber-400
+      {% elif multiplier < 0.5 %}text-red-600 dark:text-red-400
+      {% else %}text-slate-500 dark:text-slate-400{% endif %}">
+      {{ multiplier|floatformat:2 }}×
+    </span>
+  </div>
+  {% endfor %}
+</div>

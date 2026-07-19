@@ -14,6 +14,7 @@ PROD_CSP = {
         "connect-src": [SELF],
         "base-uri": [SELF],
         "frame-ancestors": [SELF],
+        "form-action": [SELF],
         "object-src": ["'none'"],
     },
 }
@@ -34,6 +35,7 @@ def test_csp_header_emitted_with_prod_settings():
     )
     assert "script-src 'self'" in csp_header
     assert "object-src 'none'" in csp_header
+    assert "form-action 'self'" in csp_header
 
 
 @pytest.mark.django_db

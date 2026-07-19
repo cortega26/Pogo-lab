@@ -7,7 +7,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Pogo-lab{% endblock %}</title>
+  <meta name="description" content="{% block description %}{% trans "Plataforma de análisis estadístico para mecánicas de Pokémon GO — probabilidades, IV, Lucky e inferencia honesta." %}{% endblock %}">
 
   {% block extra_head %}{% endblock %}
 
@@ -25,62 +27,252 @@
   {% endblock %}
 
   <meta property="og:site_name" content="Pogo-lab">
-  <meta property="og:type" content="website">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
   <meta property="og:locale" content="{{ LANGUAGE_CODE }}">
+  <meta property="og:title" content="{% block og_title %}Pogo-lab{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{% trans "Plataforma de análisis estadístico para mecánicas de Pokémon GO." %}{% endblock %}">
+  <meta property="og:image" content="{% block og_image %}{% static 'og-image.svg' %}{% endblock %}">
+  <meta property="og:image:width" content="{% block og_image_width %}1200{% endblock %}">
+  <meta property="og:image:height" content="{% block og_image_height %}630{% endblock %}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{% block twitter_title %}Pogo-lab{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}{% trans "Análisis estadístico para Pokémon GO." %}{% endblock %}">
 
+  <link rel="icon" href="{% static 'pogo-lab.svg' %}" type="image/svg+xml">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" nonce="{{ request.csp_nonce }}">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
+
+  {% block json_ld %}{% endblock %}
+
+  {% block extra_css %}{% endblock %}
   <link rel="stylesheet" href="{% static 'css/output.css' %}" nonce="{{ request.csp_nonce }}">
+  <script nonce="{{ request.csp_nonce }}">
+    document.addEventListener('htmx:configLoad', () => htmx.config.allowEval = false);
+  </script>
   <script src="{% static 'vendor/htmx.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
 </head>
-<body class="bg-gray-50 text-gray-900 antialiased">
-  <header class="border-b border-gray-200 bg-white">
-    <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-      <a href="{% url 'healthz' %}" class="text-lg font-bold text-blue-600">Pogo-lab</a>
+<body class="{% block body_class %}{% endblock %}">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg">
+    {% trans "Saltar al contenido principal" %}
+  </a>
 
-      <div class="flex items-center gap-4">
-        <a href="{% url 'calculator' %}" class="text-sm text-gray-600 hover:text-gray-900">
+  <header class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/75 backdrop-blur-xl transition-colors duration-200 dark:border-slate-800/80 dark:bg-slate-950/75">
+    <nav class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <a href="{% url 'healthz' %}" class="flex items-center gap-2.5 text-lg font-bold text-slate-800 transition-colors hover:text-brand-500 dark:text-slate-100 dark:hover:text-brand-400" {% if request.path == '/' or request.path == '/es/' or request.path == '/en/' %}aria-current="page"{% endif %}>
+        <span class="flex h-8 w-8 items-center justify-center text-brand-500 dark:text-brand-400" aria-hidden="true">
+          {% include "includes/_logo_icon.html" %}
+        </span>
+        <span class="hidden sm:inline">Pogo-lab</span>
+      </a>
+
+      <button id="menu-toggle" type="button"
+              class="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
+              aria-label="{% trans "Abrir menú" %}"
+              aria-expanded="false"
+              aria-controls="nav-menu">
+        <svg id="menu-icon" class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10zm0 5.25a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd"/>
+        </svg>
+        <svg id="close-icon" class="hidden h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+        </svg>
+      </button>
+
+      <div id="nav-menu"
+           class="hidden sm:flex sm:items-center sm:gap-1 max-sm:absolute max-sm:left-0 max-sm:right-0 max-sm:top-full max-sm:z-50 max-sm:mt-0 max-sm:border-b max-sm:border-slate-200 max-sm:bg-white/95 max-sm:p-4 max-sm:shadow-lg max-sm:backdrop-blur-xl dark:max-sm:border-slate-800 dark:max-sm:bg-slate-950/95"
+           role="navigation" aria-label="{% trans "Navegación principal" %}">
+        <a href="{% url 'calculator' %}"
+           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+           {% if '/calculadora/' in request.path or '/calculator/' in request.path %}aria-current="page"{% endif %}>
           {% trans "Calculadora" %}
         </a>
-        <a href="{% url 'mechanic_list' %}" class="text-sm text-gray-600 hover:text-gray-900">
+        <a href="{% url 'mechanic_list' %}"
+           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+           {% if '/mecanicas/' in request.path or '/mechanics/' in request.path %}aria-current="page"{% endif %}>
           {% trans "Mecánicas" %}
         </a>
+        <a href="{% url 'dps_browser' %}"
+           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+           {% if '/dps/' in request.path %}aria-current="page"{% endif %}>
+          DPS/TDO
+        </a>
 
-        <select id="language-selector" class="rounded border px-2 py-1 text-sm"
-                onchange="if(this.selectedOptions[0].dataset.url){window.location.href=this.selectedOptions[0].dataset.url}">
-          {% for code, name in LANGUAGES %}
-            <option value="{{ code }}" data-url="{% change_lang code %}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
-              {{ name }}
-            </option>
-          {% endfor %}
-        </select>
+        <div class="ml-1 hidden sm:flex sm:items-center sm:gap-1 max-sm:mt-3 max-sm:w-full">
+          <label for="language-selector" class="sr-only">{% trans "Idioma" %}</label>
+          <select id="language-selector"
+                  class="block w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-700 placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400 pr-6 appearance-none select-chevron min-h-11">
+            {% for code, name in LANGUAGES %}
+              <option value="{{ code }}" data-url="{% change_lang code %}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
+                {{ name }}
+              </option>
+            {% endfor %}
+          </select>
+          <script nonce="{{ request.csp_nonce }}">
+            document.getElementById('language-selector').addEventListener('change', function() {
+              var opt = this.selectedOptions[0];
+              if (opt && opt.dataset.url) { window.location.href = opt.dataset.url; }
+            });
+          </script>
+        </div>
 
-        {% if user.is_authenticated %}
-          <a href="{% url 'account_logout' %}" class="text-sm text-gray-600 hover:text-gray-900">
-            {% trans "Cerrar sesión" %}
-          </a>
-        {% else %}
-          <a href="{% url 'account_login' %}" class="text-sm text-gray-600 hover:text-gray-900">
-            {% trans "Iniciar sesión" %}
-          </a>
-        {% endif %}
+        <div class="max-sm:mt-3 max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2">
+          <button id="dark-toggle" type="button"
+                  class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+                  aria-label="{% trans "Alternar modo oscuro" %}"
+                  title="{% trans "Alternar modo oscuro" %}">
+            <svg id="sun-icon" class="hidden h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM10 7a3 3 0 100 6 3 3 0 000-6zM5.23 5.23a.75.75 0 011.06 0l.7.7a.75.75 0 01-1.06 1.06l-.7-.7a.75.75 0 010-1.06zM13.01 13.01a.75.75 0 011.06 0l.7.7a.75.75 0 01-1.06 1.06l-.7-.7a.75.75 0 010-1.06zM4 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 014 10zM18 10a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0118 10zM5.23 14.77a.75.75 0 010-1.06l.7-.7a.75.75 0 111.06 1.06l-.7.7a.75.75 0 01-1.06 0zM13.01 6.99a.75.75 0 010-1.06l.7-.7a.75.75 0 111.06 1.06l-.7.7a.75.75 0 01-1.06 0z"/>
+            </svg>
+            <svg id="moon-icon" class="hidden h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M7.455 2.004a.75.75 0 01.26.77 7 7 0 009.958 7.967.75.75 0 011.067.853A8.5 8.5 0 116.647 1.921a.75.75 0 01.808.083z" clip-rule="evenodd"/>
+            </svg>
+            <span class="sm:hidden">{% trans "Modo oscuro" %}</span>
+          </button>
+
+          {% if user.is_authenticated %}
+            <a href="{% url 'account_logout' %}"
+               class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11">
+              {% trans "Salir" %}
+            </a>
+          {% else %}
+            <a href="{% url 'account_login' %}"
+               class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 min-h-11">
+              {% trans "Entrar" %}
+            </a>
+          {% endif %}
+        </div>
       </div>
     </nav>
   </header>
 
-  <main class="mx-auto max-w-6xl px-4 py-8">
+  <main id="main-content" class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="border-t border-gray-200 bg-white py-6 text-center text-sm text-gray-500">
-    <p>Pogo-lab &mdash; {% trans "No afiliado a Niantic ni The Pokémon Company" %}</p>
-    <nav class="mt-2 flex justify-center gap-4">
-      <a href="{% url 'calculator' %}" class="text-gray-400 hover:text-gray-600">
-        {% trans "Calculadora" %}
-      </a>
-      <a href="{% url 'mechanic_list' %}" class="text-gray-400 hover:text-gray-600">
-        {% trans "Mecánicas" %}
-      </a>
-    </nav>
+  <footer class="border-t border-slate-200 bg-white py-10 transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <div class="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
+            <span class="flex h-6 w-6 items-center justify-center text-brand-500 dark:text-brand-400" aria-hidden="true">
+              {% include "includes/_logo_icon.html" %}
+            </span>
+            Pogo-lab
+          </div>
+          <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+            {% trans "Análisis estadístico honesto y trazable para las mecánicas de Pokémon GO." %}
+          </p>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {% trans "Herramientas" %}
+          </h3>
+          <ul class="space-y-2">
+            <li><a href="{% url 'calculator' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Calculadora de IV" %}</a></li>
+            <li><a href="{% url 'mechanic_list' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Mecánicas" %}</a></li>
+            <li><a href="{% url 'dps_browser' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">DPS/TDO</a></li>
+            <li><a href="{% url 'trades:dashboard' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Dashboard" %}</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {% trans "Comunidad" %}
+          </h3>
+          <ul class="space-y-2">
+            <li><a href="{% url 'analysis_dashboard' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Análisis personal" %}</a></li>
+            <li><a href="{% url 'experiments:community_dashboard' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Dataset comunitario" %}</a></li>
+            {% if user.is_authenticated %}
+              <li><a href="{% url 'trades:session_list' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Mis sesiones" %}</a></li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {% trans "Legal" %}
+          </h3>
+          <ul class="space-y-2">
+            <li><a href="{% url 'privacy' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Privacidad" %}</a></li>
+            <li><a href="{% url 'tos' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Términos" %}</a></li>
+            <li><a href="{% url 'disclaimer' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Descargo" %}</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="mt-10 border-t border-slate-100 pt-6 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
+        <p>Pogo-lab &mdash; {% trans "No afiliado a Niantic, The Pokémon Company, Nintendo ni Creatures Inc." %}</p>
+        <p class="mt-1">{% trans "Los datos y análisis son proporcionados 'tal cual' con fines educativos." %}</p>
+      </div>
+    </div>
   </footer>
+
+  <script nonce="{{ request.csp_nonce }}">
+    (function() {
+      var toggle = document.getElementById('dark-toggle');
+      var sun = document.getElementById('sun-icon');
+      var moon = document.getElementById('moon-icon');
+      var html = document.documentElement;
+
+      function setDark(dark) {
+        if (dark) {
+          html.classList.add('dark');
+          sun.classList.remove('hidden');
+          moon.classList.add('hidden');
+        } else {
+          html.classList.remove('dark');
+          sun.classList.add('hidden');
+          moon.classList.remove('hidden');
+        }
+        try { localStorage.setItem('pogo-dark-mode', dark ? '1' : '0'); } catch(e) {}
+      }
+
+      var stored = (function() { try { return localStorage.getItem('pogo-dark-mode'); } catch(e) { return null; } })();
+      if (stored !== null) {
+        setDark(stored === '1');
+      } else {
+        setDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      }
+
+      if (toggle) {
+        toggle.addEventListener('click', function() {
+          setDark(!html.classList.contains('dark'));
+        });
+      }
+
+      var menuToggle = document.getElementById('menu-toggle');
+      var navMenu = document.getElementById('nav-menu');
+      var menuIcon = document.getElementById('menu-icon');
+      var closeIcon = document.getElementById('close-icon');
+      if (menuToggle && navMenu) {
+        menuToggle.addEventListener('click', function() {
+          var expanded = menuToggle.getAttribute('aria-expanded') === 'true';
+          menuToggle.setAttribute('aria-expanded', !expanded);
+          navMenu.classList.toggle('hidden');
+          navMenu.classList.toggle('flex');
+          menuIcon.classList.toggle('hidden');
+          closeIcon.classList.toggle('hidden');
+          menuToggle.setAttribute('aria-label', expanded ? 'Abrir menú' : 'Cerrar menú');
+        });
+        navMenu.querySelectorAll('a').forEach(function(link) {
+          link.addEventListener('click', function() {
+            if (window.innerWidth < 640) {
+              navMenu.classList.add('hidden');
+              navMenu.classList.remove('flex');
+              menuToggle.setAttribute('aria-expanded', 'false');
+              menuToggle.setAttribute('aria-label', 'Abrir menú');
+              menuIcon.classList.remove('hidden');
+              closeIcon.classList.add('hidden');
+            }
+          });
+        });
+      }
+    })();
+  </script>
 
   {% block extra_js %}{% endblock %}
 </body>

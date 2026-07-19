@@ -29,20 +29,21 @@ if [ ! -f "${BACKUP_FILE}" ]; then
     exit 1
 fi
 
-echo "==> ADVERTENCIA: Vas a sobrescribir la base de datos en ${DATABASE_URL}"
-echo "==> Presiona Ctrl-C para cancelar o Enter para continuar..."
-read -r _UNUSED
+echo "==> ADVERTENCIA: Vas a sobrescribir la base de datos configurada."
+if [ "${RESTORE_ASSUME_YES:-0}" != "1" ]; then
+    echo "==> Presiona Ctrl-C para cancelar o Enter para continuar..."
+    read -r _UNUSED
+fi
 
 echo "==> Restaurando desde: ${BACKUP_FILE}"
 
 if [[ "${BACKUP_FILE}" == *.gz ]]; then
-    gunzip -c "${BACKUP_FILE}" | psql "${DATABASE_URL}"
+    gunzip -c "${BACKUP_FILE}" | psql --set ON_ERROR_STOP=1 --single-transaction "${DATABASE_URL}"
 else
-    psql "${DATABASE_URL}" < "${BACKUP_FILE}"
+    psql --set ON_ERROR_STOP=1 --single-transaction "${DATABASE_URL}" < "${BACKUP_FILE}"
 fi
 
 echo "==> Restauración completada."
 
-# PENDIENTE-HUMANO: Verificar la restauración en el entorno de producción real.
 # Ejecutar migrate después de restaurar si el backup es de una versión anterior:
 #   uv run python manage.py migrate --settings=config.settings.prod

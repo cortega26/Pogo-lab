@@ -1,55 +1,24 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}Pogo-lab — {% trans "Aviso legal" %}{% endblock %}
+{% block title %}Pogo-lab — {% trans "Descargo de responsabilidad" %}{% endblock %}
 
 {% block content %}
-  <article class="prose prose-gray max-w-none">
-    <h1>{% trans "Aviso legal" %}</h1>
+<article class="mx-auto max-w-3xl">
+  <h1 class="section-title">{% trans "Descargo de responsabilidad" %}</h1>
 
-    <h2>{% trans "No afiliación" %}</h2>
-    <p>
-      {% blocktrans %}
-      Pogo-lab no está afiliado, asociado, autorizado, respaldado ni conectado de ninguna manera
-      con Niantic, Inc., Nintendo Co., Ltd., The Pokémon Company ni ninguna de sus filiales o
-      subsidiarias. Pokémon GO es una marca registrada de Niantic, Inc. Pokémon es una marca
-      registrada de Nintendo / The Pokémon Company.
-      {% endblocktrans %}
-    </p>
+  <div class="prose-custom">
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Afiliación" %}</h2>
+    <p>{% blocktrans %}Pogo-lab no está afiliado, asociado, autorizado, respaldado por, ni de ninguna manera vinculado oficialmente a Niantic, Inc., The Pokémon Company, Nintendo, Creatures Inc., o cualquiera de sus subsidiarias o afiliadas. Pokémon GO, Pokémon y sus respectivos nombres, marcas, imágenes y personajes son marcas registradas de sus respectivos propietarios.{% endblocktrans %}</p>
 
-    <h2>{% trans "Contenido" %}</h2>
-    <p>
-      {% blocktrans %}
-      La información proporcionada en este sitio es de carácter educativo y analítico. Las
-      probabilidades, estadísticas y modelos presentados se basan en datos reportados por la
-      comunidad, investigaciones de datamining y análisis propios. No garantizamos que reflejen
-      con exactitud el comportamiento real del juego.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Precisión de los datos" %}</h2>
+    <p>{% blocktrans %}Los análisis, cálculos y mecánicas presentados en Pogo-lab se basan en investigaciones de la comunidad, datamining y documentación oficial cuando está disponible. Si bien nos esforzamos por mantener la información actualizada y precisa, las mecánicas del juego pueden cambiar sin previo aviso. No garantizamos la exactitud, integridad o actualidad de ningún contenido.{% endblocktrans %}</p>
 
-    <h2>{% trans "Uso bajo tu propio riesgo" %}</h2>
-    <p>
-      {% blocktrans %}
-      Las herramientas de cálculo y recomendaciones son orientativas. El uso que hagas de la
-      información de este sitio es bajo tu propia responsabilidad.
-      {% endblocktrans %}
-    </p>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Uso del servicio" %}</h2>
+    <p>{% blocktrans %}El uso de Pogo-lab y sus herramientas es bajo tu propio riesgo. Las decisiones que tomes en el juego basadas en nuestros análisis son tu responsabilidad. No nos hacemos responsables de pérdidas de recursos en el juego, intercambios fallidos, o cualquier otro resultado derivado del uso de la plataforma.{% endblocktrans %}</p>
 
-    <h2>{% trans "Propiedad intelectual" %}</h2>
-    <p>
-      {% blocktrans %}
-      Los nombres, imágenes y logotipos de Pokémon son propiedad de sus respectivos titulares.
-      El código fuente de Pogo-lab y los análisis originales están disponibles bajo la licencia
-      del proyecto.
-      {% endblocktrans %}
-    </p>
-
-    <h2>{% trans "Contacto" %}</h2>
-    <p>
-      {% trans "Para consultas sobre este aviso legal, contacta a través del repositorio del proyecto." %}
-    </p>
-
-    {# PENDIENTE-HUMANO: Revisar este aviso legal con un profesional antes de publicar. #}
-    {# Este documento es un placeholder sustantivo pero no constituye asesoría legal. #}
-  </article>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Contenido generado por usuarios" %}</h2>
+    <p>{% blocktrans %}Pogo-lab puede contener datos de observaciones contribuidos por usuarios. Estos datos no han sido verificados de forma independiente y pueden contener errores. El dataset comunitario se proporciona "tal cual" con fines de investigación y entretenimiento.{% endblocktrans %}</p>
+  </div>
+</article>
 {% endblock %}

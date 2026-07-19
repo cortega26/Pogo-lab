@@ -8,9 +8,27 @@
     <h1 class="mb-4 text-2xl font-bold text-red-600">{% trans "Eliminar cuenta" %}</h1>
     <form method="post" class="rounded-lg border bg-white p-6">
       {% csrf_token %}
+
       <p class="mb-4 text-gray-600">
         {% trans "Esta acción es irreversible. Todos tus datos serán eliminados." %}
       </p>
+
+      <p class="mb-4">
+        <label for="id_password" class="mb-1 block text-sm font-medium text-gray-700">{% trans "Contraseña" %}</label>
+        <input type="password" name="password" required id="id_password"
+               class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+      </p>
+
+      {% if form.errors %}
+        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+              <p>{{ error }}</p>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
       <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">
         {% trans "Confirmar eliminación" %}
       </button>

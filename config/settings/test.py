@@ -1,11 +1,11 @@
-from .base import *  # noqa: F403
+from .base import *
 
 DEBUG = False
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "test_db.sqlite3",  # noqa: F405 — file-based para live_server
+        "NAME": BASE_DIR / "test_db.sqlite3",  # Base de datos en archivo para live_server.
     },
 }
 
@@ -36,6 +36,7 @@ CONTENT_SECURITY_POLICY = {
         "connect-src": ["'self'"],
         "base-uri": ["'self'"],
         "frame-ancestors": ["'self'"],
+        "form-action": ["'self'"],
     },
 }
 

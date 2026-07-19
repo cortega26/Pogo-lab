@@ -22,7 +22,6 @@ RUN groupadd --system app && useradd --system --gid app app
 
 WORKDIR /app
 COPY --from=builder /app /app
-COPY --from=builder /root/.cache/uv /root/.cache/uv
 
 ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 ENV PATH="/app/.venv/bin:$PATH"

@@ -37,3 +37,12 @@ plans/
 skills-lock.json
 .agents/
 .claude/
+
+# Artefactos de CI / builds
+.import_linter_cache/
+.continue/
+staticfiles/
+test_db.sqlite3
+tailwindcss
+.python-version
+.gitattributes

@@ -183,7 +183,7 @@ def test_delete_removes_pii_from_db(client, user):
     session = _create_session(user)
     email_original = user.email
 
-    response = client.post("/es/cuenta/eliminar/")
+    response = client.post("/es/cuenta/eliminar/", {"password": "pass123"})
     assert response.status_code == 200
     assert "accounts/delete_done.html" in [t.name for t in response.templates]
 
@@ -209,7 +209,7 @@ def test_delete_removes_all_observations_including_deleted(client, user):
     obs_deleted = _create_observation(user, atk=12, state="deleted")
     obs_valid = _create_observation(user, atk=13, state="valid")
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     assert not TradeObservation.objects.filter(pk=obs_deleted.pk).exists()
     assert not TradeObservation.objects.filter(pk=obs_valid.pk).exists()
@@ -220,7 +220,7 @@ def test_delete_anonymizes_user(client, user):
     client.force_login(user)
     email_original = user.email
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     user.refresh_from_db()
     assert user.email != email_original
@@ -250,7 +250,7 @@ def test_delete_does_not_mutate_dataset_versions(client, user):
         "pipeline_version": ds.pipeline_version,
     }
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     ds.refresh_from_db()
     assert ds.number == ds_before["number"]
@@ -273,7 +273,7 @@ def test_delete_audit_events_created(client, user):
         is_active=True,
     )
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     event = AuditEvent.objects.filter(verb="account_deleted").first()
     assert event is not None
@@ -289,7 +289,7 @@ def test_delete_audit_events_created(client, user):
 
 @pytest.mark.django_db
 def test_delete_requires_login(client):
-    response = client.post("/es/cuenta/eliminar/")
+    response = client.post("/es/cuenta/eliminar/", {"password": "pass123"})
     assert response.status_code == 302  # redirect to login
 
 
@@ -311,7 +311,7 @@ def test_delete_removes_consent_records(client, user):
         is_active=True,
     )
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     assert not DataContributionConsent.objects.filter(pk=consent.pk).exists()
 
@@ -321,7 +321,7 @@ def test_delete_removes_analysis_runs(client, user):
     client.force_login(user)
     run = AnalysisRun.objects.create(owner=user)
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     assert not AnalysisRun.objects.filter(pk=run.pk).exists()
 
@@ -335,7 +335,7 @@ def test_delete_only_affects_own_data(client, user, user2):
     session_self = _create_session(user)
     session_other = _create_session(user2, label="Otro")
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     # Los datos del usuario se borraron
     assert not TradeObservation.objects.filter(pk=obs_self.pk).exists()
@@ -348,6 +348,31 @@ def test_delete_only_affects_own_data(client, user, user2):
     # El otro usuario sigue activo
     user2.refresh_from_db()
     assert user2.is_active
+
+
+@pytest.mark.django_db
+def test_delete_requires_password_in_post(client, user):
+    client.force_login(user)
+    response = client.post("/es/cuenta/eliminar/", {})
+    assert response.status_code == 400
+    assert b"Contrase" in response.content or b"password" in response.content
+
+
+@pytest.mark.django_db
+def test_delete_rejects_wrong_password(client, user):
+    client.force_login(user)
+    response = client.post("/es/cuenta/eliminar/", {"password": "wrongpassword"})
+    assert response.status_code == 400
+    assert b"incorrecta" in response.content.lower() or b"Contrase" in response.content
+
+
+@pytest.mark.django_db
+def test_delete_flushes_session(client, user):
+    client.force_login(user)
+    response = client.post("/es/cuenta/eliminar/", {"password": "pass123"})
+    assert response.status_code == 200
+    # After logout, the request user should be anonymous
+    assert response.wsgi_request.user.is_anonymous
 
 
 # ── PII EN AUDITORÍA (M7-1) ──────────────────────────────────────────
@@ -368,7 +393,7 @@ def test_delete_no_pii_in_audit_event(client, user):
         is_active=True,
     )
 
-    client.post("/es/cuenta/eliminar/")
+    client.post("/es/cuenta/eliminar/", {"password": "pass123"})
 
     events = AuditEvent.objects.filter(verb="account_deleted")
     assert events.exists(), "Debe existir al menos un AuditEvent de borrado"

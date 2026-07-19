@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Count, Q
 
 from apps.mechanics.models import MechanicRuleSet as MechanicRuleSetModel
 from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
@@ -70,10 +71,10 @@ def _determine_state(
     hp: int,
     friendship_level: str,
     trade_type: str,
-    owner_id: int,
+    _owner_id: int,
     _observed_at: datetime,
     _species: str,
-    dedup_hash: str,
+    _dedup_hash: str,
     resolved_floor: int | None = None,
 ) -> tuple[str, str]:
     """Determina el estado y motivo de una observacion segun la tabla §6.
@@ -97,17 +98,6 @@ def _determine_state(
             "suspicious",
             f"Inconsistente con el piso f={f} del ruleset (modelo re-roll [f,15])",
         )
-
-    existing = (
-        TradeObservation.objects.filter(
-            owner_id=owner_id,
-            dedup_hash=dedup_hash,
-        )
-        .exclude(state="deleted")
-        .exists()
-    )
-    if existing:
-        return ("duplicate", "")
 
     return ("valid", "")
 
@@ -156,6 +146,14 @@ def register_observation(
         hp,
         species,
     )
+
+    existing = (
+        TradeObservation.objects.filter(owner_id=owner_id, dedup_hash=dedup_hash)
+        .exclude(state="deleted")
+        .first()
+    )
+    if existing is not None:
+        return existing
 
     if state is None:
         state, exclusion_reason = _determine_state(
@@ -409,12 +407,10 @@ def dashboard_stats(owner_id: int) -> dict[str, Any]:
         owner_id=owner_id,
     ).exclude(state="deleted")
 
-    total = base.count()
-    lucky = base.filter(is_lucky=True).count()
-    normal = base.filter(is_lucky=False).count()
+    aggregated = base.aggregate(
+        total=Count("id"),
+        lucky=Count("pk", filter=Q(is_lucky=True)),
+        normal=Count("pk", filter=Q(is_lucky=False)),
+    )
 
-    return {
-        "total": total,
-        "lucky": lucky,
-        "normal": normal,
-    }
+    return aggregated

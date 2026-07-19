@@ -129,6 +129,15 @@ class TradeObservation(TimestampedModel):
             ),
             models.Index(fields=["dedup_hash"], name="trade_obs_dedup_hash"),
         ]
+        constraints: ClassVar = [
+            models.UniqueConstraint(
+                fields=["owner", "dedup_hash"],
+                name="uq_trade_observation_owner_dedup",
+                condition=(
+                    models.Q(dedup_hash__gt="") & ~models.Q(state__in=("duplicate", "deleted"))
+                ),
+            ),
+        ]
 
     def __str__(self):
         return (

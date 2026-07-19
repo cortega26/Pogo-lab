@@ -2,11 +2,6 @@ name: Deploy
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**.md"
 
 jobs:
   deploy-oci:
@@ -19,28 +14,31 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
+            export PATH="/home/ubuntu/.local/bin:$PATH"
             cd /opt/pogo-lab
-            git pull origin main
-            docker compose -f compose.prod.yaml up -d --build --remove-orphans
-            docker compose -f compose.prod.yaml exec -T web python manage.py migrate --noinput
-            docker compose -f compose.prod.yaml exec -T web python manage.py collectstatic --noinput
-            docker system prune -f
+            git pull --ff-only origin main
+            uv sync --frozen --no-dev
+            uv run python manage.py check --deploy
+            uv run python manage.py migrate --noinput
+            uv run python manage.py collectstatic --noinput
+            sudo systemctl restart pogo-lab.service
+            curl --fail --silent --show-error --retry 5 \
+              --retry-connrefused --header "Host: ${{ secrets.OCI_HOST }}" \
+              http://127.0.0.1:8000/healthcheck.json
             echo "Despliegue completado en $(date -Iseconds)"
 
 # Setup inicial en OCI (una sola vez):
 # 1. Crear VM ARM Ampere A1 (4 OCPU, 24 GB) en la capa gratuita de OCI:
 #    https://cloud.oracle.com/compute/instances
-# 2. Instalar Docker + Docker Compose en la VM:
-#    curl -fsSL https://get.docker.com | sh
-#    sudo usermod -aG docker $USER
+# 2. Instalar Python 3.13, uv, PostgreSQL y nginx en la VM.
 # 3. Clonar el repo: git clone <repo-url> /opt/pogo-lab
-# 4. Crear .env.prod a partir de .env.prod.example y configurar valores reales.
+# 4. Crear .env y configurar el servicio systemd `pogo-lab.service`.
 # 5. Configurar secretos en GitHub (Settings > Secrets and variables > Actions):
 #    - OCI_HOST: IP pública de la VM
 #    - OCI_USER: usuario SSH (ubuntu en Oracle Linux)
 #    - OCI_SSH_KEY: clave privada SSH (~/.ssh/id_rsa sin passphrase o deploy key)
-# 6. Ejecutar docker compose -f compose.prod.yaml up -d --build la primera vez.
+# 6. Habilitar `pogo-lab.service` y verificar `/healthcheck.json` localmente.
 # 7. Configurar DNS (A record) apuntando al dominio.
-# 8. Configurar backup automático vía cron/systemd timer con bin/backup.sh.
+# 8. Ejecutar `sudo ./bin/install-backup-timer.sh`.
 # 9. Opcional: configurar firewall de OCI (puertos 80/443 abiertos).

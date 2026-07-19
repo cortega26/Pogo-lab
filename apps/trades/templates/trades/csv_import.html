@@ -4,44 +4,47 @@
 {% block title %}{% trans "Importar CSV — Pogo-lab" %}{% endblock %}
 
 {% block content %}
-<h1 class="mb-6 text-3xl font-bold">{% trans "Importar CSV de observaciones" %}</h1>
+<div class="mx-auto max-w-2xl">
+  <h1 class="section-title">{% trans "Importar CSV de observaciones" %}</h1>
 
-<form method="post" enctype="multipart/form-data"
-      class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-  {% csrf_token %}
+  <form method="post" enctype="multipart/form-data"
+        class="card p-6 mb-8">
+    {% csrf_token %}
 
-  <div class="mb-4">
-    <label class="mb-1 block text-sm font-medium text-gray-700" for="csv_file">
-      {% trans "Archivo CSV" %}
-    </label>
-    <input type="file" name="csv_file" id="csv_file" accept=".csv"
-           class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
-    <p class="mt-1 text-xs text-gray-500">
-      {% trans "Campos: observed_at, friendship_level, trade_type, atk, def, hp, species" %}
-      <br>
-      {% trans "Usa el archivo docs/csv_template.csv como plantilla." %}
-    </p>
-  </div>
+    <div class="mb-4">
+      <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="csv_file">
+        {% trans "Archivo CSV" %}
+      </label>
+      <input type="file" name="csv_file" id="csv_file" accept=".csv"
+             class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand-600 hover:file:bg-brand-100 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:file:bg-brand-800/50 dark:file:text-brand-300 dark:focus:border-brand-400">
+      <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-500">
+        {% trans "Campos: observed_at, friendship_level, trade_type, atk, def, hp, species" %}
+        <br>
+        {% trans "Usa el archivo docs/csv_template.csv como plantilla." %}
+      </p>
+    </div>
 
-  <button type="submit"
-          class="rounded bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700">
-    {% trans "Importar" %}
-  </button>
-</form>
+    <button type="submit"
+            class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
+      {% trans "Importar" %}
+    </button>
+  </form>
 
-{% if error %}
-  <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" style="white-space: pre-line">
-    {{ error }}
-  </div>
-{% endif %}
+  {% if error %}
+    <div class="mb-4 rounded-xl border border-danger-50 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400" role="alert" style="white-space: pre-line">
+      {{ error }}
+    </div>
+  {% endif %}
 
-{% if preview %}
-  <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-    {% blocktrans with valid=preview.valid_count total=preview.total %}{{ valid }} de {{ total }} filas importadas correctamente.{% endblocktrans %}
-  </div>
-{% endif %}
+  {% if preview %}
+    <div class="mb-4 rounded-xl border border-hundo-50 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-500/20 dark:bg-hundo-500/10 dark:text-hundo-400">
+      {% blocktrans with valid=preview.valid_count total=preview.total %}{{ valid }} de {{ total }} filas importadas correctamente.{% endblocktrans %}
+    </div>
+  {% endif %}
 
-<a href="{% url 'trades:session_list' %}" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700">
-  &larr; {% trans "Volver" %}
-</a>
+  <a href="{% url 'trades:session_list' %}" class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">
+    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+    {% trans "Volver a sesiones" %}
+  </a>
+</div>
 {% endblock %}

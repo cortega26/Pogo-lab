@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load i18n seo_tags %}
+
+{% block title %}{% trans "Comparar Pokémon — Pogo-lab" %}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <div class="mb-8">
+    <h1 class="section-title">{% trans "Comparar Pokémon" %}</h1>
+    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+      {% blocktrans with lvl=level %}Comparación lado a lado de estadísticas y DPS/TDO/eDPS a nivel {{ lvl }}.{% endblocktrans %}
+    </p>
+  </div>
+
+  <div class="mb-6">
+    <form method="GET" class="flex flex-wrap gap-3 items-end">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">{% trans "Pokémon A" %}</label>
+        <input type="text" name="a" value="{{ left.species_key|default:'' }}"
+               class="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+               placeholder="{% trans "ej. rayquaza" %}">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">{% trans "Pokémon B" %}</label>
+        <input type="text" name="b" value="{{ right.species_key|default:'' }}"
+               class="rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+               placeholder="{% trans "ej. mewtwo" %}">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">{% trans "Nivel" %}</label>
+        <select name="level" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <option value="30" {% if level == 30 %}selected{% endif %}>30</option>
+          <option value="35" {% if level == 35 %}selected{% endif %}>35</option>
+          <option value="40" {% if level == 40 %}selected{% endif %}>40</option>
+          <option value="45" {% if level == 45 %}selected{% endif %}>45</option>
+          <option value="50" {% if level == 50 %}selected{% endif %}>50</option>
+        </select>
+      </div>
+      <button type="submit" class="rounded-lg bg-brand-600 px-4 py-1 text-sm font-medium text-white hover:bg-brand-500 transition-colors">
+        {% trans "Comparar" %}
+      </button>
+    </form>
+  </div>
+
+  {% if not left and not right %}
+  <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+    {% trans "Ingresa dos nombres de Pokémon (en inglés y minúscula) para compararlos." %}
+  </div>
+  {% else %}
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+    {% if left %}
+    <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 font-mono text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">#{{ left.dex }}</span>
+        <div>
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">{{ left.name }}</h2>
+          <div class="flex gap-1 mt-1">
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                  style="background-color: {{ left.type1|type_color }}">{{ left.type1|capfirst }}</span>
+            {% if left.type2 %}
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                  style="background-color: {{ left.type2|type_color }}">{{ left.type2|capfirst }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% include "dps/_compare_card.html" with mon=left %}
+    </div>
+    {% endif %}
+    {% if right %}
+    <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 font-mono text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">#{{ right.dex }}</span>
+        <div>
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">{{ right.name }}</h2>
+          <div class="flex gap-1 mt-1">
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                  style="background-color: {{ right.type1|type_color }}">{{ right.type1|capfirst }}</span>
+            {% if right.type2 %}
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                  style="background-color: {{ right.type2|type_color }}">{{ right.type2|capfirst }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% include "dps/_compare_card.html" with mon=right %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="mt-6">
+    <a href="{% url 'dps_browser' %}" class="text-xs text-brand-600 hover:text-brand-500 dark:text-brand-400">
+      ← {% trans "Volver al ranking DPS/TDO" %}
+    </a>
+  </div>
+</div>
+{% endblock %}

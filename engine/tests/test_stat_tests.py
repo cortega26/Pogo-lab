@@ -269,6 +269,15 @@ class TestIndependenceTest:
         with pytest.raises(ValueError, match="desconocido"):
             independence_test([(1, 2)], method="invalid")
 
+    def test_cramers_v_non_square(self):
+        """Cramér's V para tabla no cuadrada debe usar min(rows, cols)."""
+        pairs_3x2 = (
+            [(0, 0)] * 10 + [(0, 1)] * 5 + [(1, 0)] * 5 + [(1, 1)] * 8 + [(2, 0)] * 2 + [(2, 1)] * 4
+        )
+        result = independence_test(pairs_3x2, method="g_test")
+        assert result.effect_size is not None
+        assert 0 <= result.effect_size <= 1
+
 
 # ---- Cramér's V ----
 

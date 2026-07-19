@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
 
 from apps.accounts.allauth_views import RateLimitedLoginView, RateLimitedSignupView
-from apps.core.views import healthz_json
+from apps.core.views import csp_report, healthz_json
 
 from .sitemaps import sitemaps_dict
 
@@ -30,6 +30,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
         {"sitemaps": sitemaps_dict},
         name="django.contrib.sitemaps.views.sitemap",
     ),
+    path("csp-reports/", csp_report, name="csp_report"),
 ]
 
 urlpatterns += i18n_patterns(
@@ -53,4 +54,5 @@ urlpatterns += i18n_patterns(
     path(_("analisis/"), include("apps.analysis.urls")),
     path(_("contribuciones/"), include("apps.contributions.urls")),
     path(_("comunidad/"), include("apps.experiments.urls")),
+    path(_("dps/"), include("apps.dps.urls")),
 )

@@ -63,7 +63,7 @@ def analysis_dashboard(request):
             "run": run,
             "results_with_rows": results_with_rows,
             "recommendations": recs,
-            "chart_data": json.dumps(chart_data),
+            "chart_data_json": json.dumps(chart_data),
             "has_results": results.exists(),
         },
     )

@@ -1,1 +1,129 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #EFF6FF;
+  --color-brand-100: #DBEAFE;
+  --color-brand-200: #BFDBFE;
+  --color-brand-500: #3B82F6;
+  --color-brand-600: #2563EB;
+  --color-brand-700: #1D4ED8;
+  --color-brand-800: #1E3A5F;
+
+  --color-secondary-50: #F5F3FF;
+  --color-secondary-500: #8B5CF6;
+  --color-secondary-600: #7C3AED;
+
+  --color-accent-50: #FFFBEB;
+  --color-accent-500: #F59E0B;
+  --color-accent-600: #D97706;
+
+  --color-hundo-50: #ECFDF5;
+  --color-hundo-500: #10B981;
+  --color-hundo-600: #059669;
+
+  --color-lucky-50: #FDF2F8;
+  --color-lucky-500: #EC4899;
+  --color-lucky-600: #DB2777;
+
+  --color-danger-50: #FEF2F2;
+  --color-danger-500: #EF4444;
+  --color-danger-600: #DC2626;
+
+  --font-sans: 'Fira Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, monospace;
+
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.06), 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-glass: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-glow: 0 0 15px -3px color-mix(in srgb, var(--color-brand-500) 30%, transparent);
+  --shadow-glow-accent: 0 0 15px -3px color-mix(in srgb, var(--color-accent-500) 30%, transparent);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  ::selection {
+    @apply bg-brand-500/20 text-brand-700 dark:text-brand-200;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.htmx-request .skeleton,
+.skeleton.htmx-request {
+  position: relative;
+  overflow: hidden;
+}
+
+.htmx-request .skeleton::after,
+.skeleton.htmx-request::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.4) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.dark .htmx-request .skeleton::after,
+.dark .skeleton.htmx-request::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+.htmx-request .skeleton-block {
+  @apply rounded-lg bg-slate-200 dark:bg-slate-700;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.htmx-request .htmx-spinner,
+.htmx-spinner.htmx-request {
+  display: inline-block;
+  animation: spin 0.6s linear infinite;
+}
+
+.select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%2364748B%22%3E%3Cpath fill-rule=%22evenodd%22 d=%22M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z%22 clip-rule=%22evenodd%22/%3E%3C/svg%3E");
+  background-position: right 0.25rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

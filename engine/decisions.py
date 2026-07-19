@@ -4,8 +4,9 @@ Nunca se usa un LLM en runtime (ADR-0006).
 Las recomendaciones son trazables a DecisionRule.key + version.
 """
 
-import math
 from dataclasses import dataclass, field
+
+from engine.probability import trades_for_confidence
 
 
 @dataclass
@@ -148,7 +149,7 @@ def evaluate(context: AnalysisContext) -> list[Recommendation]:
 
     # 6. trades_needed_for_confidence
     if context.metric == "hundo_rate" and context.n >= context.min_sample and context.p0 > 0:
-        n_needed = math.ceil(math.log(0.05) / math.log(1.0 - context.p0))
+        n_needed = trades_for_confidence(context.p0, 0.95)
         recommendations.append(
             _decision_from_rule(
                 "trades_needed_for_confidence",

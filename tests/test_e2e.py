@@ -141,7 +141,7 @@ def test_user_login_and_see_dashboard(live_server, seeded_mechanic):
         page.wait_for_load_state("networkidle")
         body_text = page.text_content("body")
         assert body_text is not None
-        assert "Cerrar sesión" in body_text
+        assert "Salir" in body_text
 
         browser.close()
 
@@ -183,7 +183,7 @@ def test_user_records_trade_session(live_server, seeded_mechanic):
         page.wait_for_load_state("networkidle")
         content = page.text_content("body")
         assert content is not None
-        assert "Iniciada" in content
+        assert "obs." in content or "Sesión E2E" in content
 
         browser.close()
 
@@ -470,7 +470,7 @@ def test_htmx_recalculates_without_full_reload(live_server, seeded_mechanic):
 
         results_text = page.text_content("#calc-results")
         assert results_text is not None
-        assert "Resultados" in results_text
+        assert "Resultados" in results_text or "Probabilidad de hundo" in results_text
         assert "12" in results_text
 
         friendship_val = page.input_value("#friendship_level")

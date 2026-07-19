@@ -53,6 +53,10 @@ autohospedado. Un **paquete puro `engine/`** (sin Django) concentra toda la mate
    demostrada. Análisis **síncrono** + caché determinista en el MVP.
 8. **i18n indexable.** Contenido editorial traducido y **renderizado en servidor** (no traducción cliente). Rutas
    `/es/` `/en/` (pt preparado), `hreflang`, canonical.
+9. **Testear antes de declarar listo.** Ningún cambio se marca como completado sin antes ejecutar `uv run pytest` y
+   verificar que la suite pase en verde (o justificar cada fallo si son preexistentes y no relacionados). Si se descubre
+   un fallo durante el trabajo, se arregla o se documenta explícitamente en el registro de avance — no se oculta ni se
+   asume "preexistente" sin verificarlo con `git stash` primero.
 
 ## Convenciones de código
 

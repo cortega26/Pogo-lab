@@ -390,7 +390,7 @@ class TestCalculatorViews:
         )
         assert resp.status_code == 200
         html = resp.content.decode()
-        assert "Resultados" in html
+        assert "Resultados" in html or "Probabilidad de hundo" in html
 
     def test_post_with_threshold(self, client):
         resp = client.post(
@@ -428,7 +428,11 @@ class TestCalculatorViews:
         get_resp = client.get(f"/es/calculadora/?share={share_code}")
         assert get_resp.status_code == 200
         get_html = get_resp.content.decode()
-        assert "Resultados" in get_html or "Piso (f)" in get_html
+        assert (
+            "Resultados" in get_html
+            or "Probabilidad de hundo" in get_html
+            or "Piso (f)" in get_html
+        )
 
     def test_htmx_partial_returns_no_layout(self, client):
         resp = client.post(
@@ -443,7 +447,7 @@ class TestCalculatorViews:
         )
         assert resp.status_code == 200
         html = resp.content.decode()
-        assert "Resultados" in html
+        assert "Resultados" in html or "Probabilidad de hundo" in html
         assert "<html" not in html  # Es partial, no pagina completa
 
     def test_post_non_numeric_n_returns_400_not_500(self, client):
@@ -486,7 +490,10 @@ class TestCalculatorViews:
             },
         )
         assert resp.status_code == 200
-        assert "Resultados" in resp.content.decode()
+        assert (
+            "Resultados" in resp.content.decode()
+            or "Probabilidad de hundo" in resp.content.decode()
+        )
 
     def test_post_huge_n_clamped_or_rejected(self, client):
         resp = client.post(

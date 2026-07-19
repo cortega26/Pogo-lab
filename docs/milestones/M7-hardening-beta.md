@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | 🟨 PR-21 deploy + infra listos; pendiente humano: legal, deploy smoke, restore verify |
+| **Estado** | 🟨 Infra, smoke HTTP y restore verificados; pendiente humano: legal, TLS/dominio y apertura de beta |
 | **Tamaño** | M |
 | **Depende de** | M1 … M6 |
 | **PRs** | PR-20, PR-21 |
@@ -47,8 +47,8 @@ de producto y revisión legal.
 ## Pruebas
 
 - [x] Los 10 E2E verdes en CI.
-- [ ] Smoke de despliegue en el entorno objetivo. **PENDIENTE-HUMANO**
-- [ ] **Restore** verificado desde backup. **PENDIENTE-HUMANO**
+- [x] Smoke de despliegue en el entorno objetivo (health, páginas públicas, redirects autenticados y cabeceras).
+- [x] **Restore** verificado desde backup en una base aislada (30 tablas, 44 migraciones).
 
 ## Criterios de aceptación
 
@@ -74,3 +74,4 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 | 2026-07-16 | ⬜ | Hoja creada. |
 | 2026-07-17 | 🟨 | PR-20 hardening completo. Hosting decidido: OCI Santiago (AMD Micro, 1 GB). Desplegado en http://146.181.47.12. Pendiente: GitHub Actions secrets, SSL/Lets Encrypt, backup automático, revisión legal. |
 | 2026-07-18 | 🟨 | PR-21: deploy.yml + compose.prod/micro + OCI scripts + ADR-0009 + backup/restore. Legal templates pulidos (ToS/privacy/disclaimer). healthcheck.json fuera de i18n. Tests de vistas legales (11 nuevos, 491 total). Pendiente humano: revisión legal, smoke deploy, restore verify. |
+| 2026-07-19 | 🟨 | Smoke live verificado en `146.181.47.12`: health+DB, es/en, mecánicas, calculadora, comunidad y páginas legales. Backup real restaurado en DB aislada (30 tablas/44 migraciones) y eliminado después; timer diario instalado con retención de 14 días. Secrets OCI configurados. Pendiente: dominio/certificado TLS, revisión legal/licencias y apertura de beta. |

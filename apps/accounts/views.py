@@ -1,6 +1,7 @@
 import uuid
 
-from django.contrib.auth import get_user_model
+from django import forms
+from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
@@ -13,6 +14,17 @@ from apps.contributions.models import DataContributionConsent
 from apps.trades.models import TradeObservation, TradeSession
 
 User = get_user_model()
+
+
+class DeleteAccountForm(forms.Form):
+    password = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400"
+            }
+        ),
+    )
 
 
 def _build_export_payload(user):
@@ -110,9 +122,18 @@ def delete_account(request):
     POST: ejecuta la eliminación irreversible.
     """
     if request.method == "POST":
+        form = DeleteAccountForm(request.POST)
+        if not form.is_valid():
+            return render(request, "accounts/delete.html", {"form": form}, status=400)
+
+        if not request.user.check_password(form.cleaned_data["password"]):
+            form.add_error("password", "Contraseña incorrecta.")
+            return render(request, "accounts/delete.html", {"form": form}, status=400)
+
         user = request.user
 
         if not user.is_active:
+            logout(request)
             return render(request, "accounts/delete_done.html")
 
         user_id = user.pk
@@ -181,6 +202,7 @@ def delete_account(request):
             },
         )
 
+        logout(request)
         return render(request, "accounts/delete_done.html")
 
-    return render(request, "accounts/delete.html")
+    return render(request, "accounts/delete.html", {"form": DeleteAccountForm()})

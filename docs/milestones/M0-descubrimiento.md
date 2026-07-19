@@ -38,14 +38,14 @@ implementación no reinterprete decisiones.
 
 ## Pruebas
 
-- [ ] Revisión de contratos del engine (firmas acordadas).
-- [ ] Tests *skeleton* corren (marcados como pendientes) sin romper la recolección de pytest.
+- [x] Revisión de contratos del engine (firmas acordadas).
+- [x] Tests *skeleton* corren (marcados como pendientes) sin romper la recolección de pytest.
 
 ## Criterios de aceptación
 
-- [ ] ADR-0001 y ADR-0002 aprobados.
-- [ ] Firmas del `engine/` acordadas y documentadas.
-- [ ] Modelo de dominio revisado contra el plan §E.
+- [x] ADR-0001 y ADR-0002 aprobados.
+- [x] Firmas del `engine/` acordadas y documentadas.
+- [x] Modelo de dominio revisado contra el plan §E.
 
 ## Demo verificable
 

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.contributions",
     "apps.experiments",
     "apps.audit",
+    "apps.dps",
 ]
 
 MIDDLEWARE = [
@@ -92,6 +93,16 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# Argon2 como algoritmo primario de hashing de contraseñas (argon2-cffi instalado).
+# La política de privacidad declara Argon2; esta configuración lo hace efectivo.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
 ]
 
 LANGUAGE_CODE = env("LANGUAGE_CODE")
@@ -151,6 +162,7 @@ CONTENT_SECURITY_POLICY = {
         "connect-src": [SELF],
         "base-uri": [SELF],
         "frame-ancestors": [SELF],
+        "form-action": [SELF],
         "object-src": ["'none'"],
     },
 }

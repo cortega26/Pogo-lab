@@ -734,18 +734,18 @@ metadata SEO · criterio de aceptación. Todas es/en (pt preparado), SSR e index
 
 ## O. Definición de terminado (checklist para beta)
 
-- [ ] `clonar → uv sync → compose up → migrate → seed → pytest → runserver` en pasos cortos y verificables.
-- [ ] `engine/` con cobertura alta (unit + property); fixtures matemáticas a mano pasan.
-- [ ] Los 10 flujos E2E (§13) verdes en CI.
-- [ ] Calculadora: casos de referencia correctos + URL compartible reproduce; es/en indexables (sitemap/hreflang).
-- [ ] Ruleset publicado inmutable con `SourceClaim` citados; **pisos comunitarios verificados** y marcados como tales.
-- [ ] Panel personal separa Lucky/normal; muestra IC y umbrales; nunca afirma "bug".
-- [ ] Recomendaciones deterministas, versionadas, trazables a regla; sin LLM en runtime.
-- [ ] Dataset comunitario: opt-in/revocación funcionan; sin PII; público solo si `min_sample_met`; advertencia de sesgo.
-- [ ] Seguridad: CSP, CSRF, rate limit, anti CSV-injection, pip-audit sin críticos.
-- [ ] Privacidad: export + eliminación de cuenta; logs sin PII; política de privacidad + no afiliación publicadas.
-- [ ] Backup + **restore probado**; `/healthz`; logging con correlation id; métricas de producto básicas.
-- [ ] a11y razonable (teclado, contraste, tabla alternativa a gráficos); mobile-first; CWV razonables.
+- [x] `clonar → uv sync → compose up → migrate → seed → pytest → runserver` en pasos cortos y verificables.
+- [x] `engine/` con cobertura alta (unit + property); fixtures matemáticas a mano pasan.
+- [x] Los 10 flujos E2E (§13) verdes en CI.
+- [x] Calculadora: casos de referencia correctos + URL compartible reproduce; es/en indexables (sitemap/hreflang).
+- [x] Ruleset publicado inmutable con `SourceClaim` citados; **pisos comunitarios verificados** y marcados como tales.
+- [x] Panel personal separa Lucky/normal; muestra IC y umbrales; nunca afirma "bug".
+- [x] Recomendaciones deterministas, versionadas, trazables a regla; sin LLM en runtime.
+- [x] Dataset comunitario: opt-in/revocación funcionan; sin PII; público solo si `min_sample_met`; advertencia de sesgo.
+- [x] Seguridad: CSP, CSRF, rate limit, anti CSV-injection, pip-audit sin críticos.
+- [x] Privacidad: export + eliminación de cuenta; logs sin PII; política de privacidad + no afiliación publicadas.
+- [x] Backup + **restore probado**; `/healthz`; logging con correlation id; métricas de producto básicas.
+- [x] a11y razonable (teclado, contraste, tabla alternativa a gráficos); mobile-first; CWV razonables.
 - [ ] Revisión legal/marca completada; licencias (código + dataset) definidas.
 
 ---

@@ -1,7 +1,13 @@
+import json
+import logging
+
 from django.db import connections
 from django.db.utils import OperationalError
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+
+logger = logging.getLogger(__name__)
 
 
 def healthz(request):
@@ -19,6 +25,25 @@ def healthz(request):
         return render(request, "core/healthz.html", {"db_ok": db_ok})
 
     return render(request, "core/healthz.html", {"db_ok": True})
+
+
+MAX_CSP_REPORT_BYTES = 10_000
+
+
+@csrf_exempt
+def csp_report(request):
+    """Collector de reportes CSP. Logea violaciones en producción."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    if request.body and len(request.body) > MAX_CSP_REPORT_BYTES:
+        logger.info("CSP report body too large (%d bytes)", len(request.body))
+        return JsonResponse({"status": "accepted"})
+    try:
+        report = json.loads(request.body)
+        logger.info("CSP violation: %s", report)
+    except (json.JSONDecodeError, AttributeError):
+        logger.info("CSP report with invalid body")
+    return JsonResponse({"status": "accepted"})
 
 
 def healthz_json(request):  # noqa: ARG001

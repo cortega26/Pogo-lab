@@ -254,13 +254,13 @@ class TestLegalViews:
     def test_disclaimer_contains_no_affiliation(self):
         response = Client().get("/es/aviso-legal/")
         html = response.content.decode()
-        assert "No afiliación" in html
+        assert "no está afiliado" in html
         assert "Niantic" in html
 
     def test_disclaimer_contains_no_affiliation_en(self):
         response = Client().get("/en/aviso-legal/")
         html = response.content.decode()
-        assert "No affiliation" in html or "No afiliación" in html
+        assert "not affiliated" in html or "no está afiliado" in html
         assert "Niantic" in html
 
     def test_privacy_200(self):

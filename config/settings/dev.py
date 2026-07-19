@@ -1,10 +1,10 @@
-from .base import *  # noqa: F403
+from .base import *
 
 DEBUG = True
 
 ACCOUNT_EMAIL_VERIFICATION = "optional"
 
-INSTALLED_APPS += [  # noqa: F405
+INSTALLED_APPS += [
     "django_extensions",
 ]
 

@@ -15,7 +15,7 @@ class SourceReferenceAdmin(admin.ModelAdmin):
     list_display = ("title", "source_type", "status", "author_org", "published_at")
     list_filter = ("source_type", "status")
     search_fields = ("title", "author_org", "notes")
-    inlines = [SourceClaimInline]  # noqa: RUF012
+    inlines = [SourceClaimInline]
     fieldsets = (
         (None, {"fields": ("title", "url")}),
         ("Tipo y autoría", {"fields": ("source_type", "author_org")}),

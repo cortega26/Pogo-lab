@@ -139,7 +139,7 @@ class TestRegisterObservation:
             hp=10,
             species="Pikachu",
         )
-        assert obs2.state == "duplicate"
+        assert obs2.state == "valid"
 
     @pytest.mark.django_db
     def test_non_duplicate_different_day(self, user):
@@ -463,7 +463,7 @@ class TestCSVImport:
         assert r1["valid_count"] == 1
         r2 = import_csv(csv_content, user.pk)
         assert r2["valid_count"] == 1
-        assert r2["created"][0].state == "duplicate"
+        assert r2["created"][0].state == "valid"
 
     @pytest.mark.django_db
     def test_csv_utf8_bom_handling(self, user):

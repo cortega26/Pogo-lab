@@ -3,97 +3,137 @@
 
 {% block title %}{{ mechanic.name }} — Pogo-lab{% endblock %}
 
+{% block json_ld %}
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Pogo-lab", "item": "{{ request.scheme }}://{{ request.get_host }}{% url 'healthz' %}"},
+    {"@type": "ListItem", "position": 2, "name": "{% trans "Mecánicas" %}", "item": "{{ request.scheme }}://{{ request.get_host }}{% url 'mechanic_list' %}"},
+    {"@type": "ListItem", "position": 3, "name": "{{ mechanic.name }}", "item": "{{ request.build_absolute_uri }}" }
+  ]
+}
+</script>
+{% endblock %}
+
 {% block content %}
-<nav class="mb-4 text-sm text-gray-500">
-  <a href="{% url 'mechanic_list' %}" class="hover:text-blue-600">{% trans "Mecánicas" %}</a>
-  &rsaquo; <span>{{ mechanic.name }}</span>
+<nav class="mb-6 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+  <a href="{% url 'mechanic_list' %}" class="transition-colors hover:text-brand-500 dark:hover:text-brand-400">{% trans "Mecánicas" %}</a>
+  <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+  <span class="font-medium text-slate-700 dark:text-slate-300">{{ mechanic.name }}</span>
 </nav>
 
-<h1 class="mb-2 text-3xl font-bold">{{ mechanic.name }}</h1>
-
-{% if mechanic.description %}
-  <p class="mb-6 text-gray-600">{{ mechanic.description }}</p>
-{% endif %}
+<div class="mb-6">
+  <h1 class="section-title">{{ mechanic.name }}</h1>
+  {% if mechanic.description %}
+    <p class="mt-2 text-base leading-relaxed text-slate-600 dark:text-slate-400">{{ mechanic.description }}</p>
+  {% endif %}
+</div>
 
 <div class="mb-6">
-  <a href="{% url 'calculator' %}" class="text-sm text-blue-600 hover:text-blue-800">
-    &larr; {% trans "Ir a la calculadora" %}
+  <a href="{% url 'calculator' %}" class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300">
+    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+    {% trans "Ir a la calculadora" %}
   </a>
 </div>
 
 {% if ruleset %}
-  <section class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-    <h2 class="mb-4 text-xl font-semibold">
-      {% trans "Reglas vigentes" %}
-      <span class="ml-2 text-sm font-normal text-gray-500">v{{ ruleset.version }}</span>
-    </h2>
+  <div class="rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+    <div class="border-b border-slate-200 bg-gradient-to-r from-brand-50 to-white px-6 py-4 dark:border-slate-800 dark:from-brand-800/30 dark:to-slate-900">
+      <h2 class="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100">
+        {% trans "Reglas vigentes" %}
+        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-brand-100 text-brand-700 dark:bg-brand-800 dark:text-brand-200">v{{ ruleset.version }}</span>
+      </h2>
+    </div>
 
-    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div>
-        <dt class="text-sm text-gray-500">{% trans "Versión" %}</dt>
-        <dd class="font-medium">{{ ruleset.version }}</dd>
-      </div>
-      <div>
-        <dt class="text-sm text-gray-500">{% trans "Vigente desde" %}</dt>
-        <dd class="font-medium">{{ ruleset.effective_from|date:"SHORT_DATETIME_FORMAT" }}</dd>
-      </div>
-      {% if ruleset.effective_to %}
-        <div>
-          <dt class="text-sm text-gray-500">{% trans "Vigente hasta" %}</dt>
-          <dd class="font-medium">{{ ruleset.effective_to|date:"SHORT_DATETIME_FORMAT" }}</dd>
+    <div class="p-6">
+      <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Versión" %}</dt>
+          <dd class="mt-1 text-lg font-bold font-mono text-slate-800 dark:text-slate-100">{{ ruleset.version }}</dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+          <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Vigente desde" %}</dt>
+          <dd class="mt-1 text-lg font-bold text-slate-800 dark:text-slate-100">{{ ruleset.effective_from|date:"SHORT_DATETIME_FORMAT" }}</dd>
+        </div>
+        {% if ruleset.effective_to %}
+          <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+            <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Vigente hasta" %}</dt>
+            <dd class="mt-1 text-lg font-bold text-slate-800 dark:text-slate-100">{{ ruleset.effective_to|date:"SHORT_DATETIME_FORMAT" }}</dd>
+          </div>
+        {% endif %}
+        {% if ruleset.confidence_level %}
+          <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+            <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Nivel de confianza" %}</dt>
+            <dd class="mt-1">
+              <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold
+                {% if ruleset.confidence_level == 'confirmed' %}bg-hundo-50 text-hundo-600 dark:bg-hundo-500/20 dark:text-hundo-300
+                {% elif ruleset.confidence_level == 'community' %}bg-accent-50 text-accent-600 dark:bg-accent-500/20 dark:text-accent-300
+                {% else %}bg-brand-100 text-brand-700 dark:bg-brand-800 dark:text-brand-200{% endif %}">
+                {{ ruleset.get_confidence_level_display }}
+              </span>
+            </dd>
+          </div>
+        {% endif %}
+      </dl>
+
+      {% if ruleset.parameters.exists %}
+        <h3 class="mt-8 mb-4 text-base font-bold text-slate-700 dark:text-slate-300">{% trans "Parámetros" %}</h3>
+        <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+          <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead class="bg-slate-100 dark:bg-slate-800">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Clave" %}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Valor" %}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Unidad" %}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
+              {% for param in ruleset.parameters.all %}
+                <tr class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <td class="px-4 py-3 text-sm font-mono text-slate-700 dark:text-slate-300">{{ param.key }}</td>
+                  <td class="px-4 py-3 text-sm font-mono font-bold text-slate-800 dark:text-slate-100">{{ param.value }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{{ param.unit|default:"—" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       {% endif %}
-      {% if ruleset.confidence_level %}
-        <div>
-          <dt class="text-sm text-gray-500">{% trans "Nivel de confianza" %}</dt>
-          <dd class="font-medium">{{ ruleset.get_confidence_level_display }}</dd>
-        </div>
-      {% endif %}
-    </dl>
-
-    {% if ruleset.parameters.exists %}
-      <h3 class="mt-6 mb-3 text-lg font-semibold">{% trans "Parámetros" %}</h3>
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-gray-200">
-            <th class="py-2 font-medium text-gray-500">{% trans "Clave" %}</th>
-            <th class="py-2 font-medium text-gray-500">{% trans "Valor" %}</th>
-            <th class="py-2 font-medium text-gray-500">{% trans "Unidad" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for param in ruleset.parameters.all %}
-            <tr class="border-b border-gray-100">
-              <td class="py-2 font-mono text-xs">{{ param.key }}</td>
-              <td class="py-2">{{ param.value }}</td>
-              <td class="py-2 text-gray-500">{{ param.unit|default:"—" }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% endif %}
-  </section>
+    </div>
+  </div>
 
   {% with claims=ruleset.claims.all %}
     {% if claims %}
-      <section class="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-        <h2 class="mb-4 text-xl font-semibold">{% trans "Fuentes y evidencia" %}</h2>
-        {% for claim in claims %}
-          <div class="mb-4 border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-            <p class="text-sm text-gray-600">{{ claim.quote_summary }}</p>
-            <p class="mt-1 text-xs text-gray-400">
-              <span class="font-medium">{{ claim.source.title }}</span>
-              {% if claim.source.source_type %}
-                · {{ claim.source.get_source_type_display }}
-              {% endif %}
-              · {% trans "Confianza:" %} {{ claim.get_confidence_level_display }}
-            </p>
-          </div>
-        {% endfor %}
-      </section>
+      <div class="mt-8 rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+        <div class="border-b border-slate-200 bg-gradient-to-r from-accent-50 to-white px-6 py-4 dark:border-slate-800 dark:from-accent-500/10 dark:to-slate-900">
+          <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">
+            {% trans "Fuentes y evidencia" %}
+          </h2>
+        </div>
+        <div class="divide-y divide-slate-100 dark:divide-slate-800">
+          {% for claim in claims %}
+            <div class="p-5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30">
+              <p class="text-sm text-slate-700 dark:text-slate-300">{{ claim.quote_summary }}</p>
+              <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span class="font-medium text-slate-700 dark:text-slate-300">{{ claim.source.title }}</span>
+                {% if claim.source.source_type %}
+                  <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-secondary-50 text-secondary-600 dark:bg-secondary-500/20 dark:text-secondary-300">
+                    {{ claim.source.get_source_type_display }}
+                  </span>
+                {% endif %}
+                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-accent-50 text-accent-600 dark:bg-accent-500/20 dark:text-accent-300">
+                  {% trans "Confianza:" %} {{ claim.get_confidence_level_display }}
+                </span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
     {% endif %}
   {% endwith %}
 {% else %}
-  <p class="text-gray-500">{% trans "No hay reglas publicadas para esta mecánica." %}</p>
+  {% include "includes/_empty_state.html" with title=_("Sin reglas publicadas") message=_("No hay reglas publicadas para esta mecánica todavía.") %}
 {% endif %}
 {% endblock %}
