@@ -62,7 +62,7 @@ jobs:
         run: uv run coverage run -m pytest --ignore=tests/test_e2e.py && uv run coverage report
 
       - name: Security audit
-        run: uv run pip-audit --fail-on=low
+        run: uv run pip-audit
 
   e2e:
     needs: test

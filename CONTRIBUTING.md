@@ -44,7 +44,7 @@ inertes para que no drifteen contra lo que genere `uv init`).
 | **hypothesis** | property-based | Invariantes del `engine/` (prob∈[0,1], Σ=1, monotonía, exacto≈MC) |
 | **Playwright** | E2E | Flujos críticos (plan §13) |
 | **coverage** | umbral | `engine/` alto (objetivo ≥95%), global razonable |
-| **pip-audit** / `uv` | auditoría de dependencias | Falla en vulnerabilidades críticas |
+| **pip-audit** / `uv` | auditoría de dependencias | Falla en vulnerabilidades conocidas |
 | **Dependabot** | anti-drift de dependencias | PRs automáticos (GitHub Actions ya; pip en M1) |
 
 Dos gates específicos anti-regresión (agendados):
