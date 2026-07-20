@@ -248,7 +248,7 @@ def encode_calc_share(calc_type: str, params: dict) -> str:
     Returns:
         Fragmento base64url para ?share=.
     """
-    payload = {"v": GENERIC_SHARE_VERSION, "t": calc_type}
+    payload: dict[str, str | int | float | bool] = {"v": GENERIC_SHARE_VERSION, "t": calc_type}
     # Filtrar valores no serializables y convertir a tipos planos
     for k, v in params.items():
         if v is None:
