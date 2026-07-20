@@ -17,7 +17,12 @@ class StaticViewSitemap(sitemaps.Sitemap):
     changefreq = "weekly"
 
     def items(self):
-        return ["calculator", "dps_browser"]
+        return [
+            "calculator", "cp_calculator", "cost_calculator",
+            "pvp_ranker", "catch_calculator", "type_calculator",
+            "shiny_calculator", "shadow_calculator",
+            "dps_browser",
+        ]
 
     def location(self, item):
         return reverse(item)

@@ -9,8 +9,7 @@ para decidir mejor.
 
 ## Estado
 
-🟨 **MVP implementado; hardening de beta en cierre.** Falta completar TLS, revisión legal/licencias y abrir la
-beta cerrada. Documentación:
+🟨 **MVP implementado; hardening de beta en cierre.** Falta dominio/TLS y apertura de beta cerrada. Documentación:
 
 - Plan maestro: [`docs/plan.md`](docs/plan.md)
 - Seguimiento por milestone: [`docs/milestones/`](docs/milestones/) (tablero en su `README.md`)
@@ -36,4 +35,4 @@ uv run pytest && uv run python manage.py runserver
 ## Licencias
 
 - **Código:** propietario — © 2026, todos los derechos reservados. Repositorio visible pero sin licencia de reutilización (ver `docs/plan.md` §I).
-- **Dataset comunitario:** por definir (CC BY / CC0 a decidir), sujeto a revisión legal antes de la beta.
+- **Dataset comunitario:** CC BY 4.0 (Creative Commons — Atribución 4.0 Internacional).

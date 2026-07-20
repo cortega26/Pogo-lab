@@ -27,13 +27,14 @@ milestone en curso (no el plan completo), lo que mantiene el contexto pequeño y
 | [M4 — Trade Tracker](M4-trade-tracker.md) | Registro de sesiones/observaciones (manual+CSV) + dashboard | L | M2, M3 | PR-12, 13 | ✅ |
 | [M5 — Analysis & Decisions](M5-analysis-decisions.md) | Inferencia honesta reproducible + recomendaciones | L | M4 | PR-14…16 | ✅ |
 | [M6 — Community Dataset](M6-community-dataset.md) | Contribución opt-in anonimizada + moderación + dashboard | L | M5 | PR-17…19 | ✅ |
-| [M7 — Hardening y beta](M7-hardening-beta.md) | E2E, a11y, seguridad, backup/restore, despliegue, beta | M | M1…M6 | PR-20, 21 | 🟨 |
+| [M7 — Hardening y beta](M7-hardening-beta.md) | E2E, a11y, seguridad, backup/restore, despliegue, legal | M | M1…M6 | PR-20, 21 | 🟨 |
+| [M8 — Ola A+B: Calculadoras](M8-ola-a.md) | CP, Costos, PvP, Captura, Tipos, Shiny, Shadow | L | M7, Gate 0 | PR-22, 23 | ✅ |
 
 ## Post-MVP
 
 | Roadmap | Objetivo | Estado |
 |---|---|:--:|
-| [Fase 2 — Expansión](fase-2.md) | Combate/captura/recursos: roadmap + compuerta de verificación (Gate 0). Se descompone en M8+. Entrada: [research pack sin verificar](../research/README.md). | ⬜ |
+| [Fase 2 — Expansión](fase-2.md) | Combate/captura/recursos: roadmap + compuerta de verificación (Gate 0). Se descompone en M8+. Entrada: [research pack sin verificar](../research/README.md). | 🟨 |
 
 ## Cómo usar estas hojas
 

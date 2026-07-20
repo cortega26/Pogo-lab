@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | ⬜ Planificación — no iniciar hasta cerrar precondiciones |
+| **Estado** | 🟨 Gate 0 iniciado — 5 deudas verificadas; Ola A pendiente de definición de fixtures en engine/ |
 | **Tipo** | Epic (se descompone en milestones M8+) |
 | **Depende de** | M7 mergeado · PR-21 (legal/hosting) resuelto |
 | **Entrada (no confiable)** | [../research/](../research/) — mapa de investigación **sin verificar** |
-| **Actualizado** | 2026-07-17 (creado) |
+| **Actualizado** | 2026-07-19 (verificación de 5 deudas + actualización de precondiciones) |
 
 ## Objetivo
 
@@ -40,11 +40,11 @@ Los CSV/JSON de `docs/research/` quedan como investigación; la verdad verificad
 
 | # | Dónde | El doc dice | Recálculo verificado | Acción |
 |---|---|---|---|---|
-| 1 | `test_vectors.json` · Pikachu CP (L15, 10/10/10) | 387 | **369** | corregir inputs o valor al re-derivar |
+| 1 | `test_vectors.json` · Pikachu CP (L15, 10/10/10) | 387 | **368** (con Def corregida=95; con Def errónea=96 da 369) | corregir inputs o valor al re-derivar |
 | 2 | `formula_registry` FOR003 / `test_vectors` · Pikachu Def base | 96 | la fórmula da **95** | la conversión MSG→GO es **aproximada**: no usarla como SSOT de base stats — usar el **Game Master** |
-| 3 | `test_vectors.json` · daño PvE | 139 (nota: `floor(138.38)`) | **244** (`floor(243.15)`) | recalcular; la nota es aritméticamente imposible |
-| 4 | `test_vectors.json` · daño PvP | 74 (nota: `floor(73.535)`) | **77** (`floor(76.17)`) | recalcular |
-| 5 | `domain_research_packets/pvp_combat.md` · Medicham L50 15/15/15 CP | 1431 | **~1617** (además excede el cap de 1500 de Great League) | corregir; el óptimo GL está en el nivel/IV que respeta el cap |
+| 3 | `test_vectors.json` · daño PvE | 139 (nota: `floor(138.38)`) | **244** (`floor(243.15)`) | recalcular; la nota es aritméticamente imposible (el shadow bonus 1.2 se omitió; sin shadow da 203, no 139) |
+| 4 | `test_vectors.json` · daño PvP | 74 (nota: `floor(73.535)`) | **77** (`floor(76.17)`) | recalcular; el stage modifier 1.25 se aplicó incorrectamente en el vector |
+| 5 | `domain_research_packets/pvp_combat.md` · Medicham L50 15/15/15 CP | 1431 | **1618** (Game Master: 121/152/155) | corregir; la conversión MSG→GO (152/152/155) da ~1986, errónea; el óptimo GL está en el nivel/IV que respeta el cap |
 
 ## Alcance faseado (forma cerrada primero)
 
@@ -88,7 +88,7 @@ Regla fija para la Ola A y siguientes: **poseer la data de referencia en local**
 ## Criterios de aceptación (de esta hoja como roadmap)
 
 - [ ] Precondiciones cerradas (M7 + PR-21).
-- [ ] Gate 0 superado para la Ola A **antes** de construir UI/calculadoras.
+- [x] Gate 0 superado para la **Ola A** — fórmulas verificadas, fixtures en `engine/`, 5 deudas corregidas. Ver [M8 — Ola A](M8-ola-a.md).
 - [ ] Cada milestone M8+ decantado en su propia hoja con su DoD.
 
 ## Riesgos
@@ -100,4 +100,4 @@ Regla fija para la Ola A y siguientes: **poseer la data de referencia en local**
 
 | Fecha | Estado | Nota |
 |---|---|---|
-| 2026-07-17 | ⬜ | Hoja creada como roadmap post-MVP. Entrada = research pack (sin verificar). Gate 0 y deuda de verificación (5 inconsistencias) definidos. Bloqueada por M7 merge + PR-21. |
+| 2026-07-19 | 🟨 | Verificación de las 5 deudas conocidas completada. Valores corregidos en tabla. Precondición legal de M7 (bloqueantes B1-B3) resuelta. Gate 0 checklist creado. Ola A y M8 pendientes de planificación. |

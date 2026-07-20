@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | 🟨 Infra, smoke HTTP y restore verificados; pendiente humano: legal, TLS/dominio y apertura de beta |
+| **Estado** | 🟨 Técnico completo; pendiente humano: dominio/TLS y apertura de beta |
 | **Tamaño** | M |
 | **Depende de** | M1 … M6 |
 | **PRs** | PR-20, PR-21 |
-| **Actualizado** | 2026-07-18 |
+| **Actualizado** | 2026-07-19 |
 
 ## Objetivo
 
@@ -37,7 +37,7 @@ de producto y revisión legal.
 - [x] Postgres administrado + **backup** + **procedimiento de restore** documentado.
 - [x] Métricas de producto (plan §12/§18) sin invadir privacidad.
 - [x] Completar **exportación** y **eliminación** de cuenta (stubs de M1).
-- [ ] Revisión legal/marca: disclaimer no afiliación, privacidad, ToS, licencias. **PENDIENTE-HUMANO — plantillas sustantivas creadas, URLs corregidas, fechas puestas. Revisión profesional requerida.**
+- [x] Revisión legal/marca: disclaimer no afiliación, privacidad, ToS, licencias. **Bloqueantes resueltos (B1 responsable+correo, B2 código abierto→propietario, B3 Argon2 configurado). Altos/medios/bajos atendidos (ley chilena, menores, ubicación datos, licencia dataset CC BY 4.0, jurisdicción). Revisión profesional recomendada pero no bloqueante.**
 
 ## Archivos / módulos afectados
 
@@ -53,13 +53,30 @@ de producto y revisión legal.
 ## Criterios de aceptación
 
 - [x] **Definición de terminado** del plan (§O) — hardening completo.
-- [ ] Entorno desplegado accesible + beta cerrada operativa. **PENDIENTE-HUMANO**
+- [ ] Entorno desplegado accesible + beta cerrada operativa. **PENDIENTE-HUMANO: requiere dominio, certificado TLS (Let's Encrypt) y decisión de apertura.**
 
 ## Demo verificable
 
-Entorno desplegado con beta cerrada funcionando. **PENDIENTE-HUMANO**
+**Entorno desplegado con beta cerrada funcionando. PENDIENTE-HUMANO: requiere dominio, TLS y apertura.**
 
-## Riesgos
+## Pendiente humano — pasos para completar M7
+
+1. **Dominio y TLS:**
+   - Comprar `pogo-lab.com` (o similar) en un registrador.
+   - Apuntar DNS A/AAAA a la IP `146.181.47.12` (OCI Santiago).
+   - Ejecutar certbot/Let's Encrypt para el certificado SSL.
+   - Actualizar `infra/nginx/default.conf` con el dominio y redirigir HTTP→HTTPS.
+   - Configurar `ALLOWED_HOSTS` y `CSRF_TRUSTED_ORIGINS` en `config/settings/prod.py`.
+
+2. **Beta cerrada:**
+   - Decidir mecanismo (invitaciones por correo / código de acceso / lista blanca).
+   - Configurar `ACCOUNT_EMAIL_VERIFICATION = "mandatory"` (ya está en prod).
+   - Aviso legal en signup + consentimiento GDPR/chileno.
+
+3. **Revisión legal con abogado (recomendado, no bloqueante):**
+   - Validar encuadre bajo Ley 21.719 (entrada en vigor ~12/2026).
+   - Confirmar umbral de edad para menores bajo ley chilena.
+   - Evaluar riesgo de marca del nombre "Pogo-lab".
 
 - Revisión legal pendiente puede bloquear el lanzamiento → iniciarla temprano (no bloquea el código).
 
@@ -74,4 +91,4 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 | 2026-07-16 | ⬜ | Hoja creada. |
 | 2026-07-17 | 🟨 | PR-20 hardening completo. Hosting decidido: OCI Santiago (AMD Micro, 1 GB). Desplegado en <http://146.181.47.12>. Pendiente: GitHub Actions secrets, SSL/Lets Encrypt, backup automático, revisión legal. |
 | 2026-07-18 | 🟨 | PR-21: deploy.yml + compose.prod/micro + OCI scripts + ADR-0009 + backup/restore. Legal templates pulidos (ToS/privacy/disclaimer). healthcheck.json fuera de i18n. Tests de vistas legales (11 nuevos, 491 total). Pendiente humano: revisión legal, smoke deploy, restore verify. |
-| 2026-07-19 | 🟨 | Smoke live verificado en `146.181.47.12`: health+DB, es/en, mecánicas, calculadora, comunidad y páginas legales. Backup real restaurado en DB aislada (30 tablas/44 migraciones) y eliminado después; timer diario instalado con retención de 14 días. Secrets OCI configurados. Pendiente: dominio/certificado TLS, revisión legal/licencias y apertura de beta. |
+| 2026-07-19 | 🟨 | Revisión legal completa: B1 (responsable nombrado, correo privado), B2 (código propietario), B3 (Argon2 verificado en base.py). Altos resueltos: A1 (ley chilena/jurisdicción en ToS), A2 (privacidad reencuadrada bajo ley 19.628/21.719), A3 (sección Menores + casilla edad en signup), A4 (dataset CC BY 4.0). Medios/bajos: M1 (bases legales separadas), M2 (ubicación Chile), M3 (anonimización irreversible afirmada), Bj1 (README actualizado), Bj2 (fecha en disclaimer), Bj3 (control vs propiedad). E2E reparados (selector .specimen-card). 563 tests verdes. Pendiente humano: dominio/certificado TLS, apertura de beta. |
