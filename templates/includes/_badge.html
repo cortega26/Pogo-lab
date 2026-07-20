@@ -1,9 +1,9 @@
-<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold
-  {% if variant == 'accent' %}bg-accent-50 text-accent-600 dark:bg-accent-500/20 dark:text-accent-300
-  {% elif variant == 'lucky' %}bg-lucky-50 text-lucky-600 dark:bg-lucky-500/20 dark:text-lucky-300
-  {% elif variant == 'hundo' %}bg-hundo-50 text-hundo-600 dark:bg-hundo-500/20 dark:text-hundo-300
-  {% elif variant == 'danger' %}bg-danger-50 text-danger-600 dark:bg-danger-500/20 dark:text-danger-300
-  {% elif variant == 'secondary' %}bg-secondary-50 text-secondary-600 dark:bg-secondary-500/20 dark:text-secondary-300
-  {% else %}bg-brand-100 text-brand-700 dark:bg-brand-800 dark:text-brand-200{% endif %}">
+<span class="inline-flex items-center gap-1 border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide
+  {% if variant == 'accent' %}border-accent-500 text-accent-600 dark:text-accent-400
+  {% elif variant == 'lucky' %}border-lucky-500 text-lucky-600 dark:text-lucky-400
+  {% elif variant == 'hundo' %}border-hundo-500 text-hundo-600 dark:text-hundo-400
+  {% elif variant == 'danger' %}border-danger-500 text-danger-600 dark:text-danger-400
+  {% elif variant == 'secondary' %}border-secondary-500 text-secondary-600 dark:text-secondary-500
+  {% else %}border-brand-500 text-brand-600 dark:text-brand-400{% endif %}">
   {{ label }}
 </span>

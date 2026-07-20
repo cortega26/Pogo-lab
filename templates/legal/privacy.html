@@ -13,7 +13,7 @@
 
   <div class="prose-custom">
     <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Responsable del tratamiento" %}</h2>
-    <p>{% blocktrans %}El responsable del tratamiento de tus datos personales es [RESPONSABLE: nombre del operador], persona natural con domicilio en Chile. Para cualquier asunto de privacidad puedes escribir a privacidad@pogo-lab.com.{% endblocktrans %}</p>
+    <p>{% blocktrans %}El responsable del tratamiento de tus datos personales es Carlos M., persona natural con domicilio en Chile. Para cualquier asunto de privacidad puedes escribir a privacidad@pogo-lab.com.{% endblocktrans %}</p>
 
     <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Datos que recopilamos" %}</h2>
     <p>{% blocktrans %}Recopilamos los siguientes datos cuando creas una cuenta: correo electrónico (necesario para la autenticación), nombre de usuario (público). Cuando registras observaciones de intercambios, almacenamos los IVs, tipo de intercambio, nivel de amistad, especie y marca de tiempo.{% endblocktrans %}</p>
@@ -26,20 +26,22 @@
       <li>{% trans "Contenido de notas privadas" %}</li>
     </ul>
 
-    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Base legal (GDPR)" %}</h2>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Base legal" %}</h2>
+    <p>{% blocktrans %}Tratamos tus datos conforme a la legislación chilena de protección de datos (Ley 19.628 y, de forma inminente, la Ley 21.719). Las bases legales son:{% endblocktrans %}</p>
     <ul>
-      <li>{% trans "Ejecución de un contrato: la creación y gestión de tu cuenta." %}</li>
-      <li>{% trans "Consentimiento explícito: para contribuir al dataset comunitario anonimizado." %}</li>
-      <li>{% trans "Interés legítimo: análisis agregados para entender las mecánicas del juego." %}</li>
+      <li>{% trans "Ejecución de un contrato: la creación y gestión de tu cuenta y el uso de las herramientas del servicio." %}</li>
+      <li>{% trans "Consentimiento explícito: para incluir tus observaciones en el dataset comunitario anonimizado. Puedes revocarlo en cualquier momento." %}</li>
+      <li>{% trans "Interés legítimo: análisis agregados y anonimizados para comprender las mecánicas del juego — un tratamiento distinto al del dataset comunitario." %}</li>
     </ul>
+    <p>{% trans "Si resides en la Unión Europea, también se aplica el Reglamento General de Protección de Datos (GDPR) en lo que corresponda." %}</p>
 
     <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Cookies" %}</h2>
     <p>{% trans "Usamos cookies estrictamente necesarias para la sesión (sessionid, csrftoken). No usamos cookies de rastreo, publicidad ni análisis de terceros." %}</p>
 
     <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Conservación de datos" %}</h2>
-    <p>{% trans "Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, todos tus datos personales se eliminan irreversiblemente. Las contribuciones al dataset comunitario ya agregadas no son reversibles, pero tu consentimiento para futuros builds puede revocarse en cualquier momento." %}</p>
+    <p>{% trans "Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, todos tus datos personales se eliminan irreversiblemente. Las contribuciones al dataset comunitario ya agregadas no son reversibles porque los datos han sido anonimizados de forma irreversible: no contienen nombre de entrenador, ubicación precisa ni notas privadas, e incluyen solo país agregado. Tu consentimiento para futuros builds puede revocarse en cualquier momento." %}</p>
 
-    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Tus derechos (GDPR)" %}</h2>
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Tus derechos" %}</h2>
     <ul>
       <li>{% trans "Acceso: exporta tus datos desde la sección de configuración de tu cuenta." %}</li>
       <li>{% trans "Rectificación: corrige tu información en cualquier momento." %}</li>
@@ -50,6 +52,12 @@
 
     <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Seguridad" %}</h2>
     <p>{% blocktrans %}Implementamos medidas técnicas y organizativas para proteger tus datos: cifrado en tránsito (HTTPS), hashing seguro de contraseñas (Argon2), cabeceras de seguridad (CSP, HSTS), y dependencias auditadas regularmente.{% endblocktrans %}</p>
+
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Menores" %}</h2>
+    <p>{% blocktrans %}No recopilamos a sabiendas datos de menores de 13 años. Si eres padre, madre o tutor y tienes conocimiento de que un menor a tu cargo nos ha proporcionado datos personales sin tu consentimiento, contáctanos para eliminarlos. Al registrarte, confirmas que tienes al menos 13 años.{% endblocktrans %}</p>
+
+    <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Ubicación de los datos" %}</h2>
+    <p>{% trans "Tus datos se alojan en servidores ubicados en Santiago, Chile." %}</p>
 
     <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">{% trans "Cambios a esta política" %}</h2>
     <p>{% trans "Actualizaremos esta política cuando sea necesario. Los cambios sustanciales se notificarán mediante un aviso en el sitio." %}</p>

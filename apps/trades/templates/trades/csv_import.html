@@ -8,15 +8,15 @@
   <h1 class="section-title">{% trans "Importar CSV de observaciones" %}</h1>
 
   <form method="post" enctype="multipart/form-data"
-        class="card p-6 mb-8">
+        class="specimen-card p-6 mb-8">
     {% csrf_token %}
 
     <div class="mb-4">
-      <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="csv_file">
+      <label class="field-label" for="csv_file">
         {% trans "Archivo CSV" %}
       </label>
       <input type="file" name="csv_file" id="csv_file" accept=".csv"
-             class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand-600 hover:file:bg-brand-100 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:file:bg-brand-800/50 dark:file:text-brand-300 dark:focus:border-brand-400">
+             class="input-field file:mr-3 file:border-2 file:border-slate-900 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand-600 hover:file:bg-brand-50 dark:file:border-slate-100 dark:file:bg-slate-900 dark:file:text-brand-400">
       <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-500">
         {% trans "Campos: observed_at, friendship_level, trade_type, atk, def, hp, species" %}
         <br>
@@ -24,20 +24,19 @@
       </p>
     </div>
 
-    <button type="submit"
-            class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
+    <button type="submit" class="btn-bracket bg-brand-500 text-white hover:bg-brand-600">
       {% trans "Importar" %}
     </button>
   </form>
 
   {% if error %}
-    <div class="mb-4 rounded-xl border border-danger-50 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400" role="alert" style="white-space: pre-line">
+    <div class="mb-4 border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert" style="white-space: pre-line">
       {{ error }}
     </div>
   {% endif %}
 
   {% if preview %}
-    <div class="mb-4 rounded-xl border border-hundo-50 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-500/20 dark:bg-hundo-500/10 dark:text-hundo-400">
+    <div class="mb-4 border-2 border-hundo-500 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-400 dark:bg-hundo-500/10 dark:text-hundo-400">
       {% blocktrans with valid=preview.valid_count total=preview.total %}{{ valid }} de {{ total }} filas importadas correctamente.{% endblocktrans %}
     </div>
   {% endif %}

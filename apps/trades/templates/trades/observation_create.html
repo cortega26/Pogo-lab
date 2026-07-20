@@ -16,7 +16,7 @@
   <h1 class="section-title">{% trans "Registrar intercambio" %}</h1>
 
   {% if saved %}
-    <div class="mb-6 rounded-xl border border-hundo-50 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-500/20 dark:bg-hundo-500/10 dark:text-hundo-400">
+    <div class="mb-6 border-2 border-hundo-500 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-400 dark:bg-hundo-500/10 dark:text-hundo-400">
       <span class="font-semibold">✓</span> {% trans "Observación guardada." %}
     </div>
   {% endif %}
@@ -25,22 +25,21 @@
         hx-post="{% url 'trades:observation_create' %}"
         hx-target="#obs-list"
         hx-swap="afterbegin"
-        class="card p-6 mb-6">
+        class="specimen-card p-6 mb-6">
     {% csrf_token %}
 
     {% if error %}
-      <div class="mb-4 rounded-xl border border-danger-50 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
+      <div class="mb-4 border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
         {{ error }}
       </div>
     {% endif %}
 
     <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="friendship_level">
+        <label class="field-label" for="friendship_level">
           {% trans "Amistad" %}
         </label>
-        <select name="friendship_level" id="friendship_level"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <select name="friendship_level" id="friendship_level" class="input-field">
           <option value="good">{% trans "Good Friends" %}</option>
           <option value="great">{% trans "Great Friends" %}</option>
           <option value="ultra">{% trans "Ultra Friends" %}</option>
@@ -49,11 +48,10 @@
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="trade_type">
+        <label class="field-label" for="trade_type">
           {% trans "Tipo" %}
         </label>
-        <select name="trade_type" id="trade_type"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <select name="trade_type" id="trade_type" class="input-field">
           <option value="normal">{% trans "Normal" %}</option>
           <option value="lucky">{% trans "Lucky" %}</option>
           <option value="lucky_guaranteed">{% trans "Lucky garantizado" %}</option>
@@ -62,36 +60,34 @@
     </div>
 
     <div class="mb-5">
-      <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{% trans "IVs" %}</label>
+      <label class="field-label">{% trans "IVs" %}</label>
       <div class="flex gap-3">
         <div class="flex-1">
           <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Atk</span>
           <input type="number" name="atk" id="atk" min="0" max="15" value="10" inputmode="numeric"
-                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-lg font-mono font-bold text-center placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+                 class="input-field text-center text-lg font-mono font-bold">
         </div>
         <div class="flex-1">
           <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Def</span>
           <input type="number" name="def" id="def" min="0" max="15" value="10" inputmode="numeric"
-                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-lg font-mono font-bold text-center placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+                 class="input-field text-center text-lg font-mono font-bold">
         </div>
         <div class="flex-1">
           <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">HP</span>
           <input type="number" name="hp" id="hp" min="0" max="15" value="10" inputmode="numeric"
-                 class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-lg font-mono font-bold text-center placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+                 class="input-field text-center text-lg font-mono font-bold">
         </div>
       </div>
     </div>
 
     <div class="mb-6">
-      <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="species">
+      <label class="field-label" for="species">
         {% trans "Especie (opcional)" %}
       </label>
-      <input type="text" name="species" id="species" maxlength="128"
-             class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+      <input type="text" name="species" id="species" maxlength="128" class="input-field">
     </div>
 
-    <button type="submit"
-            class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
+    <button type="submit" class="btn-bracket bg-brand-500 text-white hover:bg-brand-600">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
       </svg>

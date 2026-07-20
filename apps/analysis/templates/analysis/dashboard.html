@@ -11,60 +11,60 @@
     <div class="space-y-6">
       {% for entry in results_with_rows %}
       {% with result=entry.result payload=entry.result.payload %}
-      <div class="rounded-xl border border-slate-200 bg-white shadow-card overflow-hidden dark:border-slate-800 dark:bg-slate-900">
-        <div class="border-b border-slate-200 bg-gradient-to-r from-brand-50 to-white px-6 py-4 dark:border-slate-800 dark:from-brand-800/30 dark:to-slate-900">
+      <div class="specimen-card overflow-hidden">
+        <div class="border-b-2 border-slate-900 bg-brand-50 px-6 py-4 dark:border-slate-100 dark:bg-brand-500/10">
           <h2 class="text-base font-bold text-slate-800 dark:text-slate-100">{{ result.metric_key }}</h2>
         </div>
 
         <div class="p-6">
           <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Observaciones" %}</dt>
-              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">{{ payload.n }}</dd>
+            <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Observaciones" %}</dt>
+              <dd class="mt-1 font-mono text-2xl font-bold text-slate-800 dark:text-slate-100">{{ payload.n }}</dd>
             </div>
 
             {% if payload.successes is not None %}
-            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Éxitos" %}</dt>
-              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">{{ payload.successes }} / {{ payload.n }}</dd>
+            <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Éxitos" %}</dt>
+              <dd class="mt-1 font-mono text-2xl font-bold text-slate-800 dark:text-slate-100">{{ payload.successes }} / {{ payload.n }}</dd>
             </div>
             {% endif %}
 
             {% if payload.p_value is not None %}
-            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "p-valor" %}</dt>
-              <dd class="mt-1 text-2xl font-bold font-mono {% if payload.p_value < 0.05 %}text-hundo-500{% else %}text-slate-800 dark:text-slate-100{% endif %}">
+            <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "p-valor" %}</dt>
+              <dd class="mt-1 font-mono text-2xl font-bold {% if payload.p_value < 0.05 %}text-hundo-500{% else %}text-slate-800 dark:text-slate-100{% endif %}">
                 {{ payload.p_value|floatformat:4 }}
               </dd>
             </div>
             {% endif %}
 
             {% if payload.effect_size is not None %}
-            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Tamaño de efecto" %}</dt>
-              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">{{ payload.effect_size|floatformat:4 }}</dd>
+            <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Tamaño de efecto" %}</dt>
+              <dd class="mt-1 font-mono text-2xl font-bold text-slate-800 dark:text-slate-100">{{ payload.effect_size|floatformat:4 }}</dd>
             </div>
             {% endif %}
 
             {% if payload.ci_lo is not None %}
-            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "IC (Wilson)" %}</dt>
-              <dd class="mt-1 text-2xl font-bold font-mono text-slate-800 dark:text-slate-100">
+            <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "IC (Wilson)" %}</dt>
+              <dd class="mt-1 font-mono text-2xl font-bold text-slate-800 dark:text-slate-100">
                 [{{ payload.ci_lo|floatformat:4 }}, {{ payload.ci_hi|floatformat:4 }}]
               </dd>
             </div>
             {% endif %}
 
             {% if payload.method_used %}
-            <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-              <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Método" %}</dt>
+            <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% translate "Método" %}</dt>
               <dd class="mt-1 text-lg font-bold text-slate-800 dark:text-slate-100">{{ payload.method_used }}</dd>
             </div>
             {% endif %}
 
             {% if payload.insufficient_sample %}
-            <div class="sm:col-span-2 lg:col-span-3 rounded-lg bg-accent-50 p-4 dark:bg-accent-500/10">
-              <dt class="text-xs font-medium tracking-wide uppercase text-accent-600 dark:text-accent-400">{% translate "Advertencia" %}</dt>
+            <div class="sm:col-span-2 lg:col-span-3 border-2 border-accent-500 bg-accent-50 p-4 dark:bg-accent-500/10">
+              <dt class="font-mono text-xs font-medium tracking-wide uppercase text-accent-600 dark:text-accent-400">{% translate "Advertencia" %}</dt>
               <dd class="mt-1 text-sm font-medium text-accent-700 dark:text-accent-300">{% translate "Muestra insuficiente para inferencia" %}</dd>
             </div>
             {% endif %}
@@ -79,7 +79,7 @@
             {{ result.payload.values|json_script:values_id }}
             {% endwith %}{% endwith %}
             <noscript>
-              <div class="mt-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+              <div class="mt-2 overflow-x-auto border-2 border-slate-900 dark:border-slate-100">
                 <table class="min-w-full text-xs">
                   <thead class="bg-slate-100 dark:bg-slate-800">
                     <tr>
@@ -107,11 +107,11 @@
     </div>
 
     {% if recommendations %}
-    <div class="mt-8 rounded-xl border border-accent-50 bg-accent-50 shadow-card dark:border-accent-500/20 dark:bg-accent-500/10">
-      <div class="border-b border-accent-100 px-6 py-4 dark:border-accent-500/20">
+    <div class="mt-8 border-2 border-accent-500 bg-accent-50 dark:bg-accent-500/10">
+      <div class="border-b-2 border-accent-500 px-6 py-4 dark:border-accent-500/40">
         <h2 class="text-base font-bold text-accent-800 dark:text-accent-300">{% translate "Recomendaciones" %}</h2>
       </div>
-      <div class="divide-y divide-accent-100 dark:divide-accent-500/10">
+      <div class="divide-y divide-accent-500/20 dark:divide-accent-500/10">
         {% for rec in recommendations %}
         <div class="flex items-start gap-3 p-5">
           <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white
@@ -159,8 +159,8 @@
           datasets: [{
             label: '{% translate "Conteo" %}',
             data: counts,
-            backgroundColor: 'rgba(59, 130, 246, 0.5)',
-            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(181, 64, 44, 0.5)',
+            borderColor: 'rgba(181, 64, 44, 1)',
             borderWidth: 1
           }]
         },

@@ -7,10 +7,10 @@
       </h2>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <label for="sort-select" class="text-xs text-slate-500">{% trans "Orden:" %}</label>
+      <label for="sort-select" class="field-label mb-0">{% trans "Orden:" %}</label>
       <select id="sort-select"
               name="sort"
-              class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:focus:border-brand-400"
+              class="input-field w-auto py-1 text-xs"
               hx-get="{{ request.path }}"
               hx-target="#dps-results"
               hx-swap="innerHTML"
@@ -25,10 +25,10 @@
   </div>
 
   {% if attackers %}
-  <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+  <div class="overflow-x-auto border-2 border-slate-900 dark:border-slate-100">
     <table class="w-full text-left text-sm">
       <thead>
-        <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+        <tr class="border-b-2 border-slate-900 bg-slate-50 font-mono text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-100 dark:bg-slate-800/50 dark:text-slate-400">
           <th class="px-2 py-3 w-10">#</th>
           <th class="px-2 py-3 w-10"></th>
           <th class="px-3 py-3">{% trans "Pokémon" %}</th>
@@ -36,31 +36,31 @@
           <th class="px-3 py-3 hidden md:table-cell">{% trans "Movimientos" %}</th>
           <th class="px-3 py-3 text-right">
             <a href="{{ request.path }}?sort=dps{% if type_filter %}&type_filter={{ type_filter }}{% endif %}{% if level %}&level={{ level }}{% endif %}{% if attack_type %}&tipo={{ attack_type }}{% endif %}"
-               class="{% if sort_by == 'dps' or not sort_by %}text-brand-600 dark:text-brand-400{% else %}text-slate-500{% endif %} hover:text-brand-500">
+               class="{% if sort_by == 'dps' or not sort_by %}text-accent-600 dark:text-accent-400{% else %}text-slate-500{% endif %} hover:text-brand-500">
               DPS
             </a>
           </th>
           <th class="px-3 py-3 text-right">
             <a href="{{ request.path }}?sort=tdo{% if type_filter %}&type_filter={{ type_filter }}{% endif %}{% if level %}&level={{ level }}{% endif %}{% if attack_type %}&tipo={{ attack_type }}{% endif %}"
-               class="{% if sort_by == 'tdo' %}text-brand-600 dark:text-brand-400{% else %}text-slate-500{% endif %} hover:text-brand-500">
+               class="{% if sort_by == 'tdo' %}text-accent-600 dark:text-accent-400{% else %}text-slate-500{% endif %} hover:text-brand-500">
               TDO
             </a>
           </th>
           <th class="px-3 py-3 text-right hidden lg:table-cell">
             <a href="{{ request.path }}?sort=edps{% if type_filter %}&type_filter={{ type_filter }}{% endif %}{% if level %}&level={{ level }}{% endif %}{% if attack_type %}&tipo={{ attack_type }}{% endif %}"
-               class="{% if sort_by == 'edps' %}text-brand-600 dark:text-brand-400{% else %}text-slate-500{% endif %} hover:text-brand-500">
+               class="{% if sort_by == 'edps' %}text-accent-600 dark:text-accent-400{% else %}text-slate-500{% endif %} hover:text-brand-500">
               eDPS
             </a>
           </th>
           <th class="px-2 py-3 text-center">STAB</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+      <tbody class="divide-y-2 divide-slate-100 dark:divide-slate-800">
         {% for a in attackers %}
         <tr class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30">
           <td class="px-2 py-2 text-xs text-slate-400">{{ forloop.counter }}</td>
           <td class="px-2 py-2">
-            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 font-mono text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+            <span class="inline-flex h-8 w-8 items-center justify-center border-2 border-slate-300 font-mono text-[10px] font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400"
                   aria-label="{% blocktrans with dex=a.species.dex %}Número {{ dex }} en la Pokédex{% endblocktrans %}">
               #{{ a.species.dex }}
             </span>
@@ -106,9 +106,9 @@
           </td>
           <td class="px-2 py-2 text-center">
             {% if a.stab %}
-            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-xs text-green-600 dark:bg-green-900/30 dark:text-green-400" title="{% trans "STAB" %}">✓</span>
+            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-hundo-500 text-xs text-hundo-600 dark:text-hundo-400" title="{% trans "STAB" %}">✓</span>
             {% else %}
-            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-600" title="{% trans "Sin STAB" %}">—</span>
+            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-slate-300 text-xs text-slate-400 dark:border-slate-700 dark:text-slate-600" title="{% trans "Sin STAB" %}">—</span>
             {% endif %}
           </td>
         </tr>
@@ -117,7 +117,7 @@
     </table>
   </div>
   {% else %}
-  <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+  <div class="border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
     {% trans "Selecciona un tipo de ataque para ver el ranking." %}
   </div>
   {% endif %}

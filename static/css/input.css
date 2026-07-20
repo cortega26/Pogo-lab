@@ -2,43 +2,120 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@font-face {
+  font-family: 'Big Shoulders';
+  src: url('/static/fonts/BigShoulders-variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Newsreader';
+  src: url('/static/fonts/Newsreader-variable.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Newsreader';
+  src: url('/static/fonts/Newsreader-italic-variable.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  src: url('/static/fonts/FiraCode-variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --color-brand-50: #EFF6FF;
-  --color-brand-100: #DBEAFE;
-  --color-brand-200: #BFDBFE;
-  --color-brand-500: #3B82F6;
-  --color-brand-600: #2563EB;
-  --color-brand-700: #1D4ED8;
-  --color-brand-800: #1E3A5F;
+  /* Neutrales cálidos (papel/piedra) — reemplazan el slate azulado por defecto
+     en TODAS las clases `slate-*` ya usadas en las plantillas. */
+  --color-slate-50: #F7F4EE;
+  --color-slate-100: #EFEAE0;
+  --color-slate-200: #E1D9C8;
+  --color-slate-300: #CBBFA6;
+  --color-slate-400: #A69579;
+  --color-slate-500: #83725B;
+  --color-slate-600: #635546;
+  --color-slate-700: #493E33;
+  --color-slate-800: #322A22;
+  --color-slate-900: #201A15;
+  --color-slate-950: #14100D;
+  --color-white: #FBF8F1;
 
-  --color-secondary-50: #F5F3FF;
-  --color-secondary-500: #8B5CF6;
-  --color-secondary-600: #7C3AED;
+  /* Petróleo — color de interfaz primario (enlaces, foco, nav activa). */
+  --color-brand-50: #E9F2F1;
+  --color-brand-100: #CFE3E0;
+  --color-brand-200: #9FC7C1;
+  --color-brand-300: #7FB6AE;
+  --color-brand-400: #5FA39C;
+  --color-brand-500: #2B6F6A;
+  --color-brand-600: #205551;
+  --color-brand-700: #1A423F;
+  --color-brand-800: #143330;
+  --color-brand-900: #0F2624;
 
-  --color-accent-50: #FFFBEB;
-  --color-accent-500: #F59E0B;
-  --color-accent-600: #D97706;
+  /* Ocre — terciario, uso puntual. */
+  --color-secondary-50: #FBF1DF;
+  --color-secondary-400: #D9A754;
+  --color-secondary-500: #B4842A;
+  --color-secondary-600: #8F6820;
+  --color-secondary-700: #6B4F18;
+  --color-secondary-800: #4D3811;
 
-  --color-hundo-50: #ECFDF5;
-  --color-hundo-500: #10B981;
-  --color-hundo-600: #059669;
+  /* Rojo ladrillo — color de señal, reservado a CTA primaria y a la marca. */
+  --color-accent-50: #FBE9E4;
+  --color-accent-300: #E3A791;
+  --color-accent-400: #D4735A;
+  --color-accent-500: #B5402C;
+  --color-accent-600: #953121;
+  --color-accent-700: #7A2519;
+  --color-accent-800: #5E1C13;
 
-  --color-lucky-50: #FDF2F8;
-  --color-lucky-500: #EC4899;
-  --color-lucky-600: #DB2777;
+  --color-hundo-50: #E7F1E9;
+  --color-hundo-400: #6FA884;
+  --color-hundo-500: #3F7A52;
+  --color-hundo-600: #2F5E3F;
+  --color-hundo-700: #234A31;
 
-  --color-danger-50: #FEF2F2;
-  --color-danger-500: #EF4444;
-  --color-danger-600: #DC2626;
+  --color-lucky-50: #F5E9F0;
+  --color-lucky-400: #C07AA6;
+  --color-lucky-500: #96477A;
+  --color-lucky-600: #793962;
+  --color-lucky-700: #602C4C;
 
-  --font-sans: 'Fira Sans', ui-sans-serif, system-ui, sans-serif;
+  --color-danger-50: #FBEAE1;
+  --color-danger-400: #DB8B5A;
+  --color-danger-500: #C1571E;
+  --color-danger-600: #9C4517;
+  --color-danger-700: #7A3711;
+
+  --font-sans: 'Newsreader', ui-serif, Georgia, serif;
+  --font-display: 'Big Shoulders', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Fira Code', ui-monospace, monospace;
 
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.06), 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-glass: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-glow: 0 0 15px -3px color-mix(in srgb, var(--color-brand-500) 30%, transparent);
-  --shadow-glow-accent: 0 0 15px -3px color-mix(in srgb, var(--color-accent-500) 30%, transparent);
+  /* Radios casi cuadrados: una sola forma redonda (rounded-full, sin token)
+     queda reservada al motivo circular de la marca; el resto del sistema es
+     anguloso a propósito. */
+  --radius-md: 0.0625rem;
+  --radius-lg: 0.125rem;
+  --radius-xl: 0.1875rem;
+  --radius-2xl: 0.25rem;
+  --radius-3xl: 0.375rem;
+
+  /* Sombras duras "de ficha estampada": desplazamiento sólido, sin difuminado. */
+  --shadow-card: 2px 2px 0 0 var(--color-slate-900);
+  --shadow-card-hover: 4px 4px 0 0 var(--color-slate-900);
+  --shadow-glass: 2px 2px 0 0 var(--color-slate-300);
+  --shadow-glow: 3px 3px 0 0 var(--color-accent-600);
+  --shadow-glow-accent: 3px 3px 0 0 var(--color-accent-800, #6f2417);
 }
 
 @layer base {
@@ -50,9 +127,107 @@
     @apply bg-slate-50 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
   }
 
-  ::selection {
-    @apply bg-brand-500/20 text-brand-700 dark:text-brand-200;
+  h1, h2, h3, .section-title, .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
+
+  ::selection {
+    @apply bg-accent-500/25 text-accent-600 dark:text-accent-50;
+  }
+}
+
+.section-title {
+  @apply mb-4 flex items-baseline gap-3 text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50;
+}
+
+.section-title::before {
+  content: "";
+  @apply h-0.75 w-8 bg-accent-500;
+}
+
+/* Ficha de espécimen: la unidad de tarjeta base del sistema. Borde firme +
+   sombra dura desplazada en vez de blur/soft-shadow. */
+.specimen-card {
+  @apply relative border-2 border-slate-900 bg-white shadow-card transition-[box-shadow,transform] duration-150 dark:border-slate-100 dark:bg-slate-900;
+}
+
+.specimen-card:hover {
+  @apply shadow-card-hover -translate-x-0.5 -translate-y-0.5;
+}
+
+/* Botón "de corchete": sin scale, sin blur — se hunde al presionar. */
+.btn-bracket {
+  @apply inline-flex items-center justify-center gap-2 border-2 border-slate-900 px-5 py-2.5 font-mono text-sm font-semibold uppercase tracking-wide shadow-card transition-[box-shadow,transform] duration-100 dark:border-slate-100;
+}
+
+.btn-bracket:hover {
+  @apply shadow-card-hover -translate-x-0.5 -translate-y-0.5;
+}
+
+.btn-bracket:active {
+  @apply translate-x-0 translate-y-0 shadow-none;
+}
+
+/* Enlace de navegación: subrayado que se despliega desde la izquierda,
+   sin fondo tipo píldora. */
+.nav-link {
+  @apply relative inline-flex items-center justify-center gap-2 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-slate-600 transition-colors duration-150 dark:text-slate-400;
+}
+
+.nav-link::after {
+  content: "";
+  @apply absolute inset-x-3 bottom-1 h-0.5 origin-left scale-x-0 bg-accent-500 transition-transform duration-200;
+}
+
+.nav-link:hover {
+  @apply text-slate-900 dark:text-slate-100;
+}
+
+.nav-link:hover::after,
+.nav-link--active::after {
+  @apply scale-x-100;
+}
+
+.nav-link--active {
+  @apply text-accent-600 dark:text-accent-500;
+}
+
+/* Campo de formulario "de ficha": borde firme, foco por color sólido en vez
+   de anillo difuminado. */
+.input-field {
+  @apply block w-full border-2 border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors duration-150 focus:border-accent-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-accent-400;
+}
+
+.field-label {
+  @apply mb-1.5 block font-mono text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400;
+}
+
+/* Prosa larga (legal, guías): espaciado + viñetas cuadradas en vez de las
+   viñetas por defecto del navegador. */
+.prose-custom {
+  @apply space-y-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400;
+}
+
+.prose-custom h2 {
+  @apply mb-2 mt-8 first:mt-0;
+}
+
+.prose-custom ul {
+  @apply list-none space-y-1.5 pl-0;
+}
+
+.prose-custom li {
+  @apply relative pl-5;
+}
+
+.prose-custom li::before {
+  content: "";
+  @apply absolute left-0 top-1.5 h-1.5 w-1.5 bg-accent-500;
+}
+
+.prose-custom a {
+  @apply text-accent-600 underline decoration-2 underline-offset-2 hover:text-accent-500 dark:text-accent-400;
 }
 
 @keyframes shimmer {
@@ -93,7 +268,7 @@
 }
 
 .htmx-request .skeleton-block {
-  @apply rounded-lg bg-slate-200 dark:bg-slate-700;
+  @apply bg-slate-200 dark:bg-slate-700;
 }
 
 @keyframes spin {
@@ -107,7 +282,7 @@
 }
 
 .select-chevron {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%2364748B%22%3E%3Cpath fill-rule=%22evenodd%22 d=%22M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z%22 clip-rule=%22evenodd%22/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%23635546%22%3E%3Cpath fill-rule=%22evenodd%22 d=%22M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z%22 clip-rule=%22evenodd%22/%3E%3C/svg%3E");
   background-position: right 0.25rem center;
   background-repeat: no-repeat;
   background-size: 1rem;

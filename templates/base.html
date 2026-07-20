@@ -40,11 +40,6 @@
 
   <link rel="icon" href="{% static 'pogo-lab.svg' %}" type="image/svg+xml">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" nonce="{{ request.csp_nonce }}">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
-
   {% block json_ld %}{% endblock %}
 
   {% block extra_css %}{% endblock %}
@@ -55,21 +50,21 @@
   <script src="{% static 'vendor/htmx.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:border-2 focus:border-slate-900 focus:bg-accent-500 focus:px-4 focus:py-2 focus:font-mono focus:text-white">
     {% trans "Saltar al contenido principal" %}
   </a>
 
-  <header class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/75 backdrop-blur-xl transition-colors duration-200 dark:border-slate-800/80 dark:bg-slate-950/75">
+  <header class="sticky top-0 z-50 border-b-2 border-slate-900 bg-white transition-colors duration-200 dark:border-slate-100 dark:bg-slate-950">
     <nav class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-      <a href="{% url 'healthz' %}" class="flex items-center gap-2.5 text-lg font-bold text-slate-800 transition-colors hover:text-brand-500 dark:text-slate-100 dark:hover:text-brand-400" {% if request.path == '/' or request.path == '/es/' or request.path == '/en/' %}aria-current="page"{% endif %}>
-        <span class="flex h-8 w-8 items-center justify-center text-brand-500 dark:text-brand-400" aria-hidden="true">
+      <a href="{% url 'healthz' %}" class="group flex items-center gap-2.5" {% if request.path == '/' or request.path == '/es/' or request.path == '/en/' %}aria-current="page"{% endif %}>
+        <span class="flex h-9 w-9 items-center justify-center border-2 border-slate-900 bg-white text-accent-500 transition-colors group-hover:bg-accent-500 group-hover:text-white dark:border-slate-100 dark:bg-slate-950" aria-hidden="true">
           {% include "includes/_logo_icon.html" %}
         </span>
-        <span class="hidden sm:inline">Pogo-lab</span>
+        <span class="hidden font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50 sm:inline">Pogo-lab</span>
       </a>
 
       <button id="menu-toggle" type="button"
-              class="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
+              class="inline-flex items-center justify-center border-2 border-slate-900 p-2 text-slate-900 hover:bg-slate-900 hover:text-white dark:border-slate-100 dark:text-slate-100 dark:hover:bg-slate-100 dark:hover:text-slate-900 sm:hidden"
               aria-label="{% trans "Abrir menú" %}"
               aria-expanded="false"
               aria-controls="nav-menu">
@@ -82,20 +77,20 @@
       </button>
 
       <div id="nav-menu"
-           class="hidden sm:flex sm:items-center sm:gap-1 max-sm:absolute max-sm:left-0 max-sm:right-0 max-sm:top-full max-sm:z-50 max-sm:mt-0 max-sm:border-b max-sm:border-slate-200 max-sm:bg-white/95 max-sm:p-4 max-sm:shadow-lg max-sm:backdrop-blur-xl dark:max-sm:border-slate-800 dark:max-sm:bg-slate-950/95"
+           class="hidden sm:flex sm:items-center sm:gap-1 max-sm:absolute max-sm:left-0 max-sm:right-0 max-sm:top-full max-sm:z-50 max-sm:mt-0 max-sm:border-b-2 max-sm:border-slate-900 max-sm:bg-white max-sm:p-4 dark:max-sm:border-slate-100 dark:max-sm:bg-slate-950"
            role="navigation" aria-label="{% trans "Navegación principal" %}">
         <a href="{% url 'calculator' %}"
-           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+           class="nav-link min-h-11 {% if '/calculadora/' in request.path or '/calculator/' in request.path %}nav-link--active{% endif %}"
            {% if '/calculadora/' in request.path or '/calculator/' in request.path %}aria-current="page"{% endif %}>
           {% trans "Calculadora" %}
         </a>
         <a href="{% url 'mechanic_list' %}"
-           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+           class="nav-link min-h-11 {% if '/mecanicas/' in request.path or '/mechanics/' in request.path %}nav-link--active{% endif %}"
            {% if '/mecanicas/' in request.path or '/mechanics/' in request.path %}aria-current="page"{% endif %}>
           {% trans "Mecánicas" %}
         </a>
         <a href="{% url 'dps_browser' %}"
-           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+           class="nav-link min-h-11 {% if '/dps/' in request.path %}nav-link--active{% endif %}"
            {% if '/dps/' in request.path %}aria-current="page"{% endif %}>
           DPS/TDO
         </a>
@@ -103,7 +98,7 @@
         <div class="ml-1 hidden sm:flex sm:items-center sm:gap-1 max-sm:mt-3 max-sm:w-full">
           <label for="language-selector" class="sr-only">{% trans "Idioma" %}</label>
           <select id="language-selector"
-                  class="block w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-700 placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400 pr-6 appearance-none select-chevron min-h-11">
+                  class="block w-full border-2 border-slate-900 bg-white px-2 py-2 font-mono text-xs uppercase tracking-wide text-slate-700 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent-500 dark:border-slate-100 dark:bg-slate-950 dark:text-slate-100 pr-6 appearance-none select-chevron min-h-11">
             {% for code, name in LANGUAGES %}
               <option value="{{ code }}" data-url="{% change_lang code %}" {% if code == LANGUAGE_CODE %}selected{% endif %}>
                 {{ name }}
@@ -120,7 +115,7 @@
 
         <div class="max-sm:mt-3 max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2">
           <button id="dark-toggle" type="button"
-                  class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11"
+                  class="nav-link min-h-11"
                   aria-label="{% trans "Alternar modo oscuro" %}"
                   title="{% trans "Alternar modo oscuro" %}">
             <svg id="sun-icon" class="hidden h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -133,13 +128,11 @@
           </button>
 
           {% if user.is_authenticated %}
-            <a href="{% url 'account_logout' %}"
-               class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 min-h-11">
+            <a href="{% url 'account_logout' %}" class="nav-link min-h-11">
               {% trans "Salir" %}
             </a>
           {% else %}
-            <a href="{% url 'account_login' %}"
-               class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 min-h-11">
+            <a href="{% url 'account_login' %}" class="btn-bracket min-h-11 bg-accent-500 text-white hover:bg-accent-600">
               {% trans "Entrar" %}
             </a>
           {% endif %}
@@ -152,59 +145,69 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="border-t border-slate-200 bg-white py-10 transition-colors duration-200 dark:border-slate-800 dark:bg-slate-950">
+  <footer class="border-t-2 border-slate-900 bg-white py-10 transition-colors duration-200 dark:border-slate-100 dark:bg-slate-950">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <div class="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
-            <span class="flex h-6 w-6 items-center justify-center text-brand-500 dark:text-brand-400" aria-hidden="true">
+          <div class="flex items-center gap-2 font-display text-base font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">
+            <span class="flex h-7 w-7 items-center justify-center border-2 border-slate-900 bg-white text-accent-500 dark:border-slate-100 dark:bg-slate-950" aria-hidden="true">
               {% include "includes/_logo_icon.html" %}
             </span>
             Pogo-lab
           </div>
-          <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+          <p class="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
             {% trans "Análisis estadístico honesto y trazable para las mecánicas de Pokémon GO." %}
           </p>
         </div>
 
         <div>
-          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <h3 class="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-accent-600 dark:text-accent-500">
             {% trans "Herramientas" %}
           </h3>
           <ul class="space-y-2">
-            <li><a href="{% url 'calculator' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Calculadora de IV" %}</a></li>
-            <li><a href="{% url 'mechanic_list' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Mecánicas" %}</a></li>
-            <li><a href="{% url 'dps_browser' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">DPS/TDO</a></li>
-            <li><a href="{% url 'trades:dashboard' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Dashboard" %}</a></li>
+            <li><a href="{% url 'calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Calculadora de IV" %}</a></li>
+            <li><a href="{% url 'cp_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "CP y Nivel" %}</a></li>
+            <li><a href="{% url 'cost_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Costo Power-Up" %}</a></li>
+            <li><a href="{% url 'pvp_ranker' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "PvP Ranker" %}</a></li>
+            <li><a href="{% url 'catch_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Captura" %}</a></li>
+            <li><a href="{% url 'type_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Efectividad de Tipos" %}</a></li>
+            <li><a href="{% url 'shiny_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Calculadora Shiny" %}</a></li>
+            <li><a href="{% url 'shadow_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Shadow vs Purified" %}</a></li>
+            <li><a href="{% url 'breakpoints_view' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Breakpoints PvE" %}</a></li>
+            <li><a href="{% url 'mechanic_list' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Mecánicas" %}</a></li>
+            <li><a href="{% url 'content_page' slug='cp-como-funciona' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Guía: CP y HP" %}</a></li>
+            <li><a href="{% url 'content_page' slug='iv-en-intercambios' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Guía: IV en intercambios" %}</a></li>
+            <li><a href="{% url 'dps_browser' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">DPS/TDO</a></li>
+            <li><a href="{% url 'trades:dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Dashboard" %}</a></li>
           </ul>
         </div>
 
         <div>
-          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <h3 class="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-accent-600 dark:text-accent-500">
             {% trans "Comunidad" %}
           </h3>
           <ul class="space-y-2">
-            <li><a href="{% url 'analysis_dashboard' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Análisis personal" %}</a></li>
-            <li><a href="{% url 'experiments:community_dashboard' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Dataset comunitario" %}</a></li>
+            <li><a href="{% url 'analysis_dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Análisis personal" %}</a></li>
+            <li><a href="{% url 'experiments:community_dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Dataset comunitario" %}</a></li>
             {% if user.is_authenticated %}
-              <li><a href="{% url 'trades:session_list' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Mis sesiones" %}</a></li>
+              <li><a href="{% url 'trades:session_list' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Mis sesiones" %}</a></li>
             {% endif %}
           </ul>
         </div>
 
         <div>
-          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <h3 class="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-accent-600 dark:text-accent-500">
             {% trans "Legal" %}
           </h3>
           <ul class="space-y-2">
-            <li><a href="{% url 'privacy' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Privacidad" %}</a></li>
-            <li><a href="{% url 'tos' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Términos" %}</a></li>
-            <li><a href="{% url 'disclaimer' %}" class="text-sm text-slate-600 transition-colors hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400">{% trans "Descargo" %}</a></li>
+            <li><a href="{% url 'privacy' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Privacidad" %}</a></li>
+            <li><a href="{% url 'tos' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Términos" %}</a></li>
+            <li><a href="{% url 'disclaimer' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Descargo" %}</a></li>
           </ul>
         </div>
       </div>
 
-      <div class="mt-10 border-t border-slate-100 pt-6 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
+      <div class="mt-10 border-t border-slate-200 pt-6 text-center font-mono text-[11px] uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-500">
         <p>Pogo-lab &mdash; {% trans "No afiliado a Niantic, The Pokémon Company, Nintendo ni Creatures Inc." %}</p>
         <p class="mt-1">{% trans "Los datos y análisis son proporcionados 'tal cual' con fines educativos." %}</p>
       </div>

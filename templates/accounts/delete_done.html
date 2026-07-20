@@ -5,17 +5,17 @@
 
 {% block content %}
 <div class="mx-auto mt-16 max-w-md text-center">
-  <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-hundo-50 text-hundo-500 dark:bg-hundo-500/20 dark:text-hundo-300">
+  <div class="mx-auto mb-6 flex h-16 w-16 items-center justify-center border-2 border-hundo-500 text-hundo-500 dark:border-hundo-400 dark:text-hundo-400">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
     </svg>
   </div>
-  <h1 class="mb-4 text-2xl font-bold text-slate-800 dark:text-slate-100">{% trans "Cuenta eliminada" %}</h1>
+  <h1 class="section-title justify-center">{% trans "Cuenta eliminada" %}</h1>
   <p class="mb-8 text-sm text-slate-500 dark:text-slate-400">
     {% trans "Tu cuenta y todos tus datos han sido eliminados." %}
   </p>
   <a href="{% url 'healthz' %}"
-     class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
+     class="btn-bracket bg-brand-500 text-white hover:bg-brand-600">
     {% trans "Volver al inicio" %}
   </a>
 </div>

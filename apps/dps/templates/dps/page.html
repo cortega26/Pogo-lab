@@ -37,12 +37,12 @@
   {% else %}
     {% include "dps/_type_grid.html" %}
     <div class="mt-6">
-      <div class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/30">
+      <div class="flex flex-wrap items-center gap-3 border-2 border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/30">
         <div class="flex items-center gap-2">
-          <label for="level-select" class="text-xs font-medium text-slate-500 dark:text-slate-400">{% trans "Nivel:" %}</label>
+          <label for="level-select" class="field-label mb-0">{% trans "Nivel:" %}</label>
           <select id="level-select"
                   name="level"
-                  class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  class="input-field w-auto py-1 text-xs"
                   hx-get="{{ request.path }}"
                   hx-target="#dps-results"
                   hx-swap="innerHTML"
@@ -59,7 +59,7 @@
           <input type="text"
                  name="q"
                  placeholder="{% trans "Buscar Pokémon…" %}"
-                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 placeholder-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:placeholder-slate-500"
+                 class="input-field py-1 text-xs"
                  hx-get="{{ request.path }}"
                  hx-target="#dps-results"
                  hx-swap="innerHTML"
@@ -68,7 +68,7 @@
         </div>
         <input type="hidden" name="tipo" value="{{ attack_type }}">
         <a href="{% url 'dps_moves' %}"
-           class="text-xs text-brand-600 hover:text-brand-500 dark:text-brand-400 dark:hover:text-brand-300 transition-colors">
+           class="font-mono text-xs uppercase tracking-wide text-brand-600 underline decoration-2 underline-offset-2 hover:text-brand-500 dark:text-brand-400 dark:hover:text-brand-300 transition-colors">
           {% trans "Movimientos" %}
         </a>
       </div>

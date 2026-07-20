@@ -14,29 +14,29 @@
 
   <div class="mb-4 flex flex-wrap items-center gap-3">
     <div class="flex items-center gap-2">
-      <label for="kind-filter" class="text-xs text-slate-500">{% trans "Tipo:" %}</label>
+      <label for="kind-filter" class="field-label mb-0">{% trans "Tipo:" %}</label>
       <select id="kind-filter"
-              class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              class="input-field w-auto py-1 text-xs"
               onchange="window.location.href='?kind='+this.value+'&sort={{ sort }}'">
         <option value="">{% trans "Todos" %}</option>
         <option value="fast" {% if kind_filter == 'fast' %}selected{% endif %}>{% trans "Rápidos" %}</option>
         <option value="charge" {% if kind_filter == 'charge' %}selected{% endif %}>{% trans "Cargados" %}</option>
       </select>
     </div>
-    <div class="flex items-center gap-2">
-      <label class="text-xs text-slate-500">{% trans "Orden:" %}</label>
-      <a href="?sort=dps{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="text-xs {% if sort == 'dps' %}text-brand-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">DPS</a>
-      <a href="?sort=power{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="text-xs {% if sort == 'power' %}text-brand-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Poder" %}</a>
-      <a href="?sort=name{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="text-xs {% if sort == 'name' %}text-brand-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Nombre" %}</a>
-      <a href="?sort=type{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="text-xs {% if sort == 'type' %}text-brand-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Tipo" %}</a>
-      <a href="?sort=duration{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="text-xs {% if sort == 'duration' %}text-brand-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Duración" %}</a>
+    <div class="flex items-center gap-2 font-mono text-xs uppercase tracking-wide">
+      <span class="text-slate-500">{% trans "Orden:" %}</span>
+      <a href="?sort=dps{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="{% if sort == 'dps' %}text-accent-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">DPS</a>
+      <a href="?sort=power{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="{% if sort == 'power' %}text-accent-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Poder" %}</a>
+      <a href="?sort=name{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="{% if sort == 'name' %}text-accent-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Nombre" %}</a>
+      <a href="?sort=type{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="{% if sort == 'type' %}text-accent-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Tipo" %}</a>
+      <a href="?sort=duration{% if kind_filter %}&kind={{ kind_filter }}{% endif %}" class="{% if sort == 'duration' %}text-accent-600 font-semibold{% else %}text-slate-500 hover:text-brand-500{% endif %}">{% trans "Duración" %}</a>
     </div>
   </div>
 
-  <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+  <div class="overflow-x-auto border-2 border-slate-900 dark:border-slate-100">
     <table class="w-full text-left text-sm">
       <thead>
-        <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+        <tr class="border-b-2 border-slate-900 bg-slate-50 font-mono text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-100 dark:bg-slate-800/50 dark:text-slate-400">
           <th class="px-4 py-3">{% trans "Nombre" %}</th>
           <th class="px-4 py-3">{% trans "Tipo" %}</th>
           <th class="px-4 py-3">{% trans "Clase" %}</th>
@@ -74,7 +74,7 @@
   </div>
 
   <div class="mt-6">
-    <a href="{% url 'dps_browser' %}" class="text-xs text-brand-600 hover:text-brand-500 dark:text-brand-400">
+    <a href="{% url 'dps_browser' %}" class="font-mono text-xs uppercase tracking-wide text-brand-600 underline decoration-2 underline-offset-2 hover:text-brand-500 dark:text-brand-400">
       ← {% trans "Volver al ranking DPS/TDO" %}
     </a>
   </div>

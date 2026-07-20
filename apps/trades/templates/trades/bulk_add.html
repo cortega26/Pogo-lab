@@ -7,32 +7,31 @@
 <div class="mx-auto max-w-2xl">
   <h1 class="section-title">{% trans "Añadir observaciones por lotes" %}</h1>
 
-  <form method="post" class="card p-6 mb-8">
+  <form method="post" class="specimen-card p-6 mb-8">
     {% csrf_token %}
 
     <div class="mb-4">
-      <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="observations_json">
+      <label class="field-label" for="observations_json">
         {% trans "JSON de observaciones" %}
       </label>
       <textarea name="observations_json" id="observations_json" rows="10"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-mono text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400"
+                class="input-field font-mono"
                 placeholder='[{"observed_at": "2026-07-17T12:00:00+00:00", "friendship_level": "best", "trade_type": "lucky", "atk": 12, "def": 15, "hp": 13, "species": "Mewtwo"}]'></textarea>
     </div>
 
-    <button type="submit"
-            class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2">
+    <button type="submit" class="btn-bracket bg-brand-500 text-white hover:bg-brand-600">
       {% trans "Guardar todas" %}
     </button>
   </form>
 
   {% if saved %}
-    <div class="mb-4 rounded-xl border border-hundo-50 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-500/20 dark:bg-hundo-500/10 dark:text-hundo-400">
+    <div class="mb-4 border-2 border-hundo-500 bg-hundo-50 p-4 text-sm text-hundo-600 dark:border-hundo-400 dark:bg-hundo-500/10 dark:text-hundo-400">
       <span class="font-semibold">✓</span> {% blocktrans count counter=created_count %}{{ counter }} observación guardada.{% plural %}{{ counter }} observaciones guardadas.{% endblocktrans %}
     </div>
   {% endif %}
 
   {% if error %}
-    <div class="mb-4 rounded-xl border border-danger-50 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
+    <div class="mb-4 border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
       {{ error }}
     </div>
   {% endif %}

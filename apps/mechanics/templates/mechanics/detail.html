@@ -39,38 +39,38 @@
 </div>
 
 {% if ruleset %}
-  <div class="rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-    <div class="border-b border-slate-200 bg-gradient-to-r from-brand-50 to-white px-6 py-4 dark:border-slate-800 dark:from-brand-800/30 dark:to-slate-900">
+  <div class="specimen-card overflow-hidden">
+    <div class="border-b-2 border-slate-900 bg-brand-50 px-6 py-4 dark:border-slate-100 dark:bg-brand-500/10">
       <h2 class="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100">
         {% trans "Reglas vigentes" %}
-        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-brand-100 text-brand-700 dark:bg-brand-800 dark:text-brand-200">v{{ ruleset.version }}</span>
+        <span class="inline-flex items-center gap-1 border border-brand-500 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">v{{ ruleset.version }}</span>
       </h2>
     </div>
 
     <div class="p-6">
       <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Versión" %}</dt>
-          <dd class="mt-1 text-lg font-bold font-mono text-slate-800 dark:text-slate-100">{{ ruleset.version }}</dd>
+        <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+          <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Versión" %}</dt>
+          <dd class="mt-1 font-mono text-lg font-bold text-slate-800 dark:text-slate-100">{{ ruleset.version }}</dd>
         </div>
-        <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-          <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Vigente desde" %}</dt>
+        <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+          <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Vigente desde" %}</dt>
           <dd class="mt-1 text-lg font-bold text-slate-800 dark:text-slate-100">{{ ruleset.effective_from|date:"SHORT_DATETIME_FORMAT" }}</dd>
         </div>
         {% if ruleset.effective_to %}
-          <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-            <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Vigente hasta" %}</dt>
+          <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+            <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Vigente hasta" %}</dt>
             <dd class="mt-1 text-lg font-bold text-slate-800 dark:text-slate-100">{{ ruleset.effective_to|date:"SHORT_DATETIME_FORMAT" }}</dd>
           </div>
         {% endif %}
         {% if ruleset.confidence_level %}
-          <div class="rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
-            <dt class="text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Nivel de confianza" %}</dt>
+          <div class="border-2 border-slate-200 p-4 dark:border-slate-800">
+            <dt class="font-mono text-xs font-medium tracking-wide uppercase text-slate-500 dark:text-slate-400">{% trans "Nivel de confianza" %}</dt>
             <dd class="mt-1">
-              <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold
-                {% if ruleset.confidence_level == 'confirmed' %}bg-hundo-50 text-hundo-600 dark:bg-hundo-500/20 dark:text-hundo-300
-                {% elif ruleset.confidence_level == 'community' %}bg-accent-50 text-accent-600 dark:bg-accent-500/20 dark:text-accent-300
-                {% else %}bg-brand-100 text-brand-700 dark:bg-brand-800 dark:text-brand-200{% endif %}">
+              <span class="inline-flex items-center gap-1 border px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide
+                {% if ruleset.confidence_level == 'confirmed' %}border-hundo-500 text-hundo-600 dark:text-hundo-400
+                {% elif ruleset.confidence_level == 'community' %}border-accent-500 text-accent-600 dark:text-accent-400
+                {% else %}border-brand-500 text-brand-600 dark:text-brand-400{% endif %}">
                 {{ ruleset.get_confidence_level_display }}
               </span>
             </dd>
@@ -79,17 +79,17 @@
       </dl>
 
       {% if ruleset.parameters.exists %}
-        <h3 class="mt-8 mb-4 text-base font-bold text-slate-700 dark:text-slate-300">{% trans "Parámetros" %}</h3>
-        <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-          <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+        <h3 class="field-label mt-8 mb-4 text-sm">{% trans "Parámetros" %}</h3>
+        <div class="overflow-x-auto border-2 border-slate-900 dark:border-slate-100">
+          <table class="min-w-full divide-y-2 divide-slate-200 dark:divide-slate-800">
             <thead class="bg-slate-100 dark:bg-slate-800">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Clave" %}</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Valor" %}</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Unidad" %}</th>
+                <th class="px-4 py-3 text-left font-mono text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Clave" %}</th>
+                <th class="px-4 py-3 text-left font-mono text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Valor" %}</th>
+                <th class="px-4 py-3 text-left font-mono text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{% trans "Unidad" %}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
+            <tbody class="divide-y-2 divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
               {% for param in ruleset.parameters.all %}
                 <tr class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
                   <td class="px-4 py-3 text-sm font-mono text-slate-700 dark:text-slate-300">{{ param.key }}</td>
@@ -106,24 +106,24 @@
 
   {% with claims=ruleset.claims.all %}
     {% if claims %}
-      <div class="mt-8 rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-        <div class="border-b border-slate-200 bg-gradient-to-r from-accent-50 to-white px-6 py-4 dark:border-slate-800 dark:from-accent-500/10 dark:to-slate-900">
+      <div class="specimen-card mt-8 overflow-hidden">
+        <div class="border-b-2 border-slate-900 bg-accent-50 px-6 py-4 dark:border-slate-100 dark:bg-accent-500/10">
           <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">
             {% trans "Fuentes y evidencia" %}
           </h2>
         </div>
-        <div class="divide-y divide-slate-100 dark:divide-slate-800">
+        <div class="divide-y-2 divide-slate-200 dark:divide-slate-800">
           {% for claim in claims %}
             <div class="p-5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30">
               <p class="text-sm text-slate-700 dark:text-slate-300">{{ claim.quote_summary }}</p>
               <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span class="font-medium text-slate-700 dark:text-slate-300">{{ claim.source.title }}</span>
                 {% if claim.source.source_type %}
-                  <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-secondary-50 text-secondary-600 dark:bg-secondary-500/20 dark:text-secondary-300">
+                  <span class="inline-flex items-center gap-1 border border-secondary-500 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-secondary-600 dark:text-secondary-400">
                     {{ claim.source.get_source_type_display }}
                   </span>
                 {% endif %}
-                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-accent-50 text-accent-600 dark:bg-accent-500/20 dark:text-accent-300">
+                <span class="inline-flex items-center gap-1 border border-accent-500 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent-600 dark:text-accent-400">
                   {% trans "Confianza:" %} {{ claim.get_confidence_level_display }}
                 </span>
               </div>
