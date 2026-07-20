@@ -41,6 +41,10 @@ exclude = ["*/migrations/*", "apps/accounts/signals.py"]
 "config/settings/test.py" = ["F403", "F405"]
 "apps/accounts/apps.py" = ["F401"]
 "apps/*/admin.py" = ["RUF012"]
+"apps/calculators/views.py" = ["RUF001"]
+"apps/content/management/commands/seed_content.py" = ["RUF001", "RUF002"]
+"engine/*.py" = ["RUF001", "RUF002"]
+"engine/tests/*.py" = ["RUF001", "RUF002"]
 
 [tool.ruff.format]
 quote-style = "double"
