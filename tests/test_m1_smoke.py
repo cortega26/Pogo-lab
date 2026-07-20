@@ -296,3 +296,104 @@ class TestLegalViews:
         data = response.json()
         assert "status" in data
         assert data["status"] == "ok"
+
+
+class TestNewCalculatorsSmoke:
+    """M8: las 5 nuevas calculadoras renderizan (GET) y calculan (POST)."""
+
+    def test_cp_calculator_get(self):
+        response = Client().get("/es/calculadora/cp/")
+        assert response.status_code == 200
+
+    def test_cp_calculator_post(self):
+        response = Client().post(
+            "/es/calculadora/cp/",
+            {"species": "pikachu", "level": "20.0", "iv_atk": "10", "iv_def": "10", "iv_stam": "10"},
+        )
+        assert response.status_code == 200
+        assert "CP" in response.content.decode() or "Resultados" in response.content.decode()
+
+    def test_cp_calculator_post_htmx(self):
+        response = Client().post(
+            "/es/calculadora/cp/",
+            {"species": "pikachu", "level": "20.0", "iv_atk": "10", "iv_def": "10", "iv_stam": "10"},
+            HTTP_HX_REQUEST="true",
+        )
+        assert response.status_code == 200
+
+    def test_cost_calculator_get(self):
+        response = Client().get("/es/calculadora/costos/")
+        assert response.status_code == 200
+
+    def test_cost_calculator_post(self):
+        response = Client().post(
+            "/es/calculadora/costos/",
+            {"from_level": "20.0", "to_level": "40.0"},
+        )
+        assert response.status_code == 200
+        assert "225000" in response.content.decode()
+
+    def test_pvp_ranker_get(self):
+        response = Client().get("/es/calculadora/pvp/")
+        assert response.status_code == 200
+
+    def test_pvp_ranker_post(self):
+        response = Client().post(
+            "/es/calculadora/pvp/",
+            {"species": "medicham", "league": "1500"},
+        )
+        assert response.status_code == 200
+        # should contain a ranking table
+        content = response.content.decode()
+        assert "Rank" in content or "Stat Product" in content or "15" in content
+
+    def test_catch_calculator_get(self):
+        response = Client().get("/es/calculadora/captura/")
+        assert response.status_code == 200
+
+    def test_catch_calculator_post(self):
+        response = Client().post(
+            "/es/calculadora/captura/",
+            {"species": "charmander", "level": "15.0", "ball": "1.0", "berry": "1.5",
+             "curveball": "1", "throw": "1.15", "medal": "1.3"},
+        )
+        assert response.status_code == 200
+        assert "%" in response.content.decode()
+
+    def test_type_calculator_get(self):
+        response = Client().get("/es/calculadora/tipos/")
+        assert response.status_code == 200
+
+    def test_type_calculator_post(self):
+        response = Client().post(
+            "/es/calculadora/tipos/",
+            {"def_type1": "dragon", "def_type2": "flying"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "ice" in content.lower() or "fairy" in content.lower()
+
+    def test_shiny_calculator_get(self):
+        response = Client().get("/es/calculadora/shiny/")
+        assert response.status_code == 200
+
+    def test_shiny_calculator_post(self):
+        response = Client().post(
+            "/es/calculadora/shiny/",
+            {"rate": "0.008", "n": "100", "confidence": "0.95"},
+        )
+        assert response.status_code == 200
+        assert "%" in response.content.decode()
+
+    def test_shadow_calculator_get(self):
+        response = Client().get("/es/calculadora/shadow/")
+        assert response.status_code == 200
+
+    def test_shadow_calculator_post(self):
+        response = Client().post(
+            "/es/calculadora/shadow/",
+            {"species": "machamp", "level": "40.0", "iv_atk": "15", "iv_def": "15", "iv_stam": "15"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Purified" in content or "Shadow" in content or "Ataque" in content

@@ -75,7 +75,7 @@ def test_visitor_calculates_hundo(live_server, seeded_mechanic):
         page.select_option("#confidence", "0.5")
         page.click("button[type=submit]")
 
-        page.wait_for_selector("#calc-results .font-medium", timeout=10000)
+        page.wait_for_selector("#calc-results .specimen-card", timeout=10000)
         content = page.text_content("#calc-results")
         assert content is not None
         assert "Piso (f)" in content
@@ -99,6 +99,7 @@ def test_visitor_creates_account(live_server):
         page.fill("input[name=email]", "signup_e2e@example.com")
         page.fill("input[name=password1]", "AComplexPass123!")
         page.fill("input[name=password2]", "AComplexPass123!")
+        page.check("input[name=age_confirmation]")
         page.click("button[type=submit]")
 
         page.wait_for_load_state("networkidle")
@@ -426,14 +427,14 @@ def test_share_url_reproduces_calculation(live_server, seeded_mechanic):
         page.select_option("#confidence", "0.5")
         page.click("button[type=submit]")
 
-        page.wait_for_selector("#calc-results .font-medium", timeout=10000)
+        page.wait_for_selector("#calc-results .specimen-card", timeout=10000)
         share_input = page.locator("#calc-results input[readonly]")
         share_value = share_input.input_value()
 
         assert "share=" in share_value
 
         page.goto(share_value)
-        page.wait_for_selector("#calc-results .font-medium", timeout=10000)
+        page.wait_for_selector("#calc-results .specimen-card", timeout=10000)
 
         content = page.text_content("#calc-results")
         assert content is not None
@@ -463,7 +464,7 @@ def test_htmx_recalculates_without_full_reload(live_server, seeded_mechanic):
         page.select_option("#confidence", "0.5")
 
         page.click("button[type=submit]")
-        page.wait_for_selector("#calc-results .font-medium", timeout=10000)
+        page.wait_for_selector("#calc-results .specimen-card", timeout=10000)
 
         title_after = page.title()
         assert title_before == title_after
@@ -482,4 +483,169 @@ def test_htmx_recalculates_without_full_reload(live_server, seeded_mechanic):
         n_val = page.input_value("#n")
         assert n_val == "10"
 
+        browser.close()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# M8 E2E — Nuevas calculadoras
+# ═══════════════════════════════════════════════════════════════════
+
+def test_cp_calculator_htmx(live_server):
+    """CP: HTMX recalcula sin recarga."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/cp/")
+        page.wait_for_load_state("networkidle")
+
+        title_before = page.title()
+        page.select_option("#cp-species", "mewtwo")
+        page.select_option("#cp-level", "40.0")
+        page.fill("#cp-iv-atk", "15")
+        page.fill("#cp-iv-def", "15")
+        page.fill("#cp-iv-stam", "15")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#cp-results .specimen-card", timeout=10000)
+        content = page.text_content("#cp-results")
+        assert content is not None
+        assert "4178" in content
+        assert "180" in content
+        assert title_before == page.title()
+        browser.close()
+
+
+def test_cost_calculator_htmx(live_server):
+    """Costo Power-Up: HTMX con totales."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/costos/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#cost-from", "20.0")
+        page.select_option("#cost-to", "40.0")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#cost-results .specimen-card", timeout=10000)
+        content = page.text_content("#cost-results")
+        assert content is not None
+        assert "225000" in content
+        browser.close()
+
+
+def test_pvp_ranker_htmx(live_server):
+    """PvP Ranker: HTMX top IVs Medicham GL."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/pvp/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#pvp-species", "medicham")
+        page.select_option("#pvp-league", "1500")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#pvp-results table", timeout=10000)
+        content = page.text_content("#pvp-results")
+        assert content is not None
+        assert "#1" in content
+        browser.close()
+
+
+def test_shiny_calculator_htmx(live_server):
+    """Shiny: HTMX probabilidad."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/shiny/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#shiny-rate", "0.008")
+        page.fill("#shiny-n", "100")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#shiny-results .specimen-card", timeout=10000)
+        content = page.text_content("#shiny-results")
+        assert content is not None
+        assert "%" in content
+        browser.close()
+
+
+def test_shadow_calculator_htmx(live_server):
+    """Shadow vs Purified: HTMX comparativa."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/shadow/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#shadow-species", "machamp")
+        page.select_option("#shadow-level", "40.0")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#shadow-results table", timeout=10000)
+        content = page.text_content("#shadow-results")
+        assert content is not None
+        assert "Purified" in content or "Ataque" in content
+        browser.close()
+
+
+def test_catch_calculator_htmx(live_server):
+    """Captura: HTMX con probabilidad %."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/captura/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#catch-species", "charmander")
+        page.select_option("#catch-level", "15.0")
+        page.check("input[name=curveball]")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#catch-results .specimen-card", timeout=10000)
+        content = page.text_content("#catch-results")
+        assert content is not None
+        assert "%" in content
+        browser.close()
+
+
+def test_type_calculator_htmx(live_server):
+    """Tipos: HTMX efectividad."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/tipos/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#type-def1", "dragon")
+        page.select_option("#type-def2", "flying")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#type-results .specimen-card", timeout=10000)
+        content = page.text_content("#type-results")
+        assert content is not None
+        assert "ice" in content.lower() or "fairy" in content.lower()
+        browser.close()
+
+
+def test_breakpoints_calculator_htmx(live_server):
+    """Breakpoints: HTMX tabla de niveles."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"{live_server.url}/es/calculadora/breakpoints/")
+        page.wait_for_load_state("networkidle")
+
+        page.select_option("#bp-species", "mewtwo")
+        page.select_option("#bp-move", "psycho_cut")
+        page.fill("#bp-iv", "15")
+        page.fill("#bp-def", "200")
+        page.click("button[type=submit]")
+
+        page.wait_for_selector("#bp-results table", timeout=10000)
+        content = page.text_content("#bp-results")
+        assert content is not None
+        assert "Nivel" in content or "Daño" in content or "ATK" in content
         browser.close()
