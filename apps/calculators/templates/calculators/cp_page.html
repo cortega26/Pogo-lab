@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Calculadora de CP — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Calcula el CP y HP de cualquier Pokémon en Pokémon GO a cualquier nivel y combinación de IVs. Datos verificados del Game Master." %}{% endblock %}
+{% block og_title %}{% trans "Calculadora de CP y Nivel — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Calcula el CP y HP de cualquier Pokémon a cualquier nivel e IVs." %}{% endblock %}
+{% block json_ld %}
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">
+{"@context":"https://schema.org","@type":"WebApplication","name":"{% trans "Calculadora de CP" %}","applicationCategory":"GameApplication","browserRequirements":"Requiere JavaScript para HTMX","url":"{{ request.build_absolute_uri }}"}
+</script>
+{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Calculadora de CP y Nivel" %}</h1>
+  <form hx-post="{% url 'cp_calculator' %}" hx-target="#cp-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div><label class="field-label" for="cp-species">{% trans "Especie" %}</label>
+        <select name="species" id="cp-species" class="input-field">
+          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="cp-level">{% trans "Nivel" %}</label>
+        <select name="level" id="cp-level" class="input-field">
+          {% for val, label in level_choices %}<option value="{{ val }}" {% if val|stringformat:".0f" == level|stringformat:".0f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="cp-iv-atk">{% trans "IV Ataque (0–15)" %}</label>
+        <input type="number" name="iv_atk" id="cp-iv-atk" value="{{ iv_atk }}" min="0" max="15" class="input-field font-mono"></div>
+      <div><label class="field-label" for="cp-iv-def">{% trans "IV Defensa (0–15)" %}</label>
+        <input type="number" name="iv_def" id="cp-iv-def" value="{{ iv_def }}" min="0" max="15" class="input-field font-mono"></div>
+      <div><label class="field-label" for="cp-iv-stam">{% trans "IV Stamina (0–15)" %}</label>
+        <input type="number" name="iv_stam" id="cp-iv-stam" value="{{ iv_stam }}" min="0" max="15" class="input-field font-mono"></div>
+    </div>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Calcular" %}</button>
+  </form>
+  <div id="cp-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_cp_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona una especie, nivel e IVs y presiona Calcular." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

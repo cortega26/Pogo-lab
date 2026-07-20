@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Breakpoints PvE — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Encuentra los niveles donde tu ataque rápido hace 1 punto más de daño contra un Boss de incursión en Pokémon GO." %}{% endblock %}
+{% block og_title %}{% trans "Breakpoints PvE — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Calculadora de breakpoints para raids en Pokémon GO." %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Breakpoints PvE" %}</h1>
+  <form hx-post="{% url 'breakpoints_view' %}" hx-target="#bp-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div><label class="field-label" for="bp-species">{% trans "Atacante" %}</label>
+        <select name="species" id="bp-species" class="input-field">
+          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="bp-move">{% trans "Fast Move" %}</label>
+        <select name="move" id="bp-move" class="input-field">
+          {% for val, label in move_choices %}<option value="{{ val }}" {% if val == move_key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="bp-iv">{% trans "IV Ataque (0–15)" %}</label>
+        <input type="number" name="iv_atk" id="bp-iv" value="{{ iv_atk }}" min="0" max="15" class="input-field font-mono"></div>
+      <div><label class="field-label" for="bp-def">{% trans "Defensa del Boss" %}</label>
+        <input type="number" name="defender_def" id="bp-def" value="{{ defender_def|floatformat:"0" }}" min="50" max="500" class="input-field font-mono" placeholder="200"></div>
+      <label class="flex items-end gap-2 pb-2 text-sm text-slate-600 dark:text-slate-400">
+        <input type="checkbox" name="weather" value="1" {% if weather %}checked{% endif %} class="h-4 w-4 rounded border-2 border-slate-300 text-accent-600">
+        {% trans "Clima potenciado (×1.2)" %}
+      </label>
+    </div>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Calcular breakpoints" %}</button>
+  </form>
+  <div id="bp-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_breakpoints_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona atacante, fast move e IV para ver los breakpoints." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

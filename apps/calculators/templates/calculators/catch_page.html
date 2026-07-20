@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Probabilidad de Captura — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Calcula la probabilidad de capturar un Pokémon salvaje según la especie, nivel, bola, baya, tipo de tiro y medallas." %}{% endblock %}
+{% block og_title %}{% trans "Calculadora de Captura — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Calcula la probabilidad de captura en Pokémon GO con todos los modificadores." %}{% endblock %}
+{% block json_ld %}
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">
+{"@context":"https://schema.org","@type":"WebApplication","name":"{% trans "Probabilidad de Captura" %}","applicationCategory":"GameApplication","browserRequirements":"Requiere JavaScript para HTMX","url":"{{ request.build_absolute_uri }}"}
+</script>
+{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Calculadora de Captura" %}</h1>
+  <form hx-post="{% url 'catch_calculator' %}" hx-target="#catch-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div><label class="field-label" for="catch-species">{% trans "Especie" %}</label>
+        <select name="species" id="catch-species" class="input-field">
+          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="catch-level">{% trans "Nivel" %}</label>
+        <select name="level" id="catch-level" class="input-field">
+          {% for val, label in level_choices %}<option value="{{ val }}" {% if val|stringformat:".0f" == level|stringformat:".0f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="catch-ball">{% trans "Poké Ball" %}</label>
+        <select name="ball" id="catch-ball" class="input-field">
+          {% for val, label in ball_choices %}<option value="{{ val }}" {% if val|stringformat:".1f" == ball|stringformat:".1f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="catch-berry">{% trans "Baya" %}</label>
+        <select name="berry" id="catch-berry" class="input-field">
+          {% for val, label in berry_choices %}<option value="{{ val }}" {% if val|stringformat:".1f" == berry|stringformat:".1f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="catch-throw">{% trans "Tiro" %}</label>
+        <select name="throw" id="catch-throw" class="input-field">
+          {% for val, label in throw_choices %}<option value="{{ val }}" {% if val|stringformat:".2f" == throw|stringformat:".2f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="catch-medal">{% trans "Medalla" %}</label>
+        <select name="medal" id="catch-medal" class="input-field">
+          {% for val, label in medal_choices %}<option value="{{ val }}" {% if val|stringformat:".1f" == medal|stringformat:".1f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <label class="mt-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+      <input type="checkbox" name="curveball" value="1" {% if curveball == 1.7 %}checked{% endif %} class="h-4 w-4 rounded border-2 border-slate-300 text-accent-600">
+      {% trans "Lanzamiento curvo (×1.7)" %}
+    </label>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Calcular" %}</button>
+  </form>
+  <div id="catch-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_catch_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Configura los modificadores y presiona Calcular." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

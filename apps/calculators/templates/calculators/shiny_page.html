@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Probabilidad de Shiny — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Calcula cuántos encuentros necesitas para tener cierta confianza de encontrar un Pokémon shiny en Pokémon GO." %}{% endblock %}
+{% block og_title %}{% trans "Calculadora de Shiny — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Probabilidad acumulada de encontrar un shiny según la tasa y número de encuentros." %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Calculadora de Shiny" %}</h1>
+  <form hx-post="{% url 'shiny_calculator' %}" hx-target="#shiny-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div><label class="field-label" for="shiny-rate">{% trans "Tasa shiny" %}</label>
+        <select name="rate" id="shiny-rate" class="input-field">
+          {% for val, label in rate_choices %}<option value="{{ val }}" {% if val|stringformat:".3f" == rate|stringformat:".3f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="shiny-n">{% trans "Encuentros (n)" %}</label>
+        <input type="number" name="n" id="shiny-n" value="{{ n }}" min="1" max="100000" class="input-field font-mono"></div>
+      <div><label class="field-label" for="shiny-conf">{% trans "Confianza objetivo" %}</label>
+        <select name="confidence" id="shiny-conf" class="input-field">
+          {% for val, label in confidence_choices %}<option value="{{ val }}" {% if val|stringformat:".2f" == confidence|stringformat:".2f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Calcular" %}</button>
+  </form>
+  <div id="shiny-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_shiny_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona la tasa shiny y el número de encuentros." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

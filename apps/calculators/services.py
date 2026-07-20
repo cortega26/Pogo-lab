@@ -229,3 +229,57 @@ def decode_share_url(encoded: str) -> CalcInput:
         confidence=float(payload.get("c", 0.5)),
         floor_override=floor_override,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Share URL genérico para todas las calculadoras
+# ══════════════════════════════════════════════════════════════════════════════
+
+GENERIC_SHARE_VERSION = "gv1"
+
+
+def encode_calc_share(calc_type: str, params: dict) -> str:
+    """Codifica parámetros de cualquier calculadora en un fragmento de URL.
+
+    Args:
+        calc_type: Tipo de calculadora (cp, cost, pvp, catch, types).
+        params: Diccionario con los parámetros (valores simples: str, int, float).
+
+    Returns:
+        Fragmento base64url para ?share=.
+    """
+    payload = {"v": GENERIC_SHARE_VERSION, "t": calc_type}
+    # Filtrar valores no serializables y convertir a tipos planos
+    for k, v in params.items():
+        if v is None:
+            continue
+        if isinstance(v, (str, int, float, bool)):
+            payload[k] = v
+
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    encoded = b64encode(raw.encode()).decode().rstrip("=").replace("+", "-").replace("/", "_")
+    return encoded
+
+
+def decode_calc_share(encoded: str) -> tuple[str, dict]:
+    """Decodifica un fragmento de URL genérico.
+
+    Returns:
+        Tupla (calc_type, params_dict).
+    """
+    try:
+        padded = encoded.replace("-", "+").replace("_", "/")
+        pad = 4 - len(padded) % 4
+        if pad != 4:
+            padded += "=" * pad
+        raw = b64decode(padded.encode()).decode()
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, Exception) as exc:
+        raise ValueError("URL de calculadora inválida") from exc
+
+    if payload.get("v") != GENERIC_SHARE_VERSION:
+        raise ValueError("Versión de URL no soportada")
+
+    calc_type = payload.pop("t")
+    payload.pop("v", None)
+    return calc_type, payload

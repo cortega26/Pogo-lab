@@ -1,0 +1,17 @@
+{% load i18n %}{% if result %}
+<div class="specimen-card p-6">
+  <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{% trans "Resultados" %}</h2>
+  <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div><dt class="field-label">{% trans "CP" %}</dt><dd class="font-mono text-3xl font-bold text-accent-600 dark:text-accent-400">{{ result.cp }}</dd></div>
+    <div><dt class="field-label">{% trans "HP" %}</dt><dd class="font-mono text-3xl font-bold text-slate-900 dark:text-slate-100">{{ result.hp }}</dd></div>
+    <div><dt class="field-label">{% trans "Stat Product" %}</dt><dd class="font-mono text-lg font-bold text-slate-900 dark:text-slate-100">{{ result.atk_eff }} × {{ result.def_eff }} × {{ result.stam_eff }}</dd></div>
+  </dl>
+  <p class="mt-4 font-mono text-xs text-slate-400 dark:text-slate-500">
+    {{ result.species|capfirst }} · {% trans "Nivel" %} {{ result.level }} · {{ result.iv_atk }}/{{ result.iv_def }}/{{ result.iv_stam }}
+  </p>
+  {% if share_url %}
+  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
+    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
+  {% endif %}
+</div>
+{% endif %}

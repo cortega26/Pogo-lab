@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Costo de Power-Up — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Calcula cuánto stardust y caramelos necesitas para subir un Pokémon de nivel. Incluye descuento Lucky y recargo Shadow." %}{% endblock %}
+{% block og_title %}{% trans "Calculadora de Costo de Power-Up — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Calcula cuánto stardust, caramelos y caramelos XL necesitas para subir de nivel." %}{% endblock %}
+{% block json_ld %}
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">
+{"@context":"https://schema.org","@type":"WebApplication","name":"{% trans "Costo Power-Up" %}","applicationCategory":"GameApplication","browserRequirements":"Requiere JavaScript para HTMX","url":"{{ request.build_absolute_uri }}"}
+</script>
+{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Calculadora de Costo de Power-Up" %}</h1>
+  <form hx-post="{% url 'cost_calculator' %}" hx-target="#cost-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div><label class="field-label" for="cost-from">{% trans "Nivel inicial" %}</label>
+        <select name="from_level" id="cost-from" class="input-field">
+          {% for val, label in level_choices %}<option value="{{ val }}" {% if val|stringformat:".0f" == from_level|stringformat:".0f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="cost-to">{% trans "Nivel objetivo" %}</label>
+        <select name="to_level" id="cost-to" class="input-field">
+          {% for val, label in level_choices %}<option value="{{ val }}" {% if val|stringformat:".0f" == to_level|stringformat:".0f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-4">
+      <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+        <input type="checkbox" name="is_lucky" value="1" {% if is_lucky %}checked{% endif %} class="h-4 w-4 rounded border-2 border-slate-300 text-accent-600">
+        {% trans "Pokémon Lucky (50% desc.)" %}
+      </label>
+      <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+        <input type="checkbox" name="is_shadow" value="1" {% if is_shadow %}checked{% endif %} class="h-4 w-4 rounded border-2 border-slate-300 text-accent-600">
+        {% trans "Pokémon Shadow (+20%)" %}
+      </label>
+    </div>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Calcular" %}</button>
+  </form>
+  <div id="cost-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_cost_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona los niveles y opciones y presiona Calcular." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

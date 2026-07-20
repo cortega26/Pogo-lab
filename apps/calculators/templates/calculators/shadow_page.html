@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Shadow vs Purified — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Compara el daño, CP y costo en stardust entre un Pokémon Shadow y su versión Purified en Pokémon GO." %}{% endblock %}
+{% block og_title %}{% trans "Shadow vs Purified — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Comparativa de daño PvE y costos entre Shadow y Purified." %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Shadow vs Purified" %}</h1>
+  <form hx-post="{% url 'shadow_calculator' %}" hx-target="#shadow-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div><label class="field-label" for="shadow-species">{% trans "Especie" %}</label>
+        <select name="species" id="shadow-species" class="input-field">
+          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="shadow-level">{% trans "Nivel" %}</label>
+        <select name="level" id="shadow-level" class="input-field">
+          {% for val, label in level_choices %}<option value="{{ val }}" {% if val|stringformat:".0f" == level|stringformat:".0f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="shadow-iv-atk">{% trans "IV Ataque" %}</label>
+        <input type="number" name="iv_atk" id="shadow-iv-atk" value="{{ iv_atk }}" min="0" max="15" class="input-field font-mono"></div>
+      <div><label class="field-label" for="shadow-iv-def">{% trans "IV Defensa" %}</label>
+        <input type="number" name="iv_def" id="shadow-iv-def" value="{{ iv_def }}" min="0" max="15" class="input-field font-mono"></div>
+      <div><label class="field-label" for="shadow-iv-stam">{% trans "IV Stamina" %}</label>
+        <input type="number" name="iv_stam" id="shadow-iv-stam" value="{{ iv_stam }}" min="0" max="15" class="input-field font-mono"></div>
+    </div>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Comparar" %}</button>
+  </form>
+  <div id="shadow-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_shadow_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona especie, nivel e IVs para comparar." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

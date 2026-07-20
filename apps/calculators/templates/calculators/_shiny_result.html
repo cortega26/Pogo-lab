@@ -1,0 +1,20 @@
+{% load i18n %}{% if result %}
+<div class="specimen-card p-6">
+  <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{% trans "Resultados" %}</h2>
+  <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div><dt class="field-label">{% trans "Probabilidad de al menos 1 shiny" %}</dt><dd class="font-mono text-3xl font-bold text-accent-600 dark:text-accent-400">{{ result.probability }}%</dd></div>
+    <div><dt class="field-label">{% trans "Probabilidad de 0 shiny" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.p_zero }}%</dd></div>
+    <div><dt class="field-label">{% trans "Shiny esperados" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.expected_shinies }}</dd></div>
+  </dl>
+  <p class="mt-4 font-mono text-sm text-slate-500 dark:text-slate-400">
+    {% blocktrans with n=result.n rate=result.rate_label %}En {{ n }} encuentros con tasa {{ rate }}{% endblocktrans %}
+  </p>
+  <p class="mt-2 font-mono text-sm text-slate-500 dark:text-slate-400">
+    {% blocktrans with conf=result.confidence|floatformat:2 enc=result.encounters_for_confidence %}Para {{ conf }}% de confianza necesitas ~{{ enc }} encuentros{% endblocktrans %}
+  </p>
+  {% if share_url %}
+  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
+    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
+  {% endif %}
+</div>
+{% endif %}

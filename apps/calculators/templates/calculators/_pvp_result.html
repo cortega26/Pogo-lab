@@ -1,0 +1,19 @@
+{% load i18n %}{% if result %}
+<div class="specimen-card p-6 overflow-x-auto">
+  <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{{ result.species|capfirst }} · {{ result.league_name }}</h2>
+  <p class="mt-1 font-mono text-xs text-slate-400 dark:text-slate-500">{{ result.total_ranked }} {% trans "combinaciones rankeadas" %}</p>
+  <table class="mt-4 w-full text-left font-mono text-sm">
+    <thead><tr class="border-b-2 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+      <th class="py-2 pr-2">{% trans "Rank" %}</th><th class="py-2 px-2">{% trans "IVs" %}</th><th class="py-2 px-2">{% trans "Nivel" %}</th><th class="py-2 px-2">{% trans "CP" %}</th><th class="py-2 pl-2 text-right">{% trans "Stat Product" %}</th>
+    </tr></thead>
+    <tbody>{% for s in result.spreads %}
+      <tr class="border-b border-slate-100 dark:border-slate-800 {% if forloop.first %}bg-accent-50 dark:bg-accent-500/10 font-bold text-accent-700 dark:text-accent-300{% endif %}">
+        <td class="py-1.5 pr-2">#{{ s.rank }}</td>
+        <td class="py-1.5 px-2">{{ s.atk }}/{{ s.def }}/{{ s.stam }}</td>
+        <td class="py-1.5 px-2">{{ s.level }}</td>
+        <td class="py-1.5 px-2">{{ s.cp }}</td>
+        <td class="py-1.5 pl-2 text-right">{{ s.stat_product }}</td>
+      </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endif %}

@@ -1,0 +1,20 @@
+{% load i18n %}{% if result %}
+<div class="specimen-card p-6">
+  <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{% trans "Costos" %}</h2>
+  <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div><dt class="field-label">{% trans "Polvo Estelar" %}</dt><dd class="font-mono text-2xl font-bold text-accent-600 dark:text-accent-400">{{ result.total_stardust|floatformat:"0" }}</dd></div>
+    <div><dt class="field-label">{% trans "Caramelos" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.total_candy }}</dd></div>
+    <div><dt class="field-label">{% trans "Caramelos XL" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.total_candy_xl }}</dd></div>
+    <div><dt class="field-label">{% trans "Power-Ups" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.power_ups }}</dd></div>
+  </dl>
+  <p class="mt-4 font-mono text-xs text-slate-400 dark:text-slate-500">
+    {% trans "Nivel" %} {{ result.from_level }} → {{ result.to_level }}
+    {% if result.is_lucky %}&middot; {% trans "Lucky" %}{% endif %}
+    {% if result.is_shadow %}&middot; {% trans "Shadow" %}{% endif %}
+  </p>
+  {% if share_url %}
+  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
+    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
+  {% endif %}
+</div>
+{% endif %}

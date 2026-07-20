@@ -1,0 +1,18 @@
+{% load i18n %}{% if result %}
+<div class="specimen-card p-6">
+  <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">
+    {% if result.def_type2 %}{{ result.def_type1|capfirst }} / {{ result.def_type2|capfirst }}{% else %}{{ result.def_type1|capfirst }}{% endif %}
+  </h2>
+  <div class="mt-4 grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
+    {% for w in result.weaknesses %}
+    <div class="flex items-center justify-between rounded px-3 py-1.5 text-sm font-mono
+      {% if w.effectiveness >= 1.6 %}bg-green-100 text-green-800 dark:bg-green-500/10 dark:text-green-300
+      {% elif w.effectiveness == 1.0 %}bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400
+      {% else %}bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-300{% endif %}">
+      <span>{{ w.type|capfirst }}</span>
+      <span class="font-bold">{{ w.label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

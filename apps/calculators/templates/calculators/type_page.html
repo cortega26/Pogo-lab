@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load i18n %}
+{% block title %}{% trans "Efectividad de Tipos — Pogo-lab" %}{% endblock %}
+{% block description %}{% trans "Consulta la matriz de efectividad de tipos en Pokémon GO. Descubre debilidades, resistencias e inmunidades para los 18 tipos." %}{% endblock %}
+{% block og_title %}{% trans "Matriz de Efectividad de Tipos — Pogo-lab" %}{% endblock %}
+{% block og_description %}{% trans "Debilidades, resistencias y efectividad de los 18 tipos en Pokémon GO." %}{% endblock %}
+{% block json_ld %}
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">
+{"@context":"https://schema.org","@type":"WebApplication","name":"{% trans "Efectividad de Tipos" %}","applicationCategory":"GameApplication","browserRequirements":"Requiere JavaScript para HTMX","url":"{{ request.build_absolute_uri }}"}
+</script>
+{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <h1 class="section-title">{% trans "Matriz de Efectividad de Tipos" %}</h1>
+  <form hx-post="{% url 'type_calculator' %}" hx-target="#type-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
+    {% csrf_token %}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div><label class="field-label" for="type-def1">{% trans "Tipo defensivo 1" %}</label>
+        <select name="def_type1" id="type-def1" class="input-field">
+          {% for val, label in type_choices %}<option value="{{ val }}" {% if val == def_type1 %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div><label class="field-label" for="type-def2">{% trans "Tipo defensivo 2 (opcional)" %}</label>
+        <select name="def_type2" id="type-def2" class="input-field">
+          <option value="">{% trans "— Ninguno —" %}</option>
+          {% for val, label in type_choices %}<option value="{{ val }}" {% if val == def_type2 %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></div>
+    </div>
+    <button type="submit" class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600">{% trans "Ver efectividad" %}</button>
+  </form>
+  <div id="type-results">
+    {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
+    {% elif result %}{% include "calculators/_type_result.html" %}
+    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona el tipo defensivo y presiona Ver efectividad." %}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% load i18n %}{% if result %}
+<div class="specimen-card p-6 overflow-x-auto">
+  <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">
+    {{ result.species|capfirst }} · {% trans "Nivel" %} {{ result.level }} · {{ result.iv_atk }}/{{ result.iv_def }}/{{ result.iv_stam }}
+  </h2>
+  <p class="mt-1 font-mono text-sm text-slate-500 dark:text-slate-400">{% trans "CP" %} {{ result.cp }} · {% trans "HP" %} {{ result.hp }}</p>
+  <table class="mt-4 w-full text-left font-mono text-sm">
+    <thead><tr class="border-b-2 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+      <th class="py-2 pr-2"></th><th class="py-2 px-2 text-accent-600 dark:text-accent-400">{% trans "Purified" %}</th><th class="py-2 px-2 text-red-600 dark:text-red-400">{% trans "Shadow" %}</th><th class="py-2 pl-2">{% trans "Diferencia" %}</th>
+    </tr></thead>
+    <tbody>
+      <tr class="border-b border-slate-100 dark:border-slate-800"><td class="py-1.5 pr-2">{% trans "Ataque PvE" %}</td><td class="py-1.5 px-2">{{ result.atk_purified }}</td><td class="py-1.5 px-2 font-bold text-red-600 dark:text-red-400">{{ result.atk_shadow }}</td><td class="py-1.5 pl-2 font-bold text-red-600">+{{ result.damage_advantage }}%</td></tr>
+      <tr class="border-b border-slate-100 dark:border-slate-800"><td class="py-1.5 pr-2">{% trans "Stardust (L1→nivel)" %}</td><td class="py-1.5 px-2">{{ result.dust_purified|floatformat:"0" }}</td><td class="py-1.5 px-2 font-bold text-red-600">{{ result.dust_shadow|floatformat:"0" }}</td><td class="py-1.5 pl-2 text-red-600">+{{ result.dust_shadow|add:result.dust_purified|floatformat:"0" }}</td></tr>
+      <tr><td class="py-1.5 pr-2">{% trans "Caramelos (L1→nivel)" %}</td><td class="py-1.5 px-2">{{ result.candy_purified }}</td><td class="py-1.5 px-2 font-bold text-red-600">{{ result.candy_shadow }}</td><td class="py-1.5 pl-2 text-red-600">+{{ result.candy_shadow|add:result.candy_purified }}</td></tr>
+    </tbody>
+  </table>
+  {% if share_url %}
+  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
+    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
+  {% endif %}
+</div>
+{% endif %}

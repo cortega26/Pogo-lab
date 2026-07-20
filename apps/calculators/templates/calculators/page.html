@@ -32,17 +32,16 @@
         hx-target="#calc-results"
         hx-swap="innerHTML"
         hx-indicator="#calc-results"
-        class="card p-6 mb-8">
+        class="specimen-card p-6 mb-8">
 
     {% csrf_token %}
 
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="friendship_level">
+        <label class="field-label" for="friendship_level">
           {% trans "Nivel de amistad" %}
         </label>
-        <select name="friendship_level" id="friendship_level"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <select name="friendship_level" id="friendship_level" class="input-field">
           {% for val, label in friendship_choices %}
             <option value="{{ val }}">{{ label }}</option>
           {% endfor %}
@@ -50,11 +49,10 @@
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="trade_type">
+        <label class="field-label" for="trade_type">
           {% trans "Tipo de intercambio" %}
         </label>
-        <select name="trade_type" id="trade_type"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <select name="trade_type" id="trade_type" class="input-field">
           {% for val, label in trade_type_choices %}
             <option value="{{ val }}">{{ label }}</option>
           {% endfor %}
@@ -62,19 +60,17 @@
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="n">
+        <label class="field-label" for="n">
           {% trans "Número de intercambios (n)" %}
         </label>
-        <input type="number" name="n" id="n" value="1" min="1" max="100000"
-               class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <input type="number" name="n" id="n" value="1" min="1" max="100000" class="input-field font-mono">
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="target_kind">
+        <label class="field-label" for="target_kind">
           {% trans "Objetivo" %}
         </label>
-        <select name="target_kind" id="target_kind"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <select name="target_kind" id="target_kind" class="input-field">
           {% for val, label in target_choices %}
             <option value="{{ val }}">{{ label }}</option>
           {% endfor %}
@@ -82,19 +78,17 @@
       </div>
 
       <div id="threshold-group" class="hidden">
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="threshold">
+        <label class="field-label" for="threshold">
           {% trans "Umbral" %}
         </label>
-        <input type="number" name="threshold" id="threshold" value="42" min="0" max="45"
-               class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <input type="number" name="threshold" id="threshold" value="42" min="0" max="45" class="input-field font-mono">
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300" for="confidence">
+        <label class="field-label" for="confidence">
           {% trans "Nivel de confianza" %}
         </label>
-        <select name="confidence" id="confidence"
-                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm placeholder-slate-400 transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400">
+        <select name="confidence" id="confidence" class="input-field">
           <option value="0.5">50%</option>
           <option value="0.75">75%</option>
           <option value="0.9">90%</option>
@@ -105,7 +99,7 @@
     </div>
 
     <button type="submit"
-            class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-150 bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            class="btn-bracket mt-5 bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6"/>
       </svg>
@@ -115,7 +109,7 @@
 
   <div id="calc-results">
     {% if error %}
-      <div class="rounded-xl border border-danger-50 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
+      <div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
         <span class="font-semibold">{% trans "Error:" %}</span> {{ error }}
       </div>
     {% elif result %}
