@@ -49,3 +49,26 @@ perdidas después de un reinicio.
 
 - [ ] Subir backups a OCI Object Storage (capa gratuita, 10 GB).
 - [ ] Repetir el procedimiento completo de disaster recovery periódicamente.
+
+## Monitor de capacidad OCI Ampere A1
+
+El workflow [`oci-a1-capacity-monitor.yml`](../.github/workflows/oci-a1-capacity-monitor.yml)
+consulta cada cinco minutos la capacidad de `VM.Standard.A1.Flex`; no crea instancias, redes ni discos.
+Cuando OCI responde `AVAILABLE`, abre un issue de GitHub y, si se configuró, envía un webhook compatible
+con Slack o Discord. Al volver a no haber capacidad cierra el issue para que una disponibilidad futura
+genere una alerta nueva.
+
+Configura estos **Actions secrets** en el repositorio:
+
+- `OCI_USER_OCID`, `OCI_TENANCY_OCID`, `OCI_FINGERPRINT`, `OCI_PRIVATE_KEY` y `OCI_REGION`.
+- `OCI_COMPARTMENT_OCID` es opcional; si se omite se consulta el compartimento raíz de la tenancy.
+- `OCI_CAPACITY_WEBHOOK_URL` es opcional para la notificación adicional. Sin él, se usa el issue de GitHub;
+  activa las notificaciones de *Issues* del repositorio para recibirlo por correo o en la aplicación.
+
+El workflow vigila exclusivamente `2 OCPU / 12 GB`, la asignación Always Free vigente para A1. No acepta
+variables de repositorio que cambien ese tamaño, para no convertir por error el monitor en una comprobación
+de recursos PAYG.
+
+GitHub ejecuta los cron aproximadamente cada cinco minutos, pero no garantiza puntualidad absoluta. El
+workflow se activa una vez que el archivo esté en la rama por defecto; se puede probar antes desde
+**Actions → Monitor de capacidad OCI A1 → Run workflow**.

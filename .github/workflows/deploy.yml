@@ -33,7 +33,9 @@ jobs:
             echo "Despliegue completado en $(date -Iseconds)"
 
 # Setup inicial en OCI (una sola vez):
-# 1. Crear VM ARM Ampere A1 (4 OCPU, 24 GB) en la capa gratuita de OCI:
+# 1. Crear una VM ARM Ampere A1 dentro del límite Always Free vigente
+#    (2 OCPU, 12 GB). Una configuración de 4 OCPU / 24 GB excede ese límite
+#    y puede facturarse bajo PAYG:
 #    https://cloud.oracle.com/compute/instances
 # 2. Instalar Python 3.13, uv, PostgreSQL y nginx en la VM.
 # 3. Clonar el repo: git clone <repo-url> /opt/pogo-lab

@@ -62,7 +62,7 @@
 | S5 | **Django templates + HTMX** cubren toda la interactividad (calculadora, entrada rápida, dashboard) sin SPA | §7 lo prefiere explícitamente | Alto | Bajo | Spike de calculadora HTMX en M3; si friccionara, Alpine puntual |
 | S6 | **CSS: Tailwind vía standalone CLI** (binario, sin cadena Node en runtime) | §7 permite Tailwind "si mejora productividad sin complicar el build" | Bajo | Bajo | Si el binario molesta, fallback a CSS propio con tokens; reversible |
 | S7 | **Auth propia de Django + django-allauth** (email+password, verificación de email, reset), **sin** social login en MVP | §7 y §10 | Medio | Bajo | allauth es estándar; social login se añade luego sin migración |
-| S8 | **Deploy en VPS Oracle Cloud Infrastructure** (ARM Ampere A1, capa gratuita) + Docker Compose | Elección del usuario ("Oracle Cloud") | Medio | Bajo | Decidido en ADR-0009; contenedor portable a PaaS/VPS si fuera necesario |
+| S8 | **Deploy en VPS Oracle Cloud Infrastructure** (ARM Ampere A1 2 OCPU / 12 GB Always Free) + Docker Compose | Elección del usuario ("Oracle Cloud") | Medio | Bajo | Decidido en ADR-0009; contenedor portable a PaaS/VPS si fuera necesario |
 | S9 | **CSV** es el formato de import/export (no XLSX) | §4.4/§13; simplicidad y anti-injection | Bajo | Bajo | Documentar plantilla CSV; sanitizar contra spreadsheet injection al exportar |
 | S10 | **Chart.js autohospedado** para gráficos, con tabla/`aria` de respaldo | §7/§11 | Bajo | Bajo | Cargar diferido; verificar accesibilidad |
 | S11 | El país agregado es el único dato geográfico; **sin ubicación precisa, sin nombre de entrenador** | §4.8/§10 | Medio (privacidad) | Bajo | Revisión de privacidad; minimización de PII |
@@ -759,7 +759,7 @@ metadata SEO · criterio de aceptación. Todas es/en (pt preparado), SSR e index
   descarga pública del dataset (empezar con dashboard de solo lectura); verificación de email a M7.
 - **Spikes antes de comprometer:** (a) calculadora HTMX + share URL (confirma S5, ~medio día); (b) Tailwind
   standalone CLI en el pipeline de assets (confirma S6). Ambos en M1/M3, baratos y reversibles.
-- **Hosting decidido (2026-07-17):** **Oracle Cloud Infrastructure (OCI)** en capa gratuita — ARM Ampere A1 (4 OCPU, 24 GB) + Docker Compose (ADR-0009).
+- **Hosting decidido (2026-07-17, actualizado 2026-07-23):** **Oracle Cloud Infrastructure (OCI)** en capa gratuita — ARM Ampere A1 (2 OCPU, 12 GB) + Docker Compose (ADR-0009). Una configuración de 4 OCPU / 24 GB requiere PAYG.
 - **Contradicción/debilidad señalada de la spec:** el alcance completo M0–M7 (elegido) mete el **dataset comunitario
   (M6)** —con su carga de privacidad, consentimiento y moderación— dentro del MVP. Recomiendo construir M6 pero
   **lanzar su dashboard en solo lectura primero** y activar la descarga pública únicamente tras verificar
