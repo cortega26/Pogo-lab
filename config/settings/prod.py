@@ -12,6 +12,13 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 RATELIMIT_IP_META_KEY = "HTTP_X_REAL_IP"
 
+# allauth rate limiting (login/verify) usa este header para identificar al cliente.
+# Debe coincidir con el header que nginx envía tras set_real_ip_from (X-Real-IP).
+# Sin esto, allauth cae a REMOTE_ADDR (127.0.0.1 tras el proxy) y todos los
+# usuarios comparten un mismo bucket de rate limit.
+# Nota: allauth prefix es ALLAUTH_ (ver allauth.app_settings.AppSettings.prefix).
+ALLAUTH_TRUSTED_CLIENT_IP_HEADER = "X-Real-IP"
+
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
