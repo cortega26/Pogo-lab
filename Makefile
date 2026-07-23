@@ -1,9 +1,18 @@
-.PHONY: bootstrap migrate seed test run lint typecheck coverage precommit clean tailwind-install tailwind-build tailwind-watch
+.PHONY: bootstrap migrate seed test run lint typecheck coverage precommit clean tailwind-install tailwind-build tailwind-watch test-postgres
 
 bootstrap: .venv compose.yaml
 	uv sync
 	cp -n .env.example .env 2>/dev/null || true
+	docker compose up -d db
+	@echo "Esperando PostgreSQL..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		uv run python -c "import psycopg; psycopg.connect('host=localhost port=5433 dbname=pogo user=pogo')" 2>/dev/null && break; \
+		echo "  Intento $$i/10..."; sleep 2; \
+	done
 	uv run python manage.py migrate
+	uv run python manage.py seed
+	uv run python manage.py check
+	@echo "Bootstrap completado. Ejecuta 'make run' para iniciar el servidor."
 
 .venv:
 	uv sync
@@ -16,6 +25,9 @@ seed:
 
 test:
 	uv run pytest
+
+test-postgres:
+	DJANGO_SETTINGS_MODULE=config.settings.test_postgres DATABASE_URL=postgres://pogo:pogo@localhost:5433/pogo_test uv run pytest -m postgres --no-header -q --tb=short
 
 run:
 	uv run python manage.py runserver

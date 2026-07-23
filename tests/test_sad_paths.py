@@ -4,9 +4,16 @@ Cada calculadora debe devolver 200 con mensaje de error, nunca 500.
 """
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import Client
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def user(db):
+    user_model = get_user_model()
+    return user_model.objects.create_user(email="sad@example.com", password="pass123")
 
 
 class TestSadPathIV:
@@ -187,3 +194,25 @@ class TestSadPathBreakpoints:
 
     def test_empty(self):
         assert Client().post("/es/calculadora/breakpoints/", {}).status_code == 200
+
+
+class TestBulkAddSadPath:
+    """Plan 055: inputs estructuralmente inválidos devuelven 4xx."""
+
+    def test_bulk_with_null_item(self, client, user):
+        """[null] en JSON no produce 500."""
+        client.force_login(user)
+        r = client.post(
+            "/es/intercambios/lotes/",
+            data={"observations_json": "[null]"},
+        )
+        assert r.status_code == 400
+
+    def test_bulk_with_non_dict_item(self, client, user):
+        """[42] en JSON no produce 500."""
+        client.force_login(user)
+        r = client.post(
+            "/es/intercambios/lotes/",
+            data={"observations_json": "[42]"},
+        )
+        assert r.status_code == 400

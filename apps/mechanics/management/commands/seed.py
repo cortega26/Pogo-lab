@@ -35,10 +35,13 @@ class Command(BaseCommand):
     help = "Siembra datos iniciales: mecánica trade_iv, rulesets, fuentes y claims."
 
     @transaction.atomic
-    def handle(self, *args, **options):  # noqa: ARG002
+    def handle(self, *args: Any, **options: Any) -> None:  # noqa: ARG002
         self._create_site()
         self._create_trade_iv()
         self._create_content_pages()
+        from django.core.management import call_command
+
+        call_command("seed_content")
         self.stdout.write(self.style.SUCCESS("Seed completado exitosamente."))
 
     def _create_site(self):

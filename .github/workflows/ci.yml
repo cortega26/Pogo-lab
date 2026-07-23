@@ -63,6 +63,52 @@ jobs:
       - name: Security audit
         run: uv run pip-audit
 
+  test-postgres:
+    needs: test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pogo
+          POSTGRES_PASSWORD: pogo
+          POSTGRES_DB: pogo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pogo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run migrations on PostgreSQL
+        run: uv run python manage.py migrate --noinput
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test_postgres
+          DATABASE_URL: postgres://pogo:pogo@localhost:5432/pogo_test
+
+      - name: PostgreSQL-gated tests
+        run: uv run pytest -m postgres --no-header -q --tb=short
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test_postgres
+          DATABASE_URL: postgres://pogo:pogo@localhost:5432/pogo_test
+
   e2e:
     needs: test
     runs-on: ubuntu-latest

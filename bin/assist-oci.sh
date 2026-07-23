@@ -212,8 +212,10 @@ OCI_COMPARTMENT_OCID=$OCI_COMPARTMENT_OCID
 OCI_SUBNET_OCID=$OCI_SUBNET_OCID
 
 OCI_VM_SHAPE=VM.Standard.A1.Flex
-OCI_VM_OCPUS=4
-OCI_VM_MEMORY_GB=24
+# Límite Always Free vigente. Para 4/24 hay que sobreescribir ambas variables
+# de forma explícita y aceptar el consumo PAYG que exceda esta asignación.
+OCI_VM_OCPUS=2
+OCI_VM_MEMORY_GB=12
 OCI_VM_DISK_GB=100
 OCI_VM_DISPLAY_NAME=pogo-lab-prod
 OCI_VM_OS_IMAGE=Canonical Ubuntu 22.04

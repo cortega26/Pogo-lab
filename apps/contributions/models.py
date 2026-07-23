@@ -113,6 +113,13 @@ def _default_criteria() -> dict:
 
 
 class DatasetVersion(TimestampedModel):
+    PUBLICATION_STATUS_CHOICES = (
+        ("draft", _("Borrador")),
+        ("public", _("Público")),
+        ("quarantined", _("Cuarentena")),
+        ("retracted", _("Retractado")),
+    )
+
     number = models.PositiveIntegerField(unique=True)
     built_at = models.DateTimeField(auto_now_add=True)
     criteria = models.JSONField(default=_default_criteria)
@@ -120,6 +127,14 @@ class DatasetVersion(TimestampedModel):
     row_count = models.PositiveIntegerField(default=0)
     checksum = models.CharField(max_length=64, blank=True, default="")
     is_public = models.BooleanField(default=False)
+    publication_status = models.CharField(
+        max_length=16,
+        choices=PUBLICATION_STATUS_CHOICES,
+        default="draft",
+    )
+    moderation_reason = models.TextField(blank=True, default="")
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    consent_text_version = models.CharField(max_length=32, blank=True, default="")
     pipeline_version = models.CharField(max_length=32, blank=True, default="")
     anonymized_rows = models.JSONField(null=True, blank=True, default=None)
 
@@ -143,10 +158,18 @@ class DatasetVersion(TimestampedModel):
                 )
 
     def _is_meta_only_update(self, original: "DatasetVersion") -> bool:
-        """Permite actualizar flags operativos (is_public, min_sample_met) sin
-        romper la inmutabilidad del contenido."""
+        """Permite actualizar flags operativos (is_public, min_sample_met,
+        publication_status, moderation_reason, moderated_at) sin romper
+        la inmutabilidad del contenido."""
         for field in self._meta.get_fields():
-            if field.name in ("is_public", "min_sample_met", "updated_at"):
+            if field.name in (
+                "is_public",
+                "min_sample_met",
+                "publication_status",
+                "moderation_reason",
+                "moderated_at",
+                "updated_at",
+            ):
                 continue
             if getattr(self, field.name) != getattr(original, field.name):
                 return False

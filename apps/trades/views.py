@@ -160,6 +160,13 @@ def bulk_add(request: HttpRequest) -> HttpResponse:
 
         observations = []
         for item in data:
+            if not isinstance(item, dict):
+                return render(
+                    request,
+                    "trades/bulk_add.html",
+                    {"error": "Cada elemento debe ser un objeto JSON"},
+                    status=400,
+                )
             try:
                 observed_at_str = item.get("observed_at", "")
                 if observed_at_str:
@@ -189,10 +196,16 @@ def bulk_add(request: HttpRequest) -> HttpResponse:
                 )
 
         created = bulk_create_observations(observations)
+        created_new = [o for o in created if getattr(o, "_is_new", True)]
+        duplicate_count = len(created) - len(created_new)
         return render(
             request,
             "trades/bulk_add.html",
-            {"created_count": len(created), "saved": True},
+            {
+                "created_count": len(created_new),
+                "duplicate_count": duplicate_count,
+                "saved": True,
+            },
         )
 
     return render(request, "trades/bulk_add.html")
@@ -229,22 +242,43 @@ def csv_import(request: HttpRequest) -> HttpResponse:
                     "trades/csv_import.html",
                     {"preview": preview, "error": error},
                 )
+            from apps.trades.services import MAX_CSV_BYTES
+
+            if uploaded.size and uploaded.size > MAX_CSV_BYTES:
+                error = f"El archivo excede el límite de {MAX_CSV_BYTES // 1024} KB."
+                return render(
+                    request,
+                    "trades/csv_import.html",
+                    {"preview": preview, "error": error},
+                    status=413,
+                )
             try:
                 content = uploaded.read().decode("utf-8-sig")
             except UnicodeDecodeError:
                 error = "El archivo no es un CSV de texto UTF-8 válido."
             else:
-                result = import_csv(content, owner_id)
-                preview = result
-                if result["error_count"] == 0:
-                    error = f"Importados {result['valid_count']} registros correctamente."
+                if len(content) > MAX_CSV_BYTES:
+                    error = f"El archivo excede el límite de {MAX_CSV_BYTES // 1024} KB."
                 else:
-                    error_lines = "\n".join(result["errors"][:10])
-                    error = (
-                        f"Procesados {result['total']} filas. "
-                        f"{result['valid_count']} validas, {result['error_count']} errores.\n"
-                        f"Errores:\n{error_lines}"
-                    )
+                    result = import_csv(content, owner_id)
+                    preview = result
+                    if result["error_count"] == 0 and result["duplicate_count"] == 0:
+                        error = f"Importados {result['created_count']} registros correctamente."
+                    elif result["duplicate_count"] > 0:
+                        error = (
+                            f"Procesados {result['total']} filas. "
+                            f"{result['created_count']} creadas, "
+                            f"{result['duplicate_count']} duplicadas, "
+                            f"{result['error_count']} errores."
+                        )
+                    else:
+                        error_lines = "\n".join(result["errors"][:10])
+                        error = (
+                            f"Procesados {result['total']} filas. "
+                            f"{result['created_count']} creadas, "
+                            f"{result['error_count']} errores.\n"
+                            f"Errores:\n{error_lines}"
+                        )
 
     return render(
         request,

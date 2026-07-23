@@ -10,7 +10,6 @@ def _seed():
     now = timezone.now()
     pages = [
         _cp(),
-        _iv_trade(),
         _catch(),
         _pvp(),
         _shadow(),
@@ -42,17 +41,6 @@ def _cp():
         "body_es": "<h2>Fórmula de CP</h2><pre>CP = max(10, floor(Atk × √Def × √Sta × CPM² / 10))</pre><p>Donde Atk, Def, Sta = (base + IV) × CPM. El CPM es una tabla de 109 valores que aumenta con el nivel (0.094 a 0.865).</p><h2>Fórmula de HP</h2><pre>HP = max(10, floor(Sta × CPM))</pre><p>Fuente: comunidad (GamePress), verificada por datamining. Alta confianza.</p>",
         "title_en": "How CP and HP are calculated",
         "body_en": "<h2>CP Formula</h2><pre>CP = max(10, floor(Atk × √Def × √Sta × CPM² / 10))</pre><p>Where Atk, Def, Sta = (base + IV) × CPM. CPM is a table of 109 values increasing with level (0.094 to 0.865).</p><h2>HP Formula</h2><pre>HP = max(10, floor(Sta × CPM))</pre><p>Source: community (GamePress), verified via datamining. High confidence.</p>",
-    }
-
-
-def _iv_trade():
-    return {
-        "slug": "iv-en-intercambios",
-        "page_type": "mechanics",
-        "title_es": "IV en intercambios: pisos y probabilidades",
-        "body_es": "<h2>Pisos de IV por amistad</h2><ul><li>Good: f=1</li><li>Great: f=2</li><li>Ultra: f=3</li><li>Best: f=5</li><li>Lucky: f=12</li></ul><h2>Modelo</h2><p>Cada stat recibe un valor uniforme en [f, 15]. k = 16−f valores posibles, prob=1/k. Asumiendo independencia: P(hundo)=1/k³.</p><p>Lucky f=12 → k=4 → P(hundo)=1/64≈1.56%</p><p>Fuente: comunidad (Silph Road). Los pisos se modelan como RuleParameter versionados.</p>",
-        "title_en": "IVs in trades: floors and probabilities",
-        "body_en": "<h2>IV floors by friendship</h2><ul><li>Good: f=1</li><li>Great: f=2</li><li>Ultra: f=3</li><li>Best: f=5</li><li>Lucky: f=12</li></ul><h2>Model</h2><p>Each stat gets a uniform value in [f, 15]. k = 16−f possible values, prob=1/k. Assuming independence: P(hundo)=1/k³.</p><p>Lucky f=12 → k=4 → P(hundo)=1/64≈1.56%</p><p>Source: community (Silph Road). Floors are modeled as versioned RuleParameters.</p>",
     }
 
 

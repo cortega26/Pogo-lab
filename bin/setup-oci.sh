@@ -235,8 +235,10 @@ echo ""
 echo "── Creando VM ARM Ampere A1 ───────────────────"
 
 VM_NAME="${OCI_VM_DISPLAY_NAME:-pogo-lab-prod}"
-VM_OCPUS="${OCI_VM_OCPUS:-4}"
-VM_MEMORY="${OCI_VM_MEMORY_GB:-24}"
+# Límite Always Free vigente. Un tamaño mayor debe ser una decisión explícita
+# mediante .env-oci porque la diferencia se factura bajo PAYG.
+VM_OCPUS="${OCI_VM_OCPUS:-2}"
+VM_MEMORY="${OCI_VM_MEMORY_GB:-12}"
 VM_DISK="${OCI_VM_DISK_GB:-100}"
 
 # Check if VM already exists

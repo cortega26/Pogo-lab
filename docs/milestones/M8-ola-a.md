@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | ✅ Completo — engine (112 tests), 7 calculadoras con HTMX, SEO, share URLs, sitemaps, 15 smoke tests |
+| **Estado** | 🟨 Implementado, precondiciones sin verificar — engine (112 tests), 7 calculadoras con HTMX, SEO, share URLs, sitemaps, 15 smoke tests. Gate 0 y M7 merge pendientes. |
 | **Tamaño** | L |
 | **Depende de** | M7 mergeado + Gate 0 verificado |
 | **PRs** | PR-22, PR-23 |

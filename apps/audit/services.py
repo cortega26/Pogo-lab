@@ -37,7 +37,23 @@ def mark_dataset_suspicious(
     reason: str = "",
     actor=None,
 ) -> DatasetVersion:
+    from django.utils import timezone
+
     version = DatasetVersion.objects.get(pk=dataset_id)
+    version.publication_status = "quarantined"
+    version.is_public = False
+    version.moderation_reason = reason
+    version.moderated_at = timezone.now()
+    version.save(
+        update_fields=[
+            "publication_status",
+            "is_public",
+            "moderation_reason",
+            "moderated_at",
+            "updated_at",
+        ]
+    )
+
     AuditEvent.log(
         verb="dataset_marked_suspicious",
         actor=actor,

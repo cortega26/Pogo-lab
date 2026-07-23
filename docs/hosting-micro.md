@@ -1,9 +1,9 @@
 # Hosting — plan A1 (ideal) y fallback en micro (1 GB)
 
-Complementa **[ADR-0009](adr/0009-hosting-oracle-cloud.md)**. El objetivo sigue siendo la
-**Ampere A1 Flex (4 OCPU / 24 GB RAM)** — el mejor VPS gratuito que existe. Este documento cubre
-(A) cómo conseguirla pese al *"Out of host capacity"* y (B) cómo dejar la beta viva **hoy** en la
-micro diminuta mientras tanto.
+Complementa **[ADR-0009](adr/0009-hosting-oracle-cloud.md)**. La asignación Always Free vigente para
+**Ampere A1 Flex** es **2 OCPU / 12 GB RAM**; una configuración de **4 OCPU / 24 GB** requiere PAYG
+y puede generar cargos. Este documento cubre (A) cómo conseguir capacidad A1 pese al
+*"Out of host capacity"* y (B) cómo dejar la beta viva **hoy** en la micro diminuta mientras tanto.
 
 ---
 
@@ -19,15 +19,15 @@ Los recursos **Always Free solo existen en la región HOME** (aquí `sa-santiago
 y además se endureció el default del script a la región home (`OCI_REGION="${OCI_REGION:-$OCI_HOME_REGION}"`),
 así una corrida futura sin esa variable ya no cae en Ashburn.
 
-### A.1 — Sube la cuenta a Pay As You Go (PAYG) ← el desbloqueo real
+### A.1 — Pay As You Go (PAYG): cuotas pagadas, no más Always Free
 
-Es una acción **manual** de consola (no se puede automatizar) y es lo que más veces habilita la
-A1 al primer intento:
+Es una acción **manual** de consola (no se puede automatizar) que permite usar más tipos y cuotas de
+Compute, pero no amplía la asignación Always Free ni garantiza capacidad física A1:
 
 1. Consola OCI → menú de usuario → **Upgrade to Paid** / *Upgrade and manage payment*.
-2. Añades tarjeta. **No te cobran** mientras te quedes dentro de los límites Always Free
-   (4 OCPU + 24 GB RAM + 200 GB de bloque, en total).
-3. PAYG elimina el estrangulamiento de capacidad A1 que Oracle aplica a las cuentas gratuitas.
+2. Añades tarjeta. No hay cargos mientras te quedes dentro del límite Always Free vigente
+   (**2 OCPU + 12 GB RAM**); 4 OCPU / 24 GB lo excede.
+3. Revisa la capacidad antes de lanzar una VM: PAYG no elimina un `Out of host capacity`.
 
 **Red de seguridad (coste 0 garantizado):** crea una alerta de presupuesto a **0,01 USD** en
 *Billing → Budgets*, así cualquier consumo accidental salta al instante.
@@ -62,8 +62,9 @@ done
 ### A.3 — Reintento + región home en setup-oci.sh (ya aplicado)
 
 **Ya está en el script** (`bin/setup-oci.sh`): el bloque de `oci compute instance launch` está
-envuelto en reintentos con backoff, y el default de región es la home region. Verificado con un
-simulacro del launch bajo `set -euo pipefail`:
+envuelto en reintentos con backoff, y el default de región es la home region. El tamaño por defecto
+es 2 OCPU / 12 GB para respetar Always Free; 4/24 exige cambiar ambas variables explícitamente y
+aceptar PAYG. Verificado con un simulacro del launch bajo `set -euo pipefail`:
 
 - **Capacidad transitoria** (`Out of host capacity`, `LimitExceeded`, `InternalError`,
   `TooManyRequests`) → reintenta cada `A1_RETRY_SECONDS` segundos (por defecto 60).
@@ -139,7 +140,8 @@ El stack es portable (Docker + `DATABASE_URL`), migrar cuesta minutos:
 
 ## Resumen de decisión
 
-1. **PAYG** (§A.1) — mantiene todo gratis y es lo que más veces desbloquea la A1. Alerta a 0,01 USD.
+1. **Always Free** — usa 2 OCPU / 12 GB para coste de cómputo cero; alerta a 0,01 USD como red de
+   seguridad. PAYG permite configurar más recursos, pero 4/24 puede facturarse.
 2. **En paralelo**, deja la beta viva con la micro afinada (§B): Neon + swap + `compose.micro.yaml`.
 3. Verifica A1 en Santiago (§A.2); si existe, aplica el patch de reintento (§A.3).
 4. Si Santiago nunca da A1: cuenta nueva con otra home region, o GCP e2-micro (§C).

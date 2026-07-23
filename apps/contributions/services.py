@@ -25,6 +25,7 @@ def _canonical_row(row: dict[str, Any]) -> str:
 def build_dataset_version(
     criteria: dict[str, Any] | None = None,
     pipeline_version: str = DEFAULT_PIPELINE_VERSION,
+    consent_text_version: str = "1.0.0",
 ) -> DatasetVersion:
     """Construye una nueva versión de dataset comunitario anonimizado.
 
@@ -32,6 +33,7 @@ def build_dataset_version(
       - observation.state == "valid"
       - observation.contribution_optin == True
       - owner tiene DataContributionConsent activo (scope="community_dataset")
+        con consent_text_version coincidente (plan 052)
 
     ANONIMIZACIÓN por fila — solo campos no identificantes:
       - atk, iv_def (como "def"), hp
@@ -45,81 +47,96 @@ def build_dataset_version(
     CHECKSUM: SHA-256 sobre todas las filas anonimizadas, ordenadas de forma
     estable (por los propios campos anonimizados + observed_month), serializadas
     con sort_keys. Incluye pipeline_version en el contenido hasheado.
+
+    ATOMICIDAD: selección, checksum, creación y audit en una transacción
+    con select_for_update (plan 052).
     """
+    from django.db import transaction
+
     criteria = criteria or _default_criteria()
 
     min_sample = criteria.get("min_sample", 30)
     scope = "community_dataset"
 
-    user_ids_with_consent = set(
-        DataContributionConsent.objects.filter(
-            scope=scope,
-            is_active=True,
-        ).values_list("user_id", flat=True)
-    )
-
-    qs = TradeObservation.objects.select_related("ruleset").filter(
-        state="valid",
-        contribution_optin=True,
-        owner_id__in=user_ids_with_consent,
-    )
-
-    ruleset_versions: dict[int, int] = {}
-
-    rows: list[dict[str, Any]] = []
-    for obs in qs.iterator(chunk_size=1000):
-        rs_id = obs.ruleset_id
-        if rs_id is not None and rs_id not in ruleset_versions:
-            ruleset_versions[rs_id] = obs.ruleset.version if obs.ruleset else 0
-
-        rows.append(
-            {
-                "atk": obs.atk,
-                "def": obs.iv_def,
-                "hp": obs.hp,
-                "friendship_level": obs.friendship_level,
-                "trade_type": obs.trade_type,
-                "is_lucky": obs.is_lucky,
-                "ruleset_version": ruleset_versions.get(obs.ruleset_id, 0) if obs.ruleset_id else 0,
-                "observed_month": obs.observed_at.strftime("%Y-%m"),
-            }
+    with transaction.atomic():
+        user_ids_with_consent = set(
+            DataContributionConsent.objects.filter(
+                scope=scope,
+                is_active=True,
+                consent_text_version=consent_text_version,
+            ).values_list("user_id", flat=True)
         )
 
-    row_count = len(rows)
-    min_sample_met = row_count >= min_sample
+        qs = TradeObservation.objects.select_related("ruleset").filter(
+            state="valid",
+            contribution_optin=True,
+            owner_id__in=user_ids_with_consent,
+        )
 
-    sorted_rows = sorted(rows, key=_canonical_row)
-    canonicalized = "\n".join(_canonical_row(r) for r in sorted_rows)
-    checksum_input = f"{pipeline_version}\n{canonicalized}"
-    checksum = hashlib.sha256(checksum_input.encode("utf-8")).hexdigest()
+        ruleset_versions: dict[int, int] = {}
 
-    latest = DatasetVersion.objects.order_by("-number").first()
-    next_number = (latest.number + 1) if latest else 1
+        rows: list[dict[str, Any]] = []
+        for obs in qs.iterator(chunk_size=1000):
+            rs_id = obs.ruleset_id
+            if rs_id is not None and rs_id not in ruleset_versions:
+                ruleset_versions[rs_id] = obs.ruleset.version if obs.ruleset else 0
 
-    version = DatasetVersion.objects.create(
-        number=next_number,
-        criteria=criteria,
-        min_sample_met=min_sample_met,
-        row_count=row_count,
-        checksum=checksum,
-        is_public=min_sample_met,
-        pipeline_version=pipeline_version,
-        anonymized_rows=rows,
-    )
+            rows.append(
+                {
+                    "atk": obs.atk,
+                    "def": obs.iv_def,
+                    "hp": obs.hp,
+                    "friendship_level": obs.friendship_level,
+                    "trade_type": obs.trade_type,
+                    "is_lucky": obs.is_lucky,
+                    "ruleset_version": ruleset_versions.get(obs.ruleset_id, 0)
+                    if obs.ruleset_id
+                    else 0,
+                    "observed_month": obs.observed_at.strftime("%Y-%m"),
+                }
+            )
 
-    version.rows_cache = rows  # type: ignore[attr-defined]
+        row_count = len(rows)
+        min_sample_met = row_count >= min_sample
 
-    AuditEvent.log(
-        verb="dataset_built",
-        target_type="DatasetVersion",
-        target_id=version.pk,
-        metadata={
-            "number": version.number,
-            "row_count": row_count,
-            "min_sample_met": min_sample_met,
-            "pipeline_version": pipeline_version,
-        },
-    )
+        sorted_rows = sorted(rows, key=_canonical_row)
+        canonicalized = "\n".join(_canonical_row(r) for r in sorted_rows)
+        checksum_input = f"{pipeline_version}\n{canonicalized}"
+        checksum = hashlib.sha256(checksum_input.encode("utf-8")).hexdigest()
+
+        latest = DatasetVersion.objects.select_for_update().order_by("-number").first()
+        next_number = (latest.number + 1) if latest else 1
+
+        publication_status = "public" if min_sample_met else "draft"
+
+        version = DatasetVersion.objects.create(
+            number=next_number,
+            criteria=criteria,
+            min_sample_met=min_sample_met,
+            row_count=row_count,
+            checksum=checksum,
+            is_public=min_sample_met,
+            publication_status=publication_status,
+            consent_text_version=consent_text_version,
+            pipeline_version=pipeline_version,
+            anonymized_rows=rows,
+        )
+
+        version.rows_cache = rows  # type: ignore[attr-defined]
+
+        AuditEvent.log(
+            verb="dataset_built",
+            target_type="DatasetVersion",
+            target_id=version.pk,
+            metadata={
+                "number": version.number,
+                "row_count": row_count,
+                "min_sample_met": min_sample_met,
+                "pipeline_version": pipeline_version,
+                "consent_text_version": consent_text_version,
+                "publication_status": publication_status,
+            },
+        )
 
     return version
 

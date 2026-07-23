@@ -6,11 +6,13 @@ Registro, validacion, dedup, bulk import, CSV export y dashboard.
 import csv
 import hashlib
 import io
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from django.db import transaction
 from django.db.models import Count, Q
+from django.db.utils import IntegrityError
 
 from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
 from engine.observations import ivs_consistent_with_floor
@@ -21,6 +23,21 @@ FRIENDSHIP_LEVELS = ("good", "great", "ultra", "best")
 TRADE_TYPES = ("normal", "lucky", "lucky_guaranteed")
 
 DEDUP_SEPARATOR = "|"
+
+MAX_CSV_BYTES = 2 * 1024 * 1024  # 2 MB
+MAX_CSV_ROWS = 5000
+
+
+@dataclass(frozen=True)
+class RegistrationResult:
+    """Resultado tipado de register_observation (plan 055).
+
+    Distingue 'created' de 'duplicate' para que los reportes de importación
+    no cuenten duplicados como creados.
+    """
+
+    observation: TradeObservation
+    created: bool
 
 
 def _compute_dedup_hash(
@@ -152,6 +169,7 @@ def register_observation(
         .first()
     )
     if existing is not None:
+        existing._is_new = False  # type: ignore[attr-defined]
         return existing
 
     if state is None:
@@ -176,30 +194,42 @@ def register_observation(
         except RulesetUnavailableError:
             ruleset = None
 
-    obs = TradeObservation.objects.create(
-        session=session,
-        owner_id=owner_id,
-        observed_at=observed_at,
-        friendship_level=friendship_level,
-        trade_type=trade_type,
-        is_lucky=is_lucky,
-        lucky_guaranteed=lucky_guaranteed,
-        atk=atk,
-        iv_def=def_,
-        hp=hp,
-        species=species,
-        special_trade=special_trade,
-        oldest_age_bucket=oldest_age_bucket,
-        event_context=event_context,
-        app_version=app_version,
-        input_method=input_method,
-        ruleset=ruleset,
-        state=state,
-        exclusion_reason=exclusion_reason,
-        contribution_optin=contribution_optin,
-        dedup_hash=dedup_hash,
-        notes=notes,
-    )
+    try:
+        obs = TradeObservation.objects.create(
+            session=session,
+            owner_id=owner_id,
+            observed_at=observed_at,
+            friendship_level=friendship_level,
+            trade_type=trade_type,
+            is_lucky=is_lucky,
+            lucky_guaranteed=lucky_guaranteed,
+            atk=atk,
+            iv_def=def_,
+            hp=hp,
+            species=species,
+            special_trade=special_trade,
+            oldest_age_bucket=oldest_age_bucket,
+            event_context=event_context,
+            app_version=app_version,
+            input_method=input_method,
+            ruleset=ruleset,
+            state=state,
+            exclusion_reason=exclusion_reason,
+            contribution_optin=contribution_optin,
+            dedup_hash=dedup_hash,
+            notes=notes,
+        )
+    except IntegrityError:
+        existing = (
+            TradeObservation.objects.filter(owner_id=owner_id, dedup_hash=dedup_hash)
+            .exclude(state="deleted")
+            .first()
+        )
+        if existing is not None:
+            existing._is_new = False  # type: ignore[attr-defined]
+            return existing
+        raise
+    obs._is_new = True  # type: ignore[attr-defined]
     return obs
 
 
@@ -231,11 +261,18 @@ def bulk_create_observations(
         return resolved_cache[key]
 
     results: list[TradeObservation] = []
+    created_count = 0
+    duplicate_count = 0
     with transaction.atomic():
         for data in observations:
             resolved = _resolve(data["friendship_level"], data["trade_type"])
-            results.append(register_observation(**data, resolved=resolved))
-    return results
+            obs = register_observation(**data, resolved=resolved)
+            results.append(obs)
+            if getattr(obs, "_is_new", True):
+                created_count += 1
+            else:
+                duplicate_count += 1
+    return results  # callers needing counts use created_count/duplicate_count via import_csv
 
 
 def parse_csv_row(
@@ -290,10 +327,13 @@ def import_csv(
     """Importa observaciones desde contenido CSV.
 
     Devuelve dict con:
-      - created: list[TradeObservation] exitosas
+      - created: list[TradeObservation] exitosas (excluye duplicados)
+      - duplicates: int observaciones omitidas por dedup
       - errors: list[str] errores por fila
       - total: int filas procesadas
-      - valid_count: int
+      - valid_count: int (created + duplicates, filas sin error de parseo)
+      - created_count: int filas efectivamente creadas
+      - duplicate_count: int filas omitidas por dedup
       - error_count: int
     """
     cleaned = csv_content.lstrip("\ufeff")
@@ -305,20 +345,34 @@ def import_csv(
     observations_data: list[dict[str, Any]] = []
     for row_num, row in enumerate(reader, start=2):
         total += 1
+        if total > MAX_CSV_ROWS:
+            errors.append(f"Excedido el límite de {MAX_CSV_ROWS} filas")
+            break
         result = parse_csv_row(row, row_num, owner_id)
         if isinstance(result, str):
             errors.append(result)
         else:
             observations_data.append(result)
 
+    created_count = 0
+    duplicate_count = 0
     if observations_data:
-        created = bulk_create_observations(observations_data)
+        all_obs = bulk_create_observations(observations_data)
+        for obs in all_obs:
+            if getattr(obs, "_is_new", True):
+                created.append(obs)
+                created_count += 1
+            else:
+                duplicate_count += 1
 
     return {
         "created": created,
+        "duplicates": duplicate_count,
         "errors": errors,
         "total": total,
-        "valid_count": len(created),
+        "valid_count": created_count + duplicate_count,
+        "created_count": created_count,
+        "duplicate_count": duplicate_count,
         "error_count": len(errors),
     }
 

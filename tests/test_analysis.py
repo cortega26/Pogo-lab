@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.analysis.models import AnalysisRun
+from apps.analysis.models import AnalysisResult, AnalysisRun
 from apps.analysis.services import get_or_run_personal_analysis, run_personal_analysis
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
 
@@ -450,3 +450,49 @@ class TestPooledDeterminism:
             assert su1["p_value"] == su2["p_value"]
             assert su1["counts"] == su2["counts"]
             assert su1["values"] == su2["values"]
+
+
+class TestAnalysisAtomicity:
+    """Plan 054: runs atómicos, solo complete se sirve."""
+
+    def test_run_sets_status_complete(self, user):
+        """Un run exitoso queda con status='complete'."""
+        _create_observation(user, is_lucky=True, trade_type="lucky", atk=12, def_=13, hp=14)
+        run = run_personal_analysis(user.pk)
+        assert run.status == "complete"
+        assert run.completed_at is not None
+
+    def test_get_or_run_reuses_only_complete(self, user):
+        """get_or_run no reutiliza runs fallidos o pendientes."""
+        _create_observation(user, is_lucky=True, trade_type="lucky", atk=12, def_=13, hp=14)
+        run1 = run_personal_analysis(user.pk)
+        assert run1.status == "complete"
+        run2 = get_or_run_personal_analysis(user.pk)
+        assert run2.pk == run1.pk
+
+    def test_failed_run_not_reused(self, user):
+        """Un run fallido no se reutiliza."""
+        _create_observation(user, is_lucky=True, trade_type="lucky", atk=12, def_=13, hp=14)
+        run1 = run_personal_analysis(user.pk)
+        run1.status = "failed"
+        run1.save(update_fields=["status"])
+        run2 = get_or_run_personal_analysis(user.pk)
+        assert run2.pk != run1.pk
+        assert run2.status == "complete"
+
+    def test_failed_run_has_no_partial_results(self, user):
+        """Un run fallido no deja resultados parciales."""
+        from unittest.mock import patch
+
+        _create_observation(user, is_lucky=True, trade_type="lucky", atk=12, def_=13, hp=14)
+
+        with (
+            patch.object(AnalysisResult.objects, "bulk_create", side_effect=Exception("DB error")),
+            pytest.raises(Exception, match="DB error"),
+        ):
+            run_personal_analysis(user.pk)
+
+        failed_run = AnalysisRun.objects.filter(status="failed").first()
+        assert failed_run is not None
+        assert failed_run.results.count() == 0
+        assert "DB error" in failed_run.error_message

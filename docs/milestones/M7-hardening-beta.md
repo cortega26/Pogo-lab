@@ -33,7 +33,7 @@ de producto y revisión legal.
 ### PR-21 · deploy + beta
 
 - [x] `Dockerfile` de producción + `.github/workflows/deploy.yml`.
-- [x] **DECIDIR hosting** — Oracle Cloud Infrastructure (OCI) capa gratuita (ARM Ampere A1, Docker Compose). Ver ADR-0009.
+- [x] **DECIDIR hosting** — Oracle Cloud Infrastructure (OCI) capa gratuita (ARM Ampere A1 2 OCPU / 12 GB, Docker Compose). Ver ADR-0009.
 - [x] Postgres administrado + **backup** + **procedimiento de restore** documentado.
 - [x] Métricas de producto (plan §12/§18) sin invadir privacidad.
 - [x] Completar **exportación** y **eliminación** de cuenta (stubs de M1).
@@ -88,6 +88,7 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 
 | Fecha | Estado | Nota |
 |---|---|---|
+| 2026-07-23 | 🟨 | Añadido monitor programado de capacidad OCI A1: consulta `VM.Standard.A1.Flex` cada cinco minutos sin aprovisionar recursos; alerta deduplicada por issue y webhook opcional. Requiere configurar secrets de Actions. |
 | 2026-07-16 | ⬜ | Hoja creada. |
 | 2026-07-17 | 🟨 | PR-20 hardening completo. Hosting decidido: OCI Santiago (AMD Micro, 1 GB). Desplegado en <http://146.181.47.12>. Pendiente: GitHub Actions secrets, SSL/Lets Encrypt, backup automático, revisión legal. |
 | 2026-07-18 | 🟨 | PR-21: deploy.yml + compose.prod/micro + OCI scripts + ADR-0009 + backup/restore. Legal templates pulidos (ToS/privacy/disclaimer). healthcheck.json fuera de i18n. Tests de vistas legales (11 nuevos, 491 total). Pendiente humano: revisión legal, smoke deploy, restore verify. |
