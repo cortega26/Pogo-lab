@@ -66,10 +66,11 @@ de producto y revisión legal.
 1. **Dominio y TLS:** ✅ **HECHO (2026-07-23).**
    - Registro A `pogo-lab.tooltician.com` → `146.181.47.12` creado en Cloudflare (proxied/naranja).
    - nginx reconfigurado en la VM: `listen 443 ssl`, `server_name pogo-lab.tooltician.com`, `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP`.
-   - Self-signed cert instalado en `/etc/nginx/certs/{fullchain,privkey}.pem` (interim; el edge de Cloudflare usa el wildcard `*.tooltician.com` Let's Encrypt que ya estaba en la zona).
-   - `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DEFAULT_FROM_EMAIL` actualizados en `.env` de la VM; gunicorn reiniciado.
+   - **Cloudflare Origin CA cert** (15 años, válido hasta 2041) instalado en `/etc/nginx/certs/{fullchain,privkey}.pem`. Reemplaza al self-signed interim.
+   - **SSL mode = Full (strict)** en Cloudflare (válida el cert del origin).
+   - **Always Use HTTPS = on**, **HSTS at edge** (max-age=31536000, includeSubdomains, preload), **TLS 1.3 = on**, **min TLS = 1.2**.
+   - `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DEFAULT_FROM_EMAIL`, `ALLAUTH_TRUSTED_CLIENT_IP_HEADER` actualizados en `.env` de la VM; gunicorn reiniciado.
    - `cache_ratelimit` table creada (faltaba → causaba 500 en POST login).
-   - **Mejora opcional:** emitir un Cloudflare Origin CA cert (15 años) y reemplazar el self-signed, para poder subir SSL mode a Full (strict). Requiere token con scope `SSL and Certificates:Edit` o vía dashboard.
 
 2. **Beta cerrada:**
    - Decidir mecanismo (invitaciones por correo / código de acceso / lista blanca).
@@ -91,7 +92,7 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 
 | Fecha | Estado | Nota |
 |---|---|---|
-| 2026-07-23 | ✅ | **Entorno desplegado y verificado en https://pogo-lab.tooltician.com.** DNS Cloudflare proxied (A → 146.181.47.12), TLS vía wildcard `*.tooltician.com` del edge de Cloudflare, nginx 443 + self-signed origin cert (interim), `set_real_ip_from` Cloudflare, `.env` VM actualizado (ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS/DEFAULT_FROM_EMAIL), `cache_ratelimit` table creada. Smoke verde: healthz, locales es/en, login (POST 200), legales, cabeceras HSTS+CSP+XCTO+Referrer, redirect HTTP→HTTPS. Pendiente: Cloudflare Origin CA cert (swap self-signed → Full strict), `EMAIL_URL` + invitaciones para beta cerrada. |
+| 2026-07-23 | ✅ | **Entorno desplegado y verificado en https://pogo-lab.tooltician.com.** DNS Cloudflare proxied (A → 146.181.47.12), **Cloudflare Origin CA cert** (15 años, hasta 2041) instalado en nginx, **SSL mode = Full (strict)**, Always Use HTTPS + HSTS at edge + TLS 1.3 + min TLS 1.2, `set_real_ip_from` Cloudflare, `.env` VM actualizado (ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS/DEFAULT_FROM_EMAIL/ALLAUTH_TRUSTED_CLIENT_IP_HEADER), `cache_ratelimit` table creada. Rate limiting con IP real del cliente (IPv4+IPv6). Smoke verde: healthz, locales es/en, login (POST 200), legales, calculadora, cabeceras HSTS+CSP+XCTO+Referrer, redirect HTTP→HTTPS, TLS 1.1 rechazado. Pendiente: `EMAIL_URL` + invitaciones para beta cerrada. |
 | 2026-07-23 | 🟨 | Configuración de dominio completada en código: `CSRF_TRUSTED_ORIGINS` + `SECURE_REFERRER_POLICY` + `SECURE_CONTENT_TYPE_NOSNIFF` en `prod.py`; `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP` en `infra/nginx/default.conf` (rate limiting ve la IP real del cliente tras el proxy). Guía operativa nueva en `docs/deploy-tooltician.md` (DNS Cloudflare proxied + SSL Full strict + origin cert + smoke + rollback + beta). Tests: 817 passed, ruff/mypy limpios. Pendiente humano: crear registro A `pogo-lab`→`146.181.47.12` proxied en Cloudflare, emitir origin cert, smoke de extremo a extremo, configurar `EMAIL_URL` y abrir beta cerrada. |
 | 2026-07-23 | 🟨 | Dominio decidido: `pogo-lab.tooltician.com` (subdominio de tooltician.com, sin compra nueva). Actualizados nginx `default.conf`, `prod.py` (`DEFAULT_FROM_EMAIL=carlos@tooltician.com`), scripts OCI, `.env-oci`, plantillas legales (tos/privacy) y `.po` es/en. Añadido monitor programado de capacidad OCI A1: consulta `VM.Standard.A1.Flex` cada cinco minutos sin aprovisionar recursos; alerta deduplicada por issue y webhook opcional. Requiere configurar secrets de Actions. |
 | 2026-07-16 | ⬜ | Hoja creada. |
