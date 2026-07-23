@@ -14,7 +14,7 @@ jobs:
   markdownlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: DavidAnson/markdownlint-cli2-action@v19
         with:
           # Los informes de investigación son insumos históricos no verificados,
@@ -27,7 +27,7 @@ jobs:
   links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # --offline: verifica solo enlaces internos/relativos (evita flakiness de red);
       # atrapa el drift real: un enlace roto entre documentos.
       - uses: lycheeverse/lychee-action@v2
@@ -38,7 +38,7 @@ jobs:
   milestones-listed:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cada milestone existe y está enlazado en el tablero
         run: |
           set -euo pipefail
