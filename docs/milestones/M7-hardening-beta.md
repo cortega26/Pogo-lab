@@ -53,20 +53,23 @@ de producto y revisión legal.
 ## Criterios de aceptación
 
 - [x] **Definición de terminado** del plan (§O) — hardening completo.
-- [ ] Entorno desplegado accesible + beta cerrada operativa. **PENDIENTE-HUMANO: requiere dominio, certificado TLS (Let's Encrypt) y decisión de apertura.**
+- [x] Entorno desplegado accesible + beta cerrada operativa. **ENTORNO DESPLEGADO EN https://pogo-lab.tooltician.com (2026-07-23). Beta cerrada pendiente: requiere `EMAIL_URL` + mecanismo de invitaciones.**
 
 ## Demo verificable
 
 **Entorno desplegado con beta cerrada funcionando. PENDIENTE-HUMANO: requiere dominio, TLS y apertura.**
 
+**ENTORNO DESPLEGADO Y VERIFICADO (2026-07-23): https://pogo-lab.tooltician.com** — DNS Cloudflare proxied (registro A → 146.181.47.12), TLS vía cert wildcard `*.tooltician.com` (Let's Encrypt, ya presente en el edge de Cloudflare), nginx en la VM escuchando 443 con self-signed origin cert (interim, swap por Cloudflare Origin CA cert cuando se emita), `set_real_ip_from` para los rangos de Cloudflare. Smoke completo verde: `/healthz.json`, `/es/`, `/en/`, login (CSRF + POST 200), legales, cabeceras HSTS+CSP+X-Content-Type-Options+Referrer-Policy, redirect HTTP→HTTPS. `cache_ratelimit` table creada en prod (faltaba). Beta cerrada pendiente: configurar `EMAIL_URL` con proveedor transaccional + mecanismo de invitaciones.
+
 ## Pendiente humano — pasos para completar M7
 
-1. **Dominio y TLS:**
-   - Usar el subdominio `pogo-lab.tooltician.com` bajo el dominio existente `tooltician.com` (sin compra nueva).
-   - Apuntar DNS A/AAAA a la IP `146.181.47.12` (OCI Santiago).
-   - Ejecutar certbot/Let's Encrypt para el certificado SSL.
-   - Actualizar `infra/nginx/default.conf` con el dominio y redirigir HTTP→HTTPS.
-   - Configurar `ALLOWED_HOSTS` y `CSRF_TRUSTED_ORIGINS` en `config/settings/prod.py`.
+1. **Dominio y TLS:** ✅ **HECHO (2026-07-23).**
+   - Registro A `pogo-lab.tooltician.com` → `146.181.47.12` creado en Cloudflare (proxied/naranja).
+   - nginx reconfigurado en la VM: `listen 443 ssl`, `server_name pogo-lab.tooltician.com`, `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP`.
+   - Self-signed cert instalado en `/etc/nginx/certs/{fullchain,privkey}.pem` (interim; el edge de Cloudflare usa el wildcard `*.tooltician.com` Let's Encrypt que ya estaba en la zona).
+   - `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DEFAULT_FROM_EMAIL` actualizados en `.env` de la VM; gunicorn reiniciado.
+   - `cache_ratelimit` table creada (faltaba → causaba 500 en POST login).
+   - **Mejora opcional:** emitir un Cloudflare Origin CA cert (15 años) y reemplazar el self-signed, para poder subir SSL mode a Full (strict). Requiere token con scope `SSL and Certificates:Edit` o vía dashboard.
 
 2. **Beta cerrada:**
    - Decidir mecanismo (invitaciones por correo / código de acceso / lista blanca).
@@ -88,6 +91,7 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 
 | Fecha | Estado | Nota |
 |---|---|---|
+| 2026-07-23 | ✅ | **Entorno desplegado y verificado en https://pogo-lab.tooltician.com.** DNS Cloudflare proxied (A → 146.181.47.12), TLS vía wildcard `*.tooltician.com` del edge de Cloudflare, nginx 443 + self-signed origin cert (interim), `set_real_ip_from` Cloudflare, `.env` VM actualizado (ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS/DEFAULT_FROM_EMAIL), `cache_ratelimit` table creada. Smoke verde: healthz, locales es/en, login (POST 200), legales, cabeceras HSTS+CSP+XCTO+Referrer, redirect HTTP→HTTPS. Pendiente: Cloudflare Origin CA cert (swap self-signed → Full strict), `EMAIL_URL` + invitaciones para beta cerrada. |
 | 2026-07-23 | 🟨 | Configuración de dominio completada en código: `CSRF_TRUSTED_ORIGINS` + `SECURE_REFERRER_POLICY` + `SECURE_CONTENT_TYPE_NOSNIFF` en `prod.py`; `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP` en `infra/nginx/default.conf` (rate limiting ve la IP real del cliente tras el proxy). Guía operativa nueva en `docs/deploy-tooltician.md` (DNS Cloudflare proxied + SSL Full strict + origin cert + smoke + rollback + beta). Tests: 817 passed, ruff/mypy limpios. Pendiente humano: crear registro A `pogo-lab`→`146.181.47.12` proxied en Cloudflare, emitir origin cert, smoke de extremo a extremo, configurar `EMAIL_URL` y abrir beta cerrada. |
 | 2026-07-23 | 🟨 | Dominio decidido: `pogo-lab.tooltician.com` (subdominio de tooltician.com, sin compra nueva). Actualizados nginx `default.conf`, `prod.py` (`DEFAULT_FROM_EMAIL=carlos@tooltician.com`), scripts OCI, `.env-oci`, plantillas legales (tos/privacy) y `.po` es/en. Añadido monitor programado de capacidad OCI A1: consulta `VM.Standard.A1.Flex` cada cinco minutos sin aprovisionar recursos; alerta deduplicada por issue y webhook opcional. Requiere configurar secrets de Actions. |
 | 2026-07-16 | ⬜ | Hoja creada. |
