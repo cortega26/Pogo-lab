@@ -20,6 +20,7 @@
 ## 2. Inventario del estado actual (verificado contra código vivo)
 
 Baseline al iniciar esta sesión (commit `a285ad3`):
+
 - `uv run pytest -q --ignore=tests/test_e2e.py` → 757 passed, 4 skipped
 - `uv run ruff check .` → All checks passed
 - `uv run ruff format --check .` → 175 files already formatted
@@ -46,29 +47,34 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 ## 3. Orden de ejecución
 
 ### Fase 1 — Quick wins (sin dependencias, S/M)
+
 1. **029** — IntegrityError catch en `register_observation` (constraint ya existe)
 2. **039** — Verificar que los 21 tests pasan y marcar DONE
 3. **057** — Bootstrap determinista: `seed` orquesta `seed_content`, `.env.example` puerto 5433, `make bootstrap` levanta DB
 4. **056** — PostgreSQL CI gate: settings `test_postgres.py`, service en CI, `make test-postgres`
 
 ### Fase 2 — Seguridad/producción (P0, dependen de 056 o topología)
-5. **051** — Rate limiting: función de key probada, caché compartida (PostgreSQL-backed)
-6. **058** — Reconciliar docs de estado (tras 057)
+
+1. **051** — Rate limiting: función de key probada, caché compartida (PostgreSQL-backed)
+2. **058** — Reconciliar docs de estado (tras 057)
 
 ### Fase 3 — Arquitectura (P2, dependen de 052/054/055)
-7. **060** — App boundaries: DAG permitido, import-linter contracts
-8. **061** — AuditEvent inmutable: admin readonly, bloquear update/delete, propagar correlation_id
+
+1. **060** — App boundaries: DAG permitido, import-linter contracts
+2. **061** — AuditEvent inmutable: admin readonly, bloquear update/delete, propagar correlation_id
 
 ### Fase 4 — Datos canónicos (XL, dependen de 046)
-9. **046** — Datos de combate canónicos (evaluación de alcance)
-10. **047** — Validar breakpoints (dep 046)
-11. **048** — Corregir PvP ranking (dep 046)
+
+1. **046** — Datos de combate canónicos (evaluación de alcance)
+2. **047** — Validar breakpoints (dep 046)
+3. **048** — Corregir PvP ranking (dep 046)
 
 ### Fase 5 — Producción/semántica (L, dependen de 056)
-12. **052** — Gobernar publicación comunidad
-13. **053** — Validar contratos calculadoras
-14. **054** — Analysis runs atómicos
-15. **055** — Endurecer trade ingestion
+
+1. **052** — Gobernar publicación comunidad
+2. **053** — Validar contratos calculadoras
+3. **054** — Analysis runs atómicos
+4. **055** — Endurecer trade ingestion
 
 > **Nota de alcance:** Las Fases 4–5 son de esfuerzo L/XL. Si un plan excede
 > el alcance razonable, se documenta el avance parcial y se deja en TODO.
@@ -76,6 +82,7 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 ## 4. Detalles de implementación por plan
 
 ### Plan 029 — IntegrityError catch en register_observation
+
 - **Archivo:** `apps/trades/services.py`, función `register_observation`.
 - **Cambio:** Envolver `TradeObservation.objects.create(...)` en
   `try/except IntegrityError`; en el catch, re-buscar el duplicado y
@@ -85,10 +92,12 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 - **Verificación:** `uv run pytest apps/trades/ -v` verde.
 
 ### Plan 039 — DPS view tests
+
 - **Verificación:** `uv run pytest tests/test_dps_views.py -v` verde (21 tests).
 - Marcar DONE en README.
 
 ### Plan 057 — Bootstrap determinista
+
 - **Archivos:** `Makefile` (`bootstrap` levanta DB, espera health, migra,
   siembra), `apps/mechanics/management/commands/seed.py` (orquesta
   `seed_content` o delega), `.env.example` (puerto 5433).
@@ -97,6 +106,7 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 - **Test:** Idempotencia (`make bootstrap` x2), checksum de slug.
 
 ### Plan 056 — PostgreSQL CI gate
+
 - **Archivos:** `config/settings/test_postgres.py` (URL obligatoria con
   guard anti DB no-test), `.github/workflows/ci.yml` (service postgres:16,
   job con `pytest -m postgres`), `Makefile` (`test-postgres`), `pyproject.toml`
@@ -105,6 +115,7 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 - **Verificación:** `DATABASE_URL=postgres://...pogo_test... pytest -m postgres -q` verde.
 
 ### Plan 051 — Rate limiting robusto
+
 - **STOP:** Si la topología real incluye CDN/LB adicional no documentado.
   El plan 024 ya configuró `RATELIMIT_IP_META_KEY = "HTTP_X_REAL_IP"`.
   Este plan añade: función de key probada (IPv4/IPv6, spoof), caché compartida
@@ -113,17 +124,20 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
   documentar el bloqueo.
 
 ### Plan 058 — Reconciliar docs
+
 - **Archivos:** `README.md`, `AGENTS.md`, `docs/milestones/`.
 - **Verificación:** `rg -n "aún no hay código|Estado.*✅|\[ \]"` no encuentra
   contradicciones.
 
 ### Plan 060 — App boundaries
+
 - **Depende de:** 052, 054, 055 (que dependen de 056). Si esos no están
   hechos, se puede avanzar el inventario de imports y el ADR, pero los
   contratos de import-linter se diseñan sobre el estado final.
 - **STOP:** Si romper el ciclo exige mover modelos/migraciones.
 
 ### Plan 061 — AuditEvent inmutable
+
 - **Depende de:** 060. Admin readonly, bloquear update/delete, propagar
   correlation_id desde el middleware a todos los `AuditEvent.log` calls.
 - **Test:** admin POST/delete bloqueados, `.save()` bloqueado, PII centinela.
@@ -131,6 +145,7 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 ## 5. Verificación
 
 ### Por plan
+
 1. Test específico del plan pasa.
 2. `uv run pytest -q --ignore=tests/test_e2e.py` verde.
 3. `uv run ruff check .` limpio.
@@ -139,14 +154,17 @@ Baseline al iniciar esta sesión (commit `a285ad3`):
 6. `uv run python manage.py makemigrations --check --dry-run` sin cambios (si aplica).
 
 ### Tests end-to-end (`tests/`)
+
 - `tests/test_plans_regression.py` — ya tiene 37 tests de los planes anteriores.
 - Se añaden tests nuevos para cada plan implementado en esta sesión.
 - `uv run pytest tests/test_plans_regression.py -v` debe pasar.
 
 ### Loop de revisión (cada ~20 iteraciones)
+
 - Sub-agente con "review spec.md and the current implementation for gaps".
 
 ## 6. Convenciones (de AGENTS.md)
+
 - Español neutral (sin voseo).
 - Sin comentarios salvo que se pidan.
 - TDD en `engine/`: fixtures a mano primero.
