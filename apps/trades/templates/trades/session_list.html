@@ -15,12 +15,26 @@
     </a>
   </div>
 
-  {% if sessions %}
+  {% if page_obj and page_obj.object_list %}
     <div class="space-y-3">
-      {% for session in sessions %}
+      {% for session in page_obj %}
         {% include "trades/_session_row.html" %}
       {% endfor %}
     </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav class="flex items-center justify-center gap-2 mt-6" aria-label="{% trans 'Paginación' %}">
+      {% if page_obj.has_previous %}
+        <a href="?page=1" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&laquo;</a>
+        <a href="?page={{ page_obj.previous_page_number }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&lsaquo;</a>
+      {% endif %}
+      <span class="text-sm text-slate-600 dark:text-slate-300">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&rsaquo;</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&raquo;</a>
+      {% endif %}
+    </nav>
+    {% endif %}
   {% else %}
     {% url 'trades:session_create' as session_create_url %}
     {% include "includes/_empty_state.html" with title=_("Sin sesiones todavía") message=_("Crea tu primera sesión de intercambios para empezar a registrar.") cta_url=session_create_url cta_label=_("Crear sesión") %}

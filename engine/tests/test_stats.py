@@ -8,7 +8,6 @@ Los valores de referencia provienen de:
   - Medicham L50 15/15/15: CP=1618 (Game Master; la conversión MSG→GO da ~1986, errónea)
 """
 
-
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -229,7 +228,7 @@ class TestCpFormulaHypothesis:
         "base_atk,base_def,base_stam",
         [
             (300, 182, 214),  # Mewtwo
-            (112, 95, 111),   # Pikachu
+            (112, 95, 111),  # Pikachu
             (263, 198, 209),  # Dragonite
             (121, 152, 155),  # Medicham
         ],

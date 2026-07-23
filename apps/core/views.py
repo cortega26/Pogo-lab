@@ -40,7 +40,15 @@ def csp_report(request):
         return JsonResponse({"status": "accepted"})
     try:
         report = json.loads(request.body)
-        logger.info("CSP violation: %s", report)
+        csp_data = report.get("csp-report", {}) if isinstance(report, dict) else {}
+        sanitized = {
+            "blocked": str(csp_data.get("blocked-uri", "unknown"))[:200]
+            .replace("\n", " ")
+            .replace("\r", " "),
+            "directive": str(csp_data.get("effective-directive", "unknown"))[:100],
+            "count": 1,
+        }
+        logger.info("CSP violation: %s", sanitized)
     except (json.JSONDecodeError, AttributeError):
         logger.info("CSP report with invalid body")
     return JsonResponse({"status": "accepted"})

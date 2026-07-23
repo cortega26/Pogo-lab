@@ -490,6 +490,7 @@ def test_htmx_recalculates_without_full_reload(live_server, seeded_mechanic):
 # M8 E2E — Nuevas calculadoras
 # ═══════════════════════════════════════════════════════════════════
 
+
 def test_cp_calculator_htmx(live_server):
     """CP: HTMX recalcula sin recarga."""
     with sync_playwright() as p:

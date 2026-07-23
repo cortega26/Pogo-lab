@@ -8,7 +8,7 @@ import json
 from base64 import b64decode, b64encode
 from dataclasses import asdict, dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.core.cache import cache
@@ -22,6 +22,9 @@ from engine.probability import (
     per_trade_success_prob,
     trades_for_confidence,
 )
+
+if TYPE_CHECKING:
+    from apps.mechanics.models import MechanicRuleSet
 
 SHARE_URL_VERSION = "v1"
 
@@ -76,7 +79,7 @@ def _resolve_floor(
     friendship_level: str,
     trade_type: str,
     _ruleset_version: int | None = None,
-) -> tuple[int, int | None]:
+) -> tuple[int, "MechanicRuleSet | None"]:
     """Resuelve el piso `f` delegando en mechanics.services.resolve_trade_floor.
 
     Mantiene compatibilidad con la API actual (parametro ruleset_version
@@ -108,9 +111,9 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
     """
     if inputs.floor_override is not None:
         floor = _validate_floor_override(inputs.floor_override)
-        ruleset_version = None
+        ruleset = None
     else:
-        floor, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
+        floor, ruleset = _resolve_floor(inputs.friendship_level, inputs.trade_type)
 
     target: dict[str, Any] = {"kind": inputs.target_kind}
     if inputs.threshold is not None:
@@ -142,7 +145,7 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
         trades_for_confidence=trades_for_confidence(p_single, inputs.confidence),
         floor=floor,
         k=16 - floor,
-        ruleset_version=ruleset_version,
+        ruleset_version=ruleset.version if ruleset else None,
         algorithm_version=ALGORITHM_VERSION,
         assumptions=assumptions,
         params={
@@ -168,7 +171,8 @@ def compute_scenario_cached(inputs: CalcInput) -> CalcResult:
     if inputs.floor_override is not None:
         ruleset_version = None
     else:
-        _, ruleset_version = _resolve_floor(inputs.friendship_level, inputs.trade_type)
+        _, ruleset = _resolve_floor(inputs.friendship_level, inputs.trade_type)
+        ruleset_version = ruleset.version if ruleset else None
     key = _cache_key(inputs, ruleset_version)
     result = cache.get(key)
     if result is not None:

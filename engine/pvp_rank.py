@@ -115,14 +115,16 @@ def rank_for_league(
             best_sp = stat_product(base_atk, base_def, base_stam, atk_iv, def_iv, stam_iv, cpm_val)
 
         if best_cp > 0:
-            results.append(IVSpread(
-                atk_iv=atk_iv,
-                def_iv=def_iv,
-                stam_iv=stam_iv,
-                level=best_level,
-                cp_value=best_cp,
-                stat_product=best_sp,
-            ))
+            results.append(
+                IVSpread(
+                    atk_iv=atk_iv,
+                    def_iv=def_iv,
+                    stam_iv=stam_iv,
+                    level=best_level,
+                    cp_value=best_cp,
+                    stat_product=best_sp,
+                )
+            )
 
     # Ordenar: mayor stat product primero, a igual SP menor atk_iv primero
     results.sort(key=lambda s: (-s.stat_product, s.atk_iv))

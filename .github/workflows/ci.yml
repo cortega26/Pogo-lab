@@ -55,11 +55,10 @@ jobs:
 
       # test_e2e.py se excluye aquí: este job no instala Chromium; el job `e2e`
       # de abajo sí lo hace y corre esos tests por separado.
-      - name: Tests
-        run: uv run pytest --no-header -q --tb=short --ignore=tests/test_e2e.py
-
-      - name: Coverage
-        run: uv run coverage run -m pytest --ignore=tests/test_e2e.py && uv run coverage report
+      - name: Tests + coverage
+        run: |
+          uv run coverage run -m pytest --no-header -q --tb=short --ignore=tests/test_e2e.py
+          uv run coverage report
 
       - name: Security audit
         run: uv run pip-audit

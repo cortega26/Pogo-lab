@@ -171,7 +171,10 @@ def _get_params(request, _calc_type, defaults):
 # Calculadora de CP & Nivel
 # ══════════════════════════════════════════════════════════════════════════════
 
-LEVEL_CHOICES = [(f"{lv:.1f}", f"{lv:.1f}") for lv in [1.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]]
+LEVEL_CHOICES = [
+    (f"{lv:.1f}", f"{lv:.1f}")
+    for lv in [1.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
+]
 
 
 def cp_calculator_view(request):
@@ -201,8 +204,13 @@ def _cp_result(params):
 
             species = SPECIES_DB.get(species_id, SPECIES_DB["pikachu"])
             cp_val, hp_val = compute_cp_hp(
-                species.base_atk, species.base_def, species.base_stam,
-                iv_atk, iv_def, iv_stam, level,
+                species.base_atk,
+                species.base_def,
+                species.base_stam,
+                iv_atk,
+                iv_def,
+                iv_stam,
+                level,
             )
 
             result = {
@@ -314,8 +322,11 @@ def _pvp_result(params):
         try:
             species = SPECIES_DB.get(species_id, SPECIES_DB["medicham"])
             ranking = top_spreads(
-                species.base_atk, species.base_def, species.base_stam,
-                max_cp=league_cap, n=25,
+                species.base_atk,
+                species.base_def,
+                species.base_stam,
+                max_cp=league_cap,
+                n=25,
             )
             result = {
                 "species": species_id,
@@ -403,8 +414,11 @@ def _catch_result(params):
 
     if params:
         try:
-            mult = catch_multiplier(ball=ball, berry=berry, curveball=curveball, throw=throw, medal=medal)
+            mult = catch_multiplier(
+                ball=ball, berry=berry, curveball=curveball, throw=throw, medal=medal
+            )
             from engine.catch import get_bcr
+
             bcr = get_bcr(species_id)
             if species_id == "mewtwo":
                 level = 20.0
@@ -611,9 +625,15 @@ def _shadow_result(params):
         try:
             species = SPECIES_DB.get(species_id, SPECIES_DB["machamp"])
             r = compare_shadow_purified(
-                species.base_atk, species.base_def, species.base_stam,
-                iv_atk, iv_def, iv_stam, level,
-                from_level=1.0, species_name=species_id,
+                species.base_atk,
+                species.base_def,
+                species.base_stam,
+                iv_atk,
+                iv_def,
+                iv_stam,
+                level,
+                from_level=1.0,
+                species_name=species_id,
             )
             result = {
                 "species": species_id,
@@ -675,8 +695,12 @@ def _breakpoints_result(params):
     if params:
         try:
             bps = find_breakpoints(
-                species_id, move_key, iv_atk, defender_def,
-                weather_boosted=weather, max_results=15,
+                species_id,
+                move_key,
+                iv_atk,
+                defender_def,
+                weather_boosted=weather,
+                max_results=15,
             )
             result = {
                 "species": species_id,

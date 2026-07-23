@@ -308,7 +308,13 @@ class TestNewCalculatorsSmoke:
     def test_cp_calculator_post(self):
         response = Client().post(
             "/es/calculadora/cp/",
-            {"species": "pikachu", "level": "20.0", "iv_atk": "10", "iv_def": "10", "iv_stam": "10"},
+            {
+                "species": "pikachu",
+                "level": "20.0",
+                "iv_atk": "10",
+                "iv_def": "10",
+                "iv_stam": "10",
+            },
         )
         assert response.status_code == 200
         assert "CP" in response.content.decode() or "Resultados" in response.content.decode()
@@ -316,7 +322,13 @@ class TestNewCalculatorsSmoke:
     def test_cp_calculator_post_htmx(self):
         response = Client().post(
             "/es/calculadora/cp/",
-            {"species": "pikachu", "level": "20.0", "iv_atk": "10", "iv_def": "10", "iv_stam": "10"},
+            {
+                "species": "pikachu",
+                "level": "20.0",
+                "iv_atk": "10",
+                "iv_def": "10",
+                "iv_stam": "10",
+            },
             HTTP_HX_REQUEST="true",
         )
         assert response.status_code == 200
@@ -354,8 +366,15 @@ class TestNewCalculatorsSmoke:
     def test_catch_calculator_post(self):
         response = Client().post(
             "/es/calculadora/captura/",
-            {"species": "charmander", "level": "15.0", "ball": "1.0", "berry": "1.5",
-             "curveball": "1", "throw": "1.15", "medal": "1.3"},
+            {
+                "species": "charmander",
+                "level": "15.0",
+                "ball": "1.0",
+                "berry": "1.5",
+                "curveball": "1",
+                "throw": "1.15",
+                "medal": "1.3",
+            },
         )
         assert response.status_code == 200
         assert "%" in response.content.decode()
@@ -392,7 +411,13 @@ class TestNewCalculatorsSmoke:
     def test_shadow_calculator_post(self):
         response = Client().post(
             "/es/calculadora/shadow/",
-            {"species": "machamp", "level": "40.0", "iv_atk": "15", "iv_def": "15", "iv_stam": "15"},
+            {
+                "species": "machamp",
+                "level": "40.0",
+                "iv_atk": "15",
+                "iv_def": "15",
+                "iv_stam": "15",
+            },
         )
         assert response.status_code == 200
         content = response.content.decode()

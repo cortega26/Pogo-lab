@@ -9,7 +9,14 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY . .
+COPY manage.py ./
+COPY config/ ./config/
+COPY apps/ ./apps/
+COPY engine/ ./engine/
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY locale/ ./locale/
+COPY docs/ ./docs/
 RUN uv sync --frozen --no-dev
 RUN uv run python manage.py collectstatic --noinput --settings=config.settings.prod
 

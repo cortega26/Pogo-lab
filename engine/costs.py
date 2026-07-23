@@ -15,21 +15,102 @@ from dataclasses import dataclass
 # La secuencia se repite 4 veces para cada valor.
 
 _DUST_TIERS: list[int] = [
-    200, 400, 600, 800, 1000, 1300, 1600, 1900, 2200, 2500,
-    3000, 3500, 4000, 4500, 5000, 6000, 7000, 8000, 9000, 10000,
-    11000, 12000, 13000, 14000, 15000, 17500, 20000, 22500, 25000, 30000,
+    200,
+    400,
+    600,
+    800,
+    1000,
+    1300,
+    1600,
+    1900,
+    2200,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    6000,
+    7000,
+    8000,
+    9000,
+    10000,
+    11000,
+    12000,
+    13000,
+    14000,
+    15000,
+    17500,
+    20000,
+    22500,
+    25000,
+    30000,
 ]
 
 _CANDY_TIERS: list[int] = [
-    1, 1, 1, 1, 1, 2, 2, 2, 2, 2,
-    3, 3, 3, 3, 3, 4, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 5, 5, 5, 6,
+    1,
+    1,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    3,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    5,
+    5,
+    5,
+    6,
 ]
 
 _XL_TIERS: list[int] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 1, 1, 1, 2, 2, 2, 3,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    3,
 ]
 
 _POWERUPS_PER_TIER = 4
@@ -96,9 +177,7 @@ def power_up_cost(
         ValueError: Si from_level > to_level.
     """
     if from_level > to_level:
-        raise ValueError(
-            f"from_level ({from_level}) no puede ser mayor que to_level ({to_level})"
-        )
+        raise ValueError(f"from_level ({from_level}) no puede ser mayor que to_level ({to_level})")
 
     start_pu = _level_to_powerup_index(from_level)
     end_pu = _level_to_powerup_index(to_level)

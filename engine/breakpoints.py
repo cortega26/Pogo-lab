@@ -37,7 +37,9 @@ def _pve_damage(
 
     Damage = floor(0.5 * Power * Atk / Def * STAB * Eff * Weather * Friend) + 1
     """
-    raw = 0.5 * power * (atk_effective / def_effective) * stab * effectiveness * weather * friendship
+    raw = (
+        0.5 * power * (atk_effective / def_effective) * stab * effectiveness * weather * friendship
+    )
     return max(1, math.floor(raw) + 1)
 
 
@@ -115,13 +117,19 @@ def find_breakpoints(
 
         atk_eff = (base_atk + iv_atk) * cpm
         damage = _pve_damage(
-            move.power, atk_eff, defender_def,
-            stab=stab, effectiveness=effectiveness,
-            weather=weather, friendship=friendship,
+            move.power,
+            atk_eff,
+            defender_def,
+            stab=stab,
+            effectiveness=effectiveness,
+            weather=weather,
+            friendship=friendship,
         )
 
         if damage > prev_damage and prev_damage >= 0:
-            breakpoints.append(Breakpoint(level=level, damage=damage, atk_effective=round(atk_eff, 1)))
+            breakpoints.append(
+                Breakpoint(level=level, damage=damage, atk_effective=round(atk_eff, 1))
+            )
             if len(breakpoints) >= max_results:
                 break
 

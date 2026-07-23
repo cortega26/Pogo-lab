@@ -99,9 +99,7 @@ class TestRankForLeague:
     def test_iv_rank_percent_best_is_zero(self):
         ranking = rank_for_league(121, 152, 155, max_cp=1500, level_cap=50.0)
         best = ranking[0]
-        pct = iv_rank_percent(
-            121, 152, 155, best.atk_iv, best.def_iv, best.stam_iv, max_cp=1500
-        )
+        pct = iv_rank_percent(121, 152, 155, best.atk_iv, best.def_iv, best.stam_iv, max_cp=1500)
         assert pct == pytest.approx(0.0, abs=0.5)
 
 

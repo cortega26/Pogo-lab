@@ -12,7 +12,6 @@ from typing import Any
 from django.db import transaction
 from django.db.models import Count, Q
 
-from apps.mechanics.models import MechanicRuleSet as MechanicRuleSetModel
 from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
 from engine.observations import ivs_consistent_with_floor
 
@@ -173,15 +172,7 @@ def register_observation(
         ruleset = resolved["ruleset"]
     else:
         try:
-            _f_ruleset, ruleset_version = resolve_trade_floor(friendship_level, trade_type)
-            if ruleset_version is not None:
-                ruleset = MechanicRuleSetModel.objects.filter(
-                    version=ruleset_version,
-                    mechanic__key="trade_iv",
-                    is_published=True,
-                ).first()
-            else:
-                ruleset = None
+            _f, ruleset = resolve_trade_floor(friendship_level, trade_type)
         except RulesetUnavailableError:
             ruleset = None
 
@@ -229,19 +220,12 @@ def bulk_create_observations(
         key = (friendship_level, trade_type)
         if key not in resolved_cache:
             try:
-                f, ruleset_version = resolve_trade_floor(friendship_level, trade_type)
+                f, ruleset = resolve_trade_floor(friendship_level, trade_type)
             except RulesetUnavailableError:
-                f, ruleset_version = 0, None
-            ruleset = None
-            if ruleset_version is not None:
-                ruleset = MechanicRuleSetModel.objects.filter(
-                    version=ruleset_version,
-                    mechanic__key="trade_iv",
-                    is_published=True,
-                ).first()
+                f, ruleset = 0, None
             resolved_cache[key] = {
                 "floor": f,
-                "ruleset_version": ruleset_version,
+                "ruleset_version": ruleset.version if ruleset else None,
                 "ruleset": ruleset,
             }
         return resolved_cache[key]

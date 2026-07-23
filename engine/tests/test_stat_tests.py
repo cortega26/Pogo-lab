@@ -107,6 +107,27 @@ class TestUniformityTest:
         assert r1.p_value == r2.p_value, f"MC no reproducible: {r1.p_value} ≠ {r2.p_value}"
         assert r1.stat == r2.stat
 
+    def test_monte_carlo_normalizes_probs(self):
+        """Monte Carlo debe normalizar probs que no suman 1 (plan 022).
+
+        Con counts=[10,10,10] y probs=[0.3,0.3,0.3] (suma 0.9), las probs
+        normalizadas son [1/3, 1/3, 1/3] y el chi² observado es ~0, por lo que
+        el p-valor es 1.0 (todos los valores simulados lo superan). La
+        verificación clave es que el p-valor sea un número válido y que el
+        min_expected refleje la normalización (n/k, no n*0.3).
+        """
+        counts = [10, 10, 10]
+        probs = [0.3, 0.3, 0.3]  # suma = 0.9, no 1
+        result = uniformity_test(counts, probs, method="monte_carlo", seed=42)
+        assert result.method_used == "monte_carlo"
+        assert result.stat is not None
+        assert 0.0 <= result.p_value <= 1.0
+        # min_expected debe reflejar la normalización: 30/3 = 10.0, no 30*0.3 = 9.0
+        assert result.min_expected == pytest.approx(10.0), (
+            f"min_expected debe ser 10.0 (normalizado), no 9.0 (sin normalizar): "
+            f"{result.min_expected}"
+        )
+
     def test_force_chisquare(self):
         """Forzar chi² aunque esperados sean pequeños."""
         counts = [2, 3, 1]

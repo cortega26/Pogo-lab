@@ -5,6 +5,7 @@
 # Secretos / entorno (NUNCA en la imagen)
 .env
 .env.*
+.env-*
 !.env.example
 .env-oci
 infra/keys/

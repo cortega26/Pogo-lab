@@ -38,7 +38,7 @@
     </a>
   </div>
 
-  {% if observations %}
+  {% if observations and page_obj.object_list %}
     <div class="overflow-x-auto border-2 border-slate-900 dark:border-slate-100">
       <table class="min-w-full divide-y-2 divide-slate-200 dark:divide-slate-800">
         <thead class="bg-slate-100 dark:bg-slate-800">
@@ -54,7 +54,7 @@
           </tr>
         </thead>
         <tbody class="divide-y-2 divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
-          {% for obs in observations %}
+          {% for obs in page_obj %}
             <tr class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50
               {% if obs.state == 'suspicious' %}bg-accent-50/30 dark:bg-accent-500/5
               {% elif obs.state == 'excluded' %}bg-danger-50/30 dark:bg-danger-500/5
@@ -80,6 +80,20 @@
         </tbody>
       </table>
     </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav class="flex items-center justify-center gap-2 mt-6" aria-label="{% trans 'Paginación' %}">
+      {% if page_obj.has_previous %}
+        <a href="?page=1" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&laquo;</a>
+        <a href="?page={{ page_obj.previous_page_number }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&lsaquo;</a>
+      {% endif %}
+      <span class="text-sm text-slate-600 dark:text-slate-300">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&rsaquo;</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}" class="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">&raquo;</a>
+      {% endif %}
+    </nav>
+    {% endif %}
   {% else %}
     {% include "includes/_empty_state.html" with title=_("Sin observaciones") message=_("Esta sesión aún no tiene observaciones registradas.") %}
   {% endif %}

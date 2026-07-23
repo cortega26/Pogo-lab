@@ -154,9 +154,30 @@ def test_export_view_post_downloads_json(client, user):
 
 
 @pytest.mark.django_db
+def test_export_filename_does_not_leak_pk(client, user):
+    """El filename de export no contiene el PK del usuario (plan 042)."""
+    client.force_login(user)
+    response = client.post("/es/cuenta/exportar/")
+    assert response.status_code == 200
+    disposition = response.get("Content-Disposition", "")
+    # El filename NO debe ser el patrón exacto con PK
+    assert f"pogolab_export_{user.pk}.json" not in disposition, (
+        f"Filename no debe usar el PK directamente: {disposition} (plan 042)"
+    )
+    # Debe ser un hash de 16 chars hex, no un número pequeño
+    assert "pogolab_export_" in disposition
+    # El identificador debe ser alfanumérico de 16 chars (hash), no solo dígitos
+    import re
+
+    match = re.search(r"pogolab_export_([a-f0-9]+)\.json", disposition)
+    assert match is not None, f"Filename debe usar hash hex: {disposition} (plan 042)"
+    safe_id = match.group(1)
+    assert len(safe_id) == 16, f"Hash debe ser 16 chars, no {len(safe_id)}: {safe_id}"
+
+
+@pytest.mark.django_db
 def test_export_creates_audit_event(client, user):
     client.force_login(user)
-
     client.post("/es/cuenta/exportar/")
 
     event = AuditEvent.objects.filter(verb="account_data_exported").first()

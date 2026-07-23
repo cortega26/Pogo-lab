@@ -1,3 +1,5 @@
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *
 
 DEBUG = env.bool("DEBUG", default=False)
@@ -10,10 +12,24 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+RATELIMIT_IP_META_KEY = "HTTP_X_REAL_IP"
 
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@pogo-lab.com")
+
+EMAIL_URL = env("EMAIL_URL", default="")
+if not EMAIL_URL:
+    raise ImproperlyConfigured(
+        "Producción exige EMAIL_URL (backend de correo transaccional). "
+        "Consola/locmem/dummy NO son válidos para producción."
+    )
+_insecure_backends = ("consolemail", "locmem", "dummy", "file")
+if any(b in EMAIL_URL.lower() for b in _insecure_backends):
+    raise ImproperlyConfigured(
+        "Producción no permite backends de correo inseguros "
+        "(console/locmem/dummy/file). Define un proveedor real en EMAIL_URL."
+    )
 
 LOGGING = {
     "version": 1,

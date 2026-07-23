@@ -102,7 +102,7 @@ def _monte_carlo_uniformity_pvalue(
     count_exceed = 0
     for _ in range(n_sim):
         simulated = rng.multinomial(n_total, norm_probs)
-        sim_expected = np.array([p * n_total for p in expected_probs])
+        sim_expected = np.array([p * n_total for p in norm_probs])
         sim_chi2 = _chi2_statistic(simulated.tolist(), sim_expected.tolist())
         if sim_chi2 >= observed_chi2:
             count_exceed += 1
@@ -144,7 +144,9 @@ def uniformity_test(
             min_expected=0.0,
         )
 
-    expected = [p * n_total for p in expected_probs]
+    total_prob = sum(expected_probs)
+    norm_probs = [p / total_prob for p in expected_probs] if total_prob > 0 else expected_probs
+    expected = [p * n_total for p in norm_probs]
     min_expected = min(expected) if expected else 0.0
 
     # --- filtrar celdas con esperado > 0 para decidir método ---

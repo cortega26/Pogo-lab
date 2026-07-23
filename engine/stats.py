@@ -159,8 +159,9 @@ def effective_stat(base: int, iv: int, cpm: float) -> float:
     return (base + iv) * cpm
 
 
-def cp(base_atk: int, base_def: int, base_stam: int,
-       iv_atk: int, iv_def: int, iv_stam: int, cpm: float) -> int:
+def cp(
+    base_atk: int, base_def: int, base_stam: int, iv_atk: int, iv_def: int, iv_stam: int, cpm: float
+) -> int:
     """Calcula el CP (Puntos de Combate) según FOR006.
 
     CP = max(10, floor(Atk_eff * sqrt(Def_eff) * sqrt(Stam_eff) * CPM² / 10))
@@ -388,6 +389,7 @@ DIALGA = SpeciesStats(
 )
 
 # ─── Base de datos de especies (canónica, generada desde dps_data) ─────────────
+
 
 def _build_species_db() -> dict[str, SpeciesStats]:
     """Construye SPECIES_DB: primero desde dps_data (~159 especies), luego

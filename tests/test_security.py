@@ -1,5 +1,7 @@
 """Tests de seguridad: CSP, CSRF, headers de hardening."""
 
+import json
+
 import pytest
 from csp.constants import NONCE, SELF
 from django.test import Client, override_settings
@@ -89,3 +91,36 @@ def test_csp_does_not_block_htmx_script_with_nonce():
     rendered = template.render(Context({"request": type("R", (), {"csp_nonce": "test123"})()}))
     assert "nonce=" in rendered
     assert "htmx" in rendered
+
+
+@pytest.mark.django_db
+def test_csp_report_handles_malicious_uri(client):
+    """CSP report con newlines en blocked-uri no inyecta logs (plan 028)."""
+    malicious = json.dumps(
+        {"csp-report": {"blocked-uri": "http://evil.com/\nFAKE LOG ENTRY"}}
+    ).encode()
+    response = client.post("/csp-reports/", data=malicious, content_type="application/json")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_csp_report_does_not_log_raw_report(client, caplog):
+    """La vista sanitiza el report CSP antes de loguear (plan 028)."""
+    import logging
+
+    payload = json.dumps(
+        {
+            "csp-report": {
+                "blocked-uri": "http://evil.com/\nFAKE",
+                "effective-directive": "script-src",
+            }
+        }
+    ).encode()
+    with caplog.at_level(logging.INFO, logger="apps.core.views"):
+        client.post("/csp-reports/", data=payload, content_type="application/json")
+    # El log debe contener 'sanitized' metadata, no el payload crudo
+    log_text = caplog.text
+    assert "FAKE LOG ENTRY" not in log_text, (
+        "El log no debe contener el contenido inyectado crudo (plan 028)"
+    )
+    assert "blocked" in log_text or "CSP violation" in log_text

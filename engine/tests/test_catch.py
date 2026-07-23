@@ -5,7 +5,6 @@ Fixtures verificadas:
   Legendary raid (BCR=0.02) L20, golden razz + curva → ~16.9 %
 """
 
-
 import pytest
 
 from engine.catch import (

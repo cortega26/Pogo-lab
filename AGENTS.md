@@ -5,13 +5,14 @@ Léela **antes** de tocar nada. `CLAUDE.md` apunta aquí.
 
 ## Estado actual
 
-Fase de **planificación**: aún no hay código. Artefactos (mapa de propiedad SSOT en `docs/README.md`):
+Fase **beta** — código completo de los 7 milestones del MVP (intercambios / IV / Lucky). Pendientes humanos:
+revisión legal, smoke de despliegue, verificación de restore (trackeados en M7). Artefactos (mapa de propiedad SSOT en `docs/README.md`):
 
 - `docs/plan.md` — plan maestro **canónico** (arquitectura, modelo de datos, motor estadístico, decisiones). Referencia; **no lo recargues entero** cada sesión. (No edites la copia de `~/.claude/plans/`.)
 - `docs/adr/` — **decisiones de arquitectura** por escrito (ADR-0001…0007). Registro detallado del *rationale*.
 - `docs/milestones/` — seguimiento por milestone (`README.md` = tablero; `M0…M7` = hojas autocontenidas). **Carga solo la hoja del milestone en curso.**
 - `CONTRIBUTING.md` — flujo de trabajo (TDD, commits, tooling y contratos de guardrails). `.github/PULL_REQUEST_TEMPLATE.md` — checklist de no-negociables.
-- `.codegraph/` — índice de código (vacío hasta que haya fuentes).
+- `.codegraph/` — no inicializado. Ejecutar `codegraph init -i` para construir el índice.
 
 ## Qué es
 
@@ -103,7 +104,7 @@ uv run pytest                             # tests (engine + apps)
 uv run python manage.py runserver
 ```
 
-`manage.py`, `compose.yaml`, `Makefile`, etc. se crean en **M1** (ver `docs/milestones/M1-fundacion.md`).
+`manage.py`, `compose.yaml`, `Dockerfile`, etc. ya existen (creados en M1). Ver el Makefile para los comandos de desarrollo.
 
 ## Estrategia de modelos (si se implementa con varios agentes)
 

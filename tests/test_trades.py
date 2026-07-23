@@ -961,6 +961,29 @@ class TestTradeViews:
         assert resp.status_code == 200
 
     @pytest.mark.django_db
+    def test_session_list_pagination(self, client, user):
+        """La lista de sesiones pagina a 25 por página (plan 031)."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.trades.models import TradeSession
+
+        client.force_login(user)
+        now = timezone.now()
+        for i in range(30):
+            TradeSession.objects.create(owner=user, started_at=now - timedelta(hours=i))
+        resp = client.get("/es/intercambios/")
+        assert resp.status_code == 200
+        page_obj = resp.context.get("page_obj")
+        assert page_obj is not None
+        assert len(list(page_obj)) == 25  # 25 por página
+        # La página 2 tiene las 5 restantes
+        resp2 = client.get("/es/intercambios/?page=2")
+        assert resp2.status_code == 200
+        assert len(list(resp2.context["page_obj"])) == 5
+
+    @pytest.mark.django_db
     def test_observation_create_get(self, client, user):
         client.force_login(user)
         resp = client.get("/es/intercambios/observar/")

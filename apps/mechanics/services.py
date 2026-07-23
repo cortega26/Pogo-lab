@@ -59,10 +59,12 @@ def resolve_trade_floor(
     friendship_level: str,
     trade_type: str,
     at: datetime | None = None,
-) -> tuple[int, int | None]:
+) -> tuple[int, MechanicRuleSet | None]:
     """Resuelve el piso `f` desde el ruleset publicado de trade_iv.
 
-    Devuelve (f, ruleset_version).
+    Devuelve (f, ruleset) donde ruleset es la instancia de MechanicRuleSet
+    (o None si no aplica). Los callers que necesiten la versión usan
+    `ruleset.version`.
     Lucky/trade_type in (lucky, lucky_guaranteed) sobrescribe con floor.lucky.
     Lanza RulesetUnavailableError si no hay ruleset publicado.
     """
@@ -91,4 +93,4 @@ def resolve_trade_floor(
         )
 
     params: dict[str, Any] = {p.key: p.value for p in ruleset.parameters.all()}
-    return _floor_from_params(params, friendship_level, trade_type), ruleset.version
+    return _floor_from_params(params, friendship_level, trade_type), ruleset

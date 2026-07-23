@@ -18,9 +18,14 @@ class StaticViewSitemap(sitemaps.Sitemap):
 
     def items(self):
         return [
-            "calculator", "cp_calculator", "cost_calculator",
-            "pvp_ranker", "catch_calculator", "type_calculator",
-            "shiny_calculator", "shadow_calculator",
+            "calculator",
+            "cp_calculator",
+            "cost_calculator",
+            "pvp_ranker",
+            "catch_calculator",
+            "type_calculator",
+            "shiny_calculator",
+            "shadow_calculator",
             "dps_browser",
         ]
 

@@ -253,7 +253,9 @@ def type_effectiveness(
     return effectiveness
 
 
-def weaknesses(defending1: PokemonType, defending2: PokemonType | None = None) -> dict[PokemonType, float]:
+def weaknesses(
+    defending1: PokemonType, defending2: PokemonType | None = None
+) -> dict[PokemonType, float]:
     """Debilidades y resistencias de una combinación de tipos defensivos.
 
     Args:

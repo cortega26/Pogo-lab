@@ -66,6 +66,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
+RATELIMIT_IP_META_KEY = "REMOTE_ADDR"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",

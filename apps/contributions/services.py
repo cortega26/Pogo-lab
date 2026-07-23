@@ -70,10 +70,7 @@ def build_dataset_version(
     for obs in qs.iterator(chunk_size=1000):
         rs_id = obs.ruleset_id
         if rs_id is not None and rs_id not in ruleset_versions:
-            from apps.mechanics.models import MechanicRuleSet
-
-            rs = MechanicRuleSet.objects.filter(pk=rs_id).first()
-            ruleset_versions[rs_id] = rs.version if rs else 0
+            ruleset_versions[rs_id] = obs.ruleset.version if obs.ruleset else 0
 
         rows.append(
             {

@@ -125,6 +125,7 @@ def _floor_for_version(
     ruleset = MechanicRuleSet.objects.filter(
         mechanic__key="trade_iv",
         version=ruleset_version,
+        is_published=True,
     ).first()
     if ruleset is not None:
         return floor_for_ruleset(ruleset, friendship_level, trade_type)
@@ -234,9 +235,11 @@ def _hundo_rate_analysis(
     f: int,
 ) -> dict[str, Any]:
     """Análisis de tasa de hundos con prueba binomial exacta."""
-    n = observations.count()
-    successes = observations.filter(atk=15, iv_def=15, hp=15).count()
-    return _hundo_payload(n, successes, f)
+    agg = observations.aggregate(
+        n=models.Count("id"),
+        successes=models.Count("pk", filter=models.Q(atk=15, iv_def=15, hp=15)),
+    )
+    return _hundo_payload(agg["n"], agg["successes"], f)
 
 
 def _stat_uniformity_analysis(

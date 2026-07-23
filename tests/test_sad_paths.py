@@ -26,6 +26,7 @@ class TestSadPathIV:
         """Sin mechanic seedeado, el POST vacío lanza RulesetUnavailableError.
         Comportamiento esperado: se necesita el fixture seeded_mechanic (ver test_e2e.py)."""
         from apps.mechanics.services import RulesetUnavailableError
+
         with pytest.raises(RulesetUnavailableError):
             Client().post("/es/calculadora/", {})
 
@@ -35,12 +36,30 @@ class TestSadPathCP:
         assert Client().get("/es/calculadora/cp/").status_code == 200
 
     def test_iv_out_of_range(self):
-        r = Client().post("/es/calculadora/cp/", {"species": "pikachu", "level": "20.0", "iv_atk": "99", "iv_def": "10", "iv_stam": "10"})
+        r = Client().post(
+            "/es/calculadora/cp/",
+            {
+                "species": "pikachu",
+                "level": "20.0",
+                "iv_atk": "99",
+                "iv_def": "10",
+                "iv_stam": "10",
+            },
+        )
         assert r.status_code == 200
         assert "Error" in r.content.decode() or "error" in r.content.decode().lower()
 
     def test_bad_species(self):
-        r = Client().post("/es/calculadora/cp/", {"species": "zzz_nonexistent", "level": "20.0", "iv_atk": "10", "iv_def": "10", "iv_stam": "10"})
+        r = Client().post(
+            "/es/calculadora/cp/",
+            {
+                "species": "zzz_nonexistent",
+                "level": "20.0",
+                "iv_atk": "10",
+                "iv_def": "10",
+                "iv_stam": "10",
+            },
+        )
         assert r.status_code == 200
 
     def test_non_numeric_iv(self):
@@ -118,11 +137,23 @@ class TestSadPathShadow:
         assert Client().get("/es/calculadora/shadow/").status_code == 200
 
     def test_bad_species(self):
-        r = Client().post("/es/calculadora/shadow/", {"species": "zzz", "level": "40.0", "iv_atk": "15", "iv_def": "15", "iv_stam": "15"})
+        r = Client().post(
+            "/es/calculadora/shadow/",
+            {"species": "zzz", "level": "40.0", "iv_atk": "15", "iv_def": "15", "iv_stam": "15"},
+        )
         assert r.status_code < 500
 
     def test_iv_out_of_range(self):
-        r = Client().post("/es/calculadora/shadow/", {"species": "machamp", "level": "40.0", "iv_atk": "99", "iv_def": "15", "iv_stam": "15"})
+        r = Client().post(
+            "/es/calculadora/shadow/",
+            {
+                "species": "machamp",
+                "level": "40.0",
+                "iv_atk": "99",
+                "iv_def": "15",
+                "iv_stam": "15",
+            },
+        )
         assert r.status_code < 500
 
     def test_empty(self):
@@ -134,12 +165,23 @@ class TestSadPathBreakpoints:
         assert Client().get("/es/calculadora/breakpoints/").status_code == 200
 
     def test_bad_species(self):
-        r = Client().post("/es/calculadora/breakpoints/", {"species": "zzz", "move": "psycho_cut", "iv_atk": "15", "defender_def": "200"})
+        r = Client().post(
+            "/es/calculadora/breakpoints/",
+            {"species": "zzz", "move": "psycho_cut", "iv_atk": "15", "defender_def": "200"},
+        )
         assert r.status_code == 200
         assert "Error" in r.content.decode()
 
     def test_bad_move(self):
-        r = Client().post("/es/calculadora/breakpoints/", {"species": "mewtwo", "move": "nonexistent_move", "iv_atk": "15", "defender_def": "200"})
+        r = Client().post(
+            "/es/calculadora/breakpoints/",
+            {
+                "species": "mewtwo",
+                "move": "nonexistent_move",
+                "iv_atk": "15",
+                "defender_def": "200",
+            },
+        )
         assert r.status_code == 200
         assert "Error" in r.content.decode()
 

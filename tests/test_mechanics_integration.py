@@ -324,9 +324,10 @@ class TestResolveTradeFloor:
     def test_resolve_with_published_ruleset(self, published_ruleset):
         from apps.mechanics.services import resolve_trade_floor
 
-        floor, version = resolve_trade_floor("good", "normal")
+        floor, ruleset = resolve_trade_floor("good", "normal")
         assert floor == 1
-        assert version == 1
+        assert ruleset is not None
+        assert ruleset.version == 1
 
     def test_resolve_lucky_uses_lucky_floor(self, published_ruleset):
         from apps.mechanics.services import resolve_trade_floor

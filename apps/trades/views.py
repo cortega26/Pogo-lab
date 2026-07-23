@@ -7,6 +7,7 @@ import datetime
 import json
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -25,8 +26,11 @@ from .services import (
 def session_list(request: HttpRequest) -> HttpResponse:
     owner_id = request.user.pk
     assert owner_id is not None
-    sessions = TradeSession.objects.filter(owner_id=owner_id).order_by("-started_at")
-    return render(request, "trades/session_list.html", {"sessions": sessions})
+    sessions_qs = TradeSession.objects.filter(owner_id=owner_id).order_by("-started_at")
+    paginator = Paginator(sessions_qs, 25)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+    return render(request, "trades/session_list.html", {"page_obj": page_obj})
 
 
 @login_required
@@ -53,11 +57,14 @@ def session_create(request: HttpRequest) -> HttpResponse:
 @login_required
 def session_detail(request: HttpRequest, session_id: int) -> HttpResponse:
     session = get_object_or_404(TradeSession, pk=session_id, owner=request.user)
-    observations = session.observations.all().order_by("-observed_at")
+    observations_qs = session.observations.select_related("ruleset").order_by("-observed_at")
+    paginator = Paginator(observations_qs, 50)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
     return render(
         request,
         "trades/session_detail.html",
-        {"session": session, "observations": observations},
+        {"session": session, "page_obj": page_obj, "observations": page_obj},
     )
 
 
