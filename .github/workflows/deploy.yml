@@ -25,6 +25,7 @@ jobs:
             uv sync --frozen --no-dev
             uv run python manage.py check --deploy
             uv run python manage.py migrate --noinput
+            uv run python manage.py createcachetable
             uv run python manage.py collectstatic --noinput
             sudo systemctl restart pogo-lab.service
             curl --fail --silent --show-error --retry 5 \

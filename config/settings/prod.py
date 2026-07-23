@@ -12,6 +12,14 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 RATELIMIT_IP_META_KEY = "HTTP_X_REAL_IP"
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "cache_ratelimit",
+        "TIMEOUT": 300,
+    }
+}
+
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@pogo-lab.com")

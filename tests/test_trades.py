@@ -460,10 +460,10 @@ class TestCSVImport:
             "2026-07-17T12:00:00+00:00,best,lucky,12,15,13,Mewtwo\n"
         )
         r1 = import_csv(csv_content, user.pk)
-        assert r1["valid_count"] == 1
+        assert r1["created_count"] == 1
         r2 = import_csv(csv_content, user.pk)
-        assert r2["valid_count"] == 1
-        assert r2["created"][0].state == "valid"
+        assert r2["created_count"] == 0
+        assert r2["duplicate_count"] == 1
 
     @pytest.mark.django_db
     def test_csv_utf8_bom_handling(self, user):

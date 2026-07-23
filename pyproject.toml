@@ -92,6 +92,9 @@ testpaths = ["engine/tests", "apps", "tests"]
 norecursedirs = [".venv", ".codegraph", ".hypothesis", "node_modules"]
 addopts = "--randomly-seed=0"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "postgres: tests that require a PostgreSQL database (run with --settings=config.settings.test_postgres)",
+]
 
 [tool.coverage.run]
 source = ["engine", "config", "apps"]

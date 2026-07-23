@@ -13,7 +13,8 @@ import json
 from collections import Counter
 from typing import Any
 
-from django.db import models
+from django.db import models, transaction
+from django.utils import timezone
 
 from apps.mechanics.models import MechanicRuleSet
 from apps.mechanics.services import (
@@ -342,15 +343,8 @@ def run_personal_analysis(
     Separa obligatoriamente Lucky de normal y por ruleset.
     Reproducible: mismo seed + algorithm_version produce el mismo resultado.
 
-    Args:
-        owner_id: ID del usuario propietario.
-        filters: Filtros opcionales (friendship_level, trade_type, fechas).
-        seed: Semilla para Monte Carlo (None → determinista a partir de owner_id+filters).
-        code_sha: SHA del código para trazabilidad.
-        input_fingerprint: Hash de la entrada; si no se pasa se calcula.
-
-    Returns:
-        AnalysisRun creado.
+    El cálculo y persistencia es atómico: si falla a mitad, el run queda
+    'failed' sin resultados parciales (plan 054).
     """
     if seed is None:
         seed = _deterministic_seed_from_data({"owner_id": owner_id, "filters": filters})
@@ -364,52 +358,68 @@ def run_personal_analysis(
         random_seed=seed,
         code_sha=code_sha,
         input_fingerprint=input_fingerprint,
+        status="pending",
     )
 
-    base_qs = _valid_observations(owner_id, filters)
-    grupos = _build_groups(base_qs)
+    try:
+        with transaction.atomic():
+            base_qs = _valid_observations(owner_id, filters)
+            grupos = _build_groups(base_qs)
 
-    # Detectar mezcla en TODO el conjunto de observaciones válidas
-    mixing = _detect_mixing(base_qs)
-    run.mixing_flags = mixing
-    run.save(update_fields=["mixing_flags"])
+            mixing = _detect_mixing(base_qs)
+            run.mixing_flags = mixing
+            run.save(update_fields=["mixing_flags"])
 
-    for grupo in grupos:
-        obs_qs: models.QuerySet = grupo["observations"]
-        # Piso leído del ruleset del grupo (nunca hardcodeado). Si no hay
-        # ruleset del que leerlo, no se analiza el grupo (honestidad).
-        f = _group_floor(grupo)
-        if f is None:
-            continue
-        label: str = grupo["label"]
+            results_to_create: list[AnalysisResult] = []
+            for grupo in grupos:
+                obs_qs: models.QuerySet = grupo["observations"]
+                f = _group_floor(grupo)
+                if f is None:
+                    continue
+                label: str = grupo["label"]
 
-        # 1. Tasa de hundos
-        hundo_payload = _hundo_rate_analysis(obs_qs, f)
-        AnalysisResult.objects.create(
-            run=run,
-            metric_key=f"hundo_rate-{label.lower().replace(' ', '_')}",
-            payload=hundo_payload,
-        )
-
-        total_n = obs_qs.count()
-
-        # 2. Uniformidad por stat
-        if total_n > 0:
-            stat_results = _stat_uniformity_analysis(obs_qs, f, seed)
-            for stat_name, payload in stat_results.items():
-                AnalysisResult.objects.create(
-                    run=run,
-                    metric_key=f"stat_uniformity_{stat_name}-{label.lower().replace(' ', '_')}",
-                    payload=payload,
+                hundo_payload = _hundo_rate_analysis(obs_qs, f)
+                results_to_create.append(
+                    AnalysisResult(
+                        run=run,
+                        metric_key=f"hundo_rate-{label.lower().replace(' ', '_')}",
+                        payload=hundo_payload,
+                    )
                 )
 
-            # 3. Uniformidad de suma
-            sum_payload = _sum_uniformity_analysis(obs_qs, f, seed)
-            AnalysisResult.objects.create(
-                run=run,
-                metric_key=f"sum_uniformity-{label.lower().replace(' ', '_')}",
-                payload=sum_payload,
-            )
+                total_n = obs_qs.count()
+
+                if total_n > 0:
+                    stat_results = _stat_uniformity_analysis(obs_qs, f, seed)
+                    for stat_name, payload in stat_results.items():
+                        results_to_create.append(
+                            AnalysisResult(
+                                run=run,
+                                metric_key=f"stat_uniformity_{stat_name}-{label.lower().replace(' ', '_')}",
+                                payload=payload,
+                            )
+                        )
+
+                    sum_payload = _sum_uniformity_analysis(obs_qs, f, seed)
+                    results_to_create.append(
+                        AnalysisResult(
+                            run=run,
+                            metric_key=f"sum_uniformity-{label.lower().replace(' ', '_')}",
+                            payload=sum_payload,
+                        )
+                    )
+
+            if results_to_create:
+                AnalysisResult.objects.bulk_create(results_to_create)
+
+            run.status = "complete"
+            run.completed_at = timezone.now()
+            run.save(update_fields=["status", "completed_at"])
+    except Exception as exc:
+        run.status = "failed"
+        run.error_message = str(exc)[:500]
+        run.save(update_fields=["status", "error_message"])
+        raise
 
     return run
 
@@ -420,10 +430,18 @@ def get_or_run_personal_analysis(
     seed: int | None = None,
     code_sha: str = "",
 ) -> AnalysisRun:
-    """Reutiliza un AnalysisRun si la entrada (owner+filtros+datos) no cambió."""
+    """Reutiliza un AnalysisRun si la entrada (owner+filtros+datos) no cambió.
+
+    Solo reutiliza runs con status='complete'. Si un run falló o está
+    pendiente, se crea uno nuevo (plan 054).
+    """
     fingerprint = _input_fingerprint(owner_id, filters)
     existing = (
-        AnalysisRun.objects.filter(owner_id=owner_id, input_fingerprint=fingerprint)
+        AnalysisRun.objects.filter(
+            owner_id=owner_id,
+            input_fingerprint=fingerprint,
+            status="complete",
+        )
         .order_by("-created_at")
         .first()
     )

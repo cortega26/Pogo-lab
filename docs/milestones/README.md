@@ -28,7 +28,7 @@ milestone en curso (no el plan completo), lo que mantiene el contexto pequeño y
 | [M5 — Analysis & Decisions](M5-analysis-decisions.md) | Inferencia honesta reproducible + recomendaciones | L | M4 | PR-14…16 | ✅ |
 | [M6 — Community Dataset](M6-community-dataset.md) | Contribución opt-in anonimizada + moderación + dashboard | L | M5 | PR-17…19 | ✅ |
 | [M7 — Hardening y beta](M7-hardening-beta.md) | E2E, a11y, seguridad, backup/restore, despliegue, legal | M | M1…M6 | PR-20, 21 | 🟨 |
-| [M8 — Ola A+B: Calculadoras](M8-ola-a.md) | CP, Costos, PvP, Captura, Tipos, Shiny, Shadow | L | M7, Gate 0 | PR-22, 23 | ✅ |
+| [M8 — Ola A+B: Calculadoras](M8-ola-a.md) | CP, Costos, PvP, Captura, Tipos, Shiny, Shadow | L | M7, Gate 0 | PR-22, 23 | 🟨 |
 
 ## Post-MVP
 

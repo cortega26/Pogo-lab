@@ -13,6 +13,12 @@ from apps.core.models import TimestampedModel
 
 
 class AnalysisRun(TimestampedModel):
+    STATUS_CHOICES = (
+        ("pending", _("Pendiente")),
+        ("complete", _("Completado")),
+        ("failed", _("Fallido")),
+    )
+
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -28,6 +34,9 @@ class AnalysisRun(TimestampedModel):
     code_sha = models.CharField(max_length=64, blank=True, default="")
     input_fingerprint = models.CharField(max_length=64, blank=True, default="", db_index=True)
     mixing_flags = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = _("ejecución de análisis")

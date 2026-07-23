@@ -125,10 +125,18 @@ class TestModeration:
             criteria={"min_sample": 30},
             row_count=100,
             checksum="abc123",
+            is_public=True,
+            publication_status="public",
         )
 
         user = User.objects.create_user(email="auditor@test.com", password="pass123")
         mark_dataset_suspicious(version.pk, reason="Sospecha de datos manipulados", actor=user)
+
+        version.refresh_from_db()
+        assert version.publication_status == "quarantined"
+        assert version.is_public is False
+        assert version.moderation_reason == "Sospecha de datos manipulados"
+        assert version.moderated_at is not None
 
         events = AuditEvent.objects.filter(verb="dataset_marked_suspicious")
         assert events.count() == 1
