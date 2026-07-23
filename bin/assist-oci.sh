@@ -179,18 +179,18 @@ if [ -z "$DB_PASSWORD" ]; then
     echo "   Generada: $DB_PASSWORD"
 fi
 
-DOMAIN=$(ask_value "Dominio (ej: pogo-lab.com, o deja vacío si no tienes aún)" "DOMAIN")
+DOMAIN=$(ask_value "Dominio (ej: pogo-lab.tooltician.com, o deja vacío si no tienes aún)" "DOMAIN")
 
 if [ -z "${ALLOWED_HOSTS:-}" ] || [ "${ALLOWED_HOSTS:-}" = "__PLACEHOLDER__" ]; then
-    ALLOWED_HOSTS="pogo-lab.com,www.pogo-lab.com"
+    ALLOWED_HOSTS="pogo-lab.tooltician.com,www.pogo-lab.tooltician.com"
     if [ -n "${DOMAIN:-}" ]; then
         ALLOWED_HOSTS="$DOMAIN,www.$DOMAIN"
     fi
 fi
 
-DEFAULT_FROM_EMAIL=$(ask_value "Email from (ej: noreply@pogo-lab.com)" "DEFAULT_FROM_EMAIL")
+DEFAULT_FROM_EMAIL=$(ask_value "Email from (ej: carlos@tooltician.com)" "DEFAULT_FROM_EMAIL")
 if [ -z "$DEFAULT_FROM_EMAIL" ]; then
-    DEFAULT_FROM_EMAIL="noreply@pogo-lab.com"
+    DEFAULT_FROM_EMAIL="carlos@tooltician.com"
 fi
 
 # ── 9. Escribir .env-oci ──────────────────────────────────────

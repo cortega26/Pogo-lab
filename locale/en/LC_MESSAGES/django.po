@@ -3,317 +3,219 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Pogo-lab\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-20 19:38+0000\n"
+"POT-Creation-Date: 2026-07-23 21:43+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: apps/accounts/admin.py:16
 msgid "Información personal"
 msgstr ""
 
-#: apps/accounts/admin.py:18
 msgid "Permisos"
 msgstr ""
 
-#: apps/accounts/admin.py:21
 msgid "Fechas"
 msgstr ""
 
-#: apps/accounts/models.py:42
 msgid "dirección de email"
 msgstr ""
 
-#: apps/accounts/templates/account/login.html:4
-#: apps/accounts/templates/account/login.html:8
-#: apps/accounts/templates/account/login.html:20
-#: apps/accounts/templates/account/signup.html:24
-#: templates/account/login.html:4 templates/account/login.html:8
-#: templates/account/login.html:55 templates/account/signup.html:71
 msgid "Iniciar sesión"
 msgstr "Log in"
 
-#: apps/accounts/templates/account/login.html:25
-#: templates/account/login.html:60
 msgid "¿No tienes cuenta?"
 msgstr "Don't have an account?"
 
-#: apps/accounts/templates/account/login.html:27
-#: templates/account/login.html:62
 msgid "Regístrate"
 msgstr "Sign up"
 
-#: apps/accounts/templates/account/signup.html:4
-#: apps/accounts/templates/account/signup.html:8
-#: apps/accounts/templates/account/signup.html:17
-#: templates/account/signup.html:4 templates/account/signup.html:8
-#: templates/account/signup.html:64
 #, fuzzy
 #| msgid "Regístrate"
 msgid "Registrarse"
 msgstr "Sign up"
 
-#: apps/accounts/templates/account/signup.html:22
-#: templates/account/signup.html:69
 msgid "¿Ya tienes cuenta?"
 msgstr "Already have an account?"
 
-#: apps/analysis/models.py:33
+msgid "Pendiente"
+msgstr ""
+
+msgid "Completado"
+msgstr ""
+
+msgid "Fallido"
+msgstr ""
+
 msgid "ejecución de análisis"
 msgstr ""
 
-#: apps/analysis/models.py:34
 msgid "ejecuciones de análisis"
 msgstr ""
 
-#: apps/analysis/models.py:51
 msgid "resultado de análisis"
 msgstr ""
 
-#: apps/analysis/models.py:52
 msgid "resultados de análisis"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:4 templates/base.html:190
 msgid "Análisis personal"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:8
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Análisis de intercambios"
 msgstr "trades/"
 
-#: apps/analysis/templates/analysis/dashboard.html:22
 msgid "Observaciones"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:28
 msgid "Éxitos"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:35
 msgid "p-valor"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:44
 msgid "Tamaño de efecto"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:51
 msgid "IC (Wilson)"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:60
 msgid "Método"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:67
-#: apps/decisions/models.py:17
 msgid "Advertencia"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:68
 msgid "Muestra insuficiente para inferencia"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:86
-#: apps/mechanics/templates/mechanics/detail.html:88
 msgid "Valor"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:87
-#: apps/analysis/templates/analysis/dashboard.html:160
 msgid "Conteo"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:112
 #, fuzzy
 #| msgid "contribuciones/"
 msgid "Recomendaciones"
 msgstr "contributions/"
 
-#: apps/analysis/templates/analysis/dashboard.html:140
 msgid "Sin datos para analizar"
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:140
 msgid "Registra intercambios para ver tu análisis estadístico."
 msgstr ""
 
-#: apps/analysis/templates/analysis/dashboard.html:140
 msgid "Ir a sesiones"
 msgstr ""
 
-#: apps/audit/models.py:31
 msgid "evento de auditoría"
 msgstr ""
 
-#: apps/audit/models.py:32
 msgid "eventos de auditoría"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:4
 msgid "IV ATK"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:4
 msgid "Defensa Boss"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:4
 msgid "Clima"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:8
-#: apps/calculators/templates/calculators/_catch_result.html:12
-#: apps/calculators/templates/calculators/_cost_result.html:11
-#: apps/calculators/templates/calculators/_cp_result.html:10
-#: apps/calculators/templates/calculators/_pvp_result.html:7
-#: apps/calculators/templates/calculators/_shadow_result.html:4
-#: apps/calculators/templates/calculators/catch_page.html:21
-#: apps/calculators/templates/calculators/cp_page.html:21
-#: apps/calculators/templates/calculators/shadow_page.html:16
-#: apps/dps/templates/dps/compare.html:30
 msgid "Nivel"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:8
 msgid "Daño por golpe"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:8
 msgid "ATK efectivo"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:17
 msgid "No se encontraron breakpoints en el rango L20–L50."
 msgstr ""
 
-#: apps/calculators/templates/calculators/_breakpoints_result.html:19
-#: apps/calculators/templates/calculators/_catch_result.html:14
-#: apps/calculators/templates/calculators/_cost_result.html:16
-#: apps/calculators/templates/calculators/_cp_result.html:13
-#: apps/calculators/templates/calculators/_result.html:54
-#: apps/calculators/templates/calculators/_shadow_result.html:18
-#: apps/calculators/templates/calculators/_shiny_result.html:16
 msgid "Enlace compartible"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_catch_result.html:3
-#: apps/calculators/templates/calculators/_cp_result.html:3
-#: apps/calculators/templates/calculators/_result.html:7
-#: apps/calculators/templates/calculators/_shiny_result.html:3
 #, fuzzy
 #| msgid "Estado"
 msgid "Resultados"
 msgstr "Status"
 
-#: apps/calculators/templates/calculators/_catch_result.html:6
 msgid "probabilidad de captura por lanzamiento"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_catch_result.html:9
 msgid "BCR"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_catch_result.html:10
 msgid "Multiplicador"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:3
 msgid "Costos"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:5
 msgid "Polvo Estelar"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:6
 msgid "Caramelos"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:7
 msgid "Caramelos XL"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:8
 msgid "Power-Ups"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:12
-#: apps/trades/models.py:33 apps/trades/models.py:66
-#: apps/trades/templates/trades/dashboard.html:28
-#: apps/trades/templates/trades/observation_create.html:56
-#: apps/trades/templates/trades/session_create.html:46
 msgid "Lucky"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cost_result.html:13
-#: apps/calculators/templates/calculators/_shadow_result.html:9
 msgid "Shadow"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cp_result.html:5
-#: apps/calculators/templates/calculators/_pvp_result.html:7
-#: apps/calculators/templates/calculators/_shadow_result.html:6
 msgid "CP"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cp_result.html:6
-#: apps/calculators/templates/calculators/_shadow_result.html:6
 msgid "HP"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_cp_result.html:7
-#: apps/calculators/templates/calculators/_pvp_result.html:7
 msgid "Stat Product"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_pvp_result.html:4
 msgid "combinaciones rankeadas"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_pvp_result.html:7
 msgid "Rank"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_pvp_result.html:7
-#: apps/trades/templates/trades/observation_create.html:63
 msgid "IVs"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:11
 msgid "Piso (f)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:15
 msgid "Valores posibles por stat (k)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:19
 msgid "Probabilidad por intercambio"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:23
 msgid "Probabilidad acumulada (n="
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:23
 msgid ")"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:27
 msgid "Éxitos esperados"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:31
 msgid "Probabilidad de cero éxitos"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:36
 #, python-format
 msgid ""
 "\n"
@@ -321,1504 +223,1127 @@ msgid ""
 "        "
 msgstr ""
 
-#: apps/calculators/templates/calculators/_result.html:45
 msgid "Supuestos"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shadow_result.html:9
 msgid "Purified"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shadow_result.html:9
 msgid "Diferencia"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shadow_result.html:12
 msgid "Ataque PvE"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shadow_result.html:13
 msgid "Stardust (L1→nivel)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shadow_result.html:14
 msgid "Caramelos (L1→nivel)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shiny_result.html:5
 msgid "Probabilidad de al menos 1 shiny"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shiny_result.html:6
 msgid "Probabilidad de 0 shiny"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shiny_result.html:7
 msgid "Shiny esperados"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shiny_result.html:10
 #, python-format
 msgid "En %(n)s encuentros con tasa %(rate)s"
 msgstr ""
 
-#: apps/calculators/templates/calculators/_shiny_result.html:13
 #, python-format
 msgid "Para %(conf)s%% de confianza necesitas ~%(enc)s encuentros"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:2
-#: apps/calculators/templates/calculators/breakpoints_page.html:4
 msgid "Breakpoints PvE — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:3
 msgid ""
 "Encuentra los niveles donde tu ataque rápido hace 1 punto más de daño contra "
 "un Boss de incursión en Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:5
 msgid "Calculadora de breakpoints para raids en Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:8
-#: templates/base.html:176
 msgid "Breakpoints PvE"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:12
 msgid "Atacante"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:16
 msgid "Fast Move"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:20
-#: apps/calculators/templates/calculators/cp_page.html:25
 msgid "IV Ataque (0–15)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:22
 msgid "Defensa del Boss"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:26
 msgid "Clima potenciado (×1.2)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:29
 msgid "Calcular breakpoints"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:32
-#: apps/calculators/templates/calculators/catch_page.html:49
-#: apps/calculators/templates/calculators/cost_page.html:39
-#: apps/calculators/templates/calculators/cp_page.html:35
-#: apps/calculators/templates/calculators/page.html:113
-#: apps/calculators/templates/calculators/pvp_page.html:29
-#: apps/calculators/templates/calculators/shadow_page.html:30
-#: apps/calculators/templates/calculators/shiny_page.html:26
-#: apps/calculators/templates/calculators/type_page.html:30
 msgid "Error:"
 msgstr ""
 
-#: apps/calculators/templates/calculators/breakpoints_page.html:34
 msgid "Selecciona atacante, fast move e IV para ver los breakpoints."
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:2
 msgid "Probabilidad de Captura — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:3
 msgid ""
 "Calcula la probabilidad de capturar un Pokémon salvaje según la especie, "
 "nivel, bola, baya, tipo de tiro y medallas."
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:4
 msgid "Calculadora de Captura — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:5
 msgid ""
 "Calcula la probabilidad de captura en Pokémon GO con todos los modificadores."
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:8
 msgid "Probabilidad de Captura"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:13
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de Captura"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/catch_page.html:17
-#: apps/calculators/templates/calculators/cp_page.html:17
-#: apps/calculators/templates/calculators/pvp_page.html:17
-#: apps/calculators/templates/calculators/shadow_page.html:12
-#: apps/trades/templates/trades/session_detail.html:52
 msgid "Especie"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:25
 msgid "Poké Ball"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:29
 msgid "Baya"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:33
 msgid "Tiro"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:37
 msgid "Medalla"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:44
 msgid "Lanzamiento curvo (×1.7)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/catch_page.html:46
-#: apps/calculators/templates/calculators/cost_page.html:36
-#: apps/calculators/templates/calculators/cp_page.html:32
-#: apps/calculators/templates/calculators/page.html:106
-#: apps/calculators/templates/calculators/shiny_page.html:23
-#: templates/core/healthz.html:69
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calcular"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/catch_page.html:51
 msgid "Configura los modificadores y presiona Calcular."
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:2
 msgid "Costo de Power-Up — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:3
 msgid ""
 "Calcula cuánto stardust y caramelos necesitas para subir un Pokémon de "
 "nivel. Incluye descuento Lucky y recargo Shadow."
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:4
 msgid "Calculadora de Costo de Power-Up — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:5
 msgid ""
 "Calcula cuánto stardust, caramelos y caramelos XL necesitas para subir de "
 "nivel."
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:8
-#: templates/base.html:170
 msgid "Costo Power-Up"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:13
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de Costo de Power-Up"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/cost_page.html:17
 msgid "Nivel inicial"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:21
 #, fuzzy
 #| msgid "Operativo"
 msgid "Nivel objetivo"
 msgstr "Operational"
 
-#: apps/calculators/templates/calculators/cost_page.html:29
 #, python-format
 msgid "Pokémon Lucky (50%% desc.)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:33
 #, python-format
 msgid "Pokémon Shadow (+20%%)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cost_page.html:41
 msgid "Selecciona los niveles y opciones y presiona Calcular."
 msgstr ""
 
-#: apps/calculators/templates/calculators/cp_page.html:2
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de CP — Pogo-lab"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/cp_page.html:3
 msgid ""
 "Calcula el CP y HP de cualquier Pokémon en Pokémon GO a cualquier nivel y "
 "combinación de IVs. Datos verificados del Game Master."
 msgstr ""
 
-#: apps/calculators/templates/calculators/cp_page.html:4
 msgid "Calculadora de CP y Nivel — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cp_page.html:5
 msgid "Calcula el CP y HP de cualquier Pokémon a cualquier nivel e IVs."
 msgstr ""
 
-#: apps/calculators/templates/calculators/cp_page.html:8
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de CP"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/cp_page.html:13
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de CP y Nivel"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/cp_page.html:27
 msgid "IV Defensa (0–15)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cp_page.html:29
 msgid "IV Stamina (0–15)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/cp_page.html:37
 msgid "Selecciona una especie, nivel e IVs y presiona Calcular."
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:4
-#: apps/calculators/templates/calculators/page.html:8
 msgid "Calculadora de IV — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:7
-#: apps/calculators/templates/calculators/page.html:9
 msgid ""
 "Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de "
 "Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:20 templates/base.html:85
 msgid "Calculadora"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/page.html:28
 msgid "Calculadora de probabilidad de IV"
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:42
 msgid "Nivel de amistad"
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:53
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Tipo de intercambio"
 msgstr "trades/"
 
-#: apps/calculators/templates/calculators/page.html:64
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Número de intercambios (n)"
 msgstr "trades/"
 
-#: apps/calculators/templates/calculators/page.html:71
 #, fuzzy
 #| msgid "Operativo"
 msgid "Objetivo"
 msgstr "Operational"
 
-#: apps/calculators/templates/calculators/page.html:82
 msgid "Umbral"
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:89
-#: apps/mechanics/templates/mechanics/detail.html:68
 msgid "Nivel de confianza"
 msgstr ""
 
-#: apps/calculators/templates/calculators/page.html:118
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculando..."
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/pvp_page.html:2
-#: apps/calculators/templates/calculators/pvp_page.html:4
 msgid "PvP IV Ranker — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:3
 msgid ""
 "Descubre la mejor combinación de IVs para tu Pokémon en Great, Ultra o "
 "Master League. Ranking por Stat Product de las 4096 combinaciones."
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:5
 msgid "Ranking de IVs por Stat Product para PvP en Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:8
 msgid "PvP IV Ranker"
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:13
 msgid "Ranking de IV para PvP"
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:21
 msgid "Liga"
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:26
 msgid "Rankear"
 msgstr ""
 
-#: apps/calculators/templates/calculators/pvp_page.html:31
 msgid "Selecciona especie y liga, luego presiona Rankear."
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:2
-#: apps/calculators/templates/calculators/shadow_page.html:4
 msgid "Shadow vs Purified — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:3
 msgid ""
 "Compara el daño, CP y costo en stardust entre un Pokémon Shadow y su versión "
 "Purified en Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:5
 msgid "Comparativa de daño PvE y costos entre Shadow y Purified."
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:8
-#: templates/base.html:175
 msgid "Shadow vs Purified"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:20
 msgid "IV Ataque"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:22
 msgid "IV Defensa"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:24
 msgid "IV Stamina"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:27
-#: apps/dps/templates/dps/_ranking.html:71
-#: apps/dps/templates/dps/compare.html:40
 msgid "Comparar"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shadow_page.html:32
 msgid "Selecciona especie, nivel e IVs para comparar."
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:2
 msgid "Probabilidad de Shiny — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:3
 msgid ""
 "Calcula cuántos encuentros necesitas para tener cierta confianza de "
 "encontrar un Pokémon shiny en Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:4
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de Shiny — Pogo-lab"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/shiny_page.html:5
 msgid ""
 "Probabilidad acumulada de encontrar un shiny según la tasa y número de "
 "encuentros."
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:8
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de Shiny"
 msgstr "Calculator"
 
-#: apps/calculators/templates/calculators/shiny_page.html:12
 msgid "Tasa shiny"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:16
 msgid "Encuentros (n)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:18
 msgid "Confianza objetivo"
 msgstr ""
 
-#: apps/calculators/templates/calculators/shiny_page.html:28
 msgid "Selecciona la tasa shiny y el número de encuentros."
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:2
 #, fuzzy
 #| msgid "Efectividad de %(type)s"
 msgid "Efectividad de Tipos — Pogo-lab"
 msgstr "%(type)s effectiveness"
 
-#: apps/calculators/templates/calculators/type_page.html:3
 msgid ""
 "Consulta la matriz de efectividad de tipos en Pokémon GO. Descubre "
 "debilidades, resistencias e inmunidades para los 18 tipos."
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:4
 msgid "Matriz de Efectividad de Tipos — Pogo-lab"
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:5
 msgid "Debilidades, resistencias y efectividad de los 18 tipos en Pokémon GO."
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:8
-#: templates/base.html:173
 #, fuzzy
 #| msgid "Efectividad de %(type)s"
 msgid "Efectividad de Tipos"
 msgstr "%(type)s effectiveness"
 
-#: apps/calculators/templates/calculators/type_page.html:13
 #, fuzzy
 #| msgid "Efectividad de %(type)s"
 msgid "Matriz de Efectividad de Tipos"
 msgstr "%(type)s effectiveness"
 
-#: apps/calculators/templates/calculators/type_page.html:17
 msgid "Tipo defensivo 1"
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:21
 msgid "Tipo defensivo 2 (opcional)"
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:23
 msgid "— Ninguno —"
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:27
 msgid "Ver efectividad"
 msgstr ""
 
-#: apps/calculators/templates/calculators/type_page.html:32
 msgid "Selecciona el tipo defensivo y presiona Ver efectividad."
 msgstr ""
 
-#: apps/content/models.py:21
 #, fuzzy
 #| msgid "Mecánicas"
 msgid "Mecánica"
 msgstr "Mechanics"
 
-#: apps/content/models.py:22
 msgid "Guía"
 msgstr ""
 
-#: apps/content/models.py:23
 msgid "Metodología"
 msgstr ""
 
-#: apps/content/models.py:24 templates/base.html:200
 msgid "Legal"
 msgstr ""
 
-#: apps/content/models.py:25
 msgid "Portada"
 msgstr ""
 
-#: apps/content/models.py:32 apps/experiments/models.py:16
-#: apps/trades/models.py:51
 msgid "Borrador"
 msgstr ""
 
-#: apps/content/models.py:33 apps/experiments/models.py:17
 msgid "Publicado"
 msgstr ""
 
-#: apps/content/models.py:34
 msgid "Archivado"
 msgstr ""
 
-#: apps/content/models.py:40
 msgid "página de contenido"
 msgstr ""
 
-#: apps/content/models.py:41
 msgid "páginas de contenido"
 msgstr ""
 
-#: apps/content/models.py:51
 msgid "Contenido renderizable (HTML)"
 msgstr ""
 
-#: apps/content/models.py:58
 msgid "traducción de página"
 msgstr ""
 
-#: apps/content/models.py:59
 msgid "traducciones de página"
 msgstr ""
 
-#: apps/contributions/models.py:20 templates/base.html:191
 msgid "Dataset comunitario"
 msgstr ""
 
-#: apps/contributions/models.py:34
 msgid "consentimiento de contribución"
 msgstr ""
 
-#: apps/contributions/models.py:35
 msgid "consentimientos de contribución"
 msgstr ""
 
-#: apps/contributions/models.py:101
 msgid "La fecha de revocación debe ser posterior a la de otorgamiento."
 msgstr ""
 
-#: apps/contributions/models.py:104
 msgid "Un consentimiento activo no puede tener fecha de revocación."
 msgstr ""
 
-#: apps/contributions/models.py:127
+msgid "Público"
+msgstr ""
+
+msgid "Cuarentena"
+msgstr ""
+
+msgid "Retractado"
+msgstr ""
+
 msgid "versión de dataset"
 msgstr ""
 
-#: apps/contributions/models.py:128
 msgid "versiones de dataset"
 msgstr ""
 
-#: apps/contributions/models.py:140
 msgid ""
 "No se puede editar una versión de dataset ya construida. Para actualizar, "
 "crea una nueva versión."
 msgstr ""
 
-#: apps/contributions/views.py:51
 msgid "Has dado tu consentimiento para contribuir."
 msgstr ""
 
-#: apps/contributions/views.py:61
 msgid "Has revocado tu consentimiento."
 msgstr ""
 
-#: apps/decisions/models.py:16
 #, fuzzy
 #| msgid "Operativo"
 msgid "Informativo"
 msgstr "Operational"
 
-#: apps/decisions/models.py:18
 msgid "Crítico"
 msgstr ""
 
-#: apps/decisions/models.py:29
 msgid "regla de decisión"
 msgstr ""
 
-#: apps/decisions/models.py:30
 msgid "reglas de decisión"
 msgstr ""
 
-#: apps/decisions/models.py:53
 msgid "recomendación"
 msgstr ""
 
-#: apps/decisions/models.py:54
 #, fuzzy
 #| msgid "contribuciones/"
 msgid "recomendaciones"
 msgstr "contributions/"
 
-#: apps/dps/templates/dps/_compare_card.html:20
-#: apps/dps/templates/dps/moves.html:61
 msgid "Rápido"
 msgstr "Fast"
 
-#: apps/dps/templates/dps/_compare_card.html:24
-#: apps/dps/templates/dps/moves.html:61
 msgid "Cargado"
 msgstr "Charged"
 
-#: apps/dps/templates/dps/_ranking.html:6
 #, python-format
 msgid "Top atacantes contra %(type)s"
 msgstr "Top attackers against %(type)s"
 
-#: apps/dps/templates/dps/_ranking.html:6
 msgid "Atacantes"
 msgstr ""
 
-#: apps/dps/templates/dps/_ranking.html:10 apps/dps/templates/dps/moves.html:27
 msgid "Orden:"
 msgstr "Sort:"
 
-#: apps/dps/templates/dps/_ranking.html:22 apps/dps/templates/dps/moves.html:30
-#: apps/dps/templates/dps/moves.html:40
 msgid "Nombre"
 msgstr "Name"
 
-#: apps/dps/templates/dps/_ranking.html:34
 msgid "Pokémon"
 msgstr "Pokémon"
 
-#: apps/dps/templates/dps/_ranking.html:35 apps/dps/templates/dps/moves.html:31
-#: apps/dps/templates/dps/moves.html:41
-#: apps/trades/templates/trades/observation_create.html:52
-#: apps/trades/templates/trades/session_detail.html:18
-#: apps/trades/templates/trades/session_detail.html:48
 msgid "Tipo"
 msgstr "Type"
 
-#: apps/dps/templates/dps/_ranking.html:36 apps/dps/templates/dps/page.html:72
 msgid "Movimientos"
 msgstr ""
 
-#: apps/dps/templates/dps/_ranking.html:64
 #, python-format
 msgid "Número %(dex)s en la Pokédex"
 msgstr ""
 
-#: apps/dps/templates/dps/_ranking.html:109
 msgid "STAB"
 msgstr "STAB"
 
-#: apps/dps/templates/dps/_ranking.html:111
 msgid "Sin STAB"
 msgstr "No STAB"
 
-#: apps/dps/templates/dps/_ranking.html:121
 msgid "Selecciona un tipo de ataque para ver el ranking."
 msgstr ""
 
-#: apps/dps/templates/dps/_type_effectiveness.html:4
 #, python-format
 msgid "Efectividad de %(type)s"
 msgstr "%(type)s effectiveness"
 
-#: apps/dps/templates/dps/_type_grid.html:4
 msgid "Tipos de ataque"
 msgstr "Attack types"
 
-#: apps/dps/templates/dps/_type_grid.html:14
 msgid "esp."
 msgstr "sp."
 
-#: apps/dps/templates/dps/compare.html:4
 msgid "Comparar Pokémon — Pogo-lab"
 msgstr ""
 
-#: apps/dps/templates/dps/compare.html:9
 #, fuzzy
 #| msgid "Pokémon"
 msgid "Comparar Pokémon"
 msgstr "Pokémon"
 
-#: apps/dps/templates/dps/compare.html:11
 #, python-format
 msgid "Comparación lado a lado de estadísticas y DPS/TDO/eDPS a nivel %(lvl)s."
 msgstr ""
 
-#: apps/dps/templates/dps/compare.html:18
 #, fuzzy
 #| msgid "Pokémon"
 msgid "Pokémon A"
 msgstr "Pokémon"
 
-#: apps/dps/templates/dps/compare.html:21
 msgid "ej. rayquaza"
 msgstr ""
 
-#: apps/dps/templates/dps/compare.html:24
 #, fuzzy
 #| msgid "Pokémon"
 msgid "Pokémon B"
 msgstr "Pokémon"
 
-#: apps/dps/templates/dps/compare.html:27
 msgid "ej. mewtwo"
 msgstr ""
 
-#: apps/dps/templates/dps/compare.html:47
 msgid ""
 "Ingresa dos nombres de Pokémon (en inglés y minúscula) para compararlos."
 msgstr ""
 
-#: apps/dps/templates/dps/compare.html:94 apps/dps/templates/dps/moves.html:78
 msgid "Volver al ranking DPS/TDO"
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:4
 msgid "Explorador de movimientos — Pogo-lab"
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:9
 msgid "Explorador de movimientos"
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:11
 msgid ""
 "Todos los movimientos rápidos y cargados de Pokémon GO con sus estadísticas "
 "PvE."
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:17
 msgid "Tipo:"
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:21
 msgid "Todos"
 msgstr "All"
 
-#: apps/dps/templates/dps/moves.html:22
 #, fuzzy
 #| msgid "Rápido"
 msgid "Rápidos"
 msgstr "Fast"
 
-#: apps/dps/templates/dps/moves.html:23
 #, fuzzy
 #| msgid "Cargado"
 msgid "Cargados"
 msgstr "Charged"
 
-#: apps/dps/templates/dps/moves.html:29 apps/dps/templates/dps/moves.html:43
 msgid "Poder"
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:32 apps/dps/templates/dps/moves.html:44
 #, fuzzy
 #| msgid "Confirmar eliminación"
 msgid "Duración"
 msgstr "Confirm deletion"
 
-#: apps/dps/templates/dps/moves.html:42
 msgid "Clase"
 msgstr ""
 
-#: apps/dps/templates/dps/moves.html:45
 msgid "Energía"
 msgstr ""
 
-#: apps/dps/templates/dps/page.html:4 apps/dps/templates/dps/page.html:8
 msgid "DPS / TDO por tipo — Pogo-lab"
 msgstr "DPS / TDO by type — Pogo-lab"
 
-#: apps/dps/templates/dps/page.html:7
 msgid ""
 "Explora el ranking de atacantes de Pokémon GO por tipo. Compara DPS, TDO y "
 "mejores combinaciones de movimientos para cada tipo de ataque."
 msgstr ""
 
-#: apps/dps/templates/dps/page.html:9
 msgid ""
 "Compara atacantes de Pokémon GO por tipo. DPS, TDO, mejores combinaciones de "
 "movimientos y cobertura de tipos."
 msgstr ""
 
-#: apps/dps/templates/dps/page.html:20
 msgid "DPS/TDO por tipo"
 msgstr "DPS/TDO by type"
 
-#: apps/dps/templates/dps/page.html:29
 msgid "DPS / TDO por tipo de ataque"
 msgstr "DPS / TDO by attack type"
 
-#: apps/dps/templates/dps/page.html:31
 msgid ""
 "Ranking de atacantes de Pokémon GO mejor contra cada tipo. Nivel 40, IVs "
 "15/15/15, sin clima."
 msgstr ""
 
-#: apps/dps/templates/dps/page.html:42
 msgid "Nivel:"
 msgstr ""
 
-#: apps/dps/templates/dps/page.html:61
 #, fuzzy
 #| msgid "Pokémon"
 msgid "Buscar Pokémon…"
 msgstr "Pokémon"
 
-#: apps/experiments/models.py:18
-msgid "Retractado"
-msgstr ""
-
-#: apps/experiments/models.py:39
 msgid "protocolo de experimento"
 msgstr ""
 
-#: apps/experiments/models.py:40
 msgid "protocolos de experimento"
 msgstr ""
 
-#: apps/mechanics/models.py:12
 msgid "Código interno, ej. trade_iv"
 msgstr ""
 
-#: apps/mechanics/models.py:19
 msgid "Activa"
 msgstr ""
 
-#: apps/mechanics/models.py:20
 msgid "Deprecada"
 msgstr ""
 
-#: apps/mechanics/models.py:21
 msgid "Experimental"
 msgstr ""
 
-#: apps/mechanics/models.py:34
 #, fuzzy
 #| msgid "Mecánicas"
 msgid "mecánica"
 msgstr "Mechanics"
 
-#: apps/mechanics/models.py:35
 #, fuzzy
 #| msgid "Mecánicas"
 msgid "mecánicas"
 msgstr "Mechanics"
 
-#: apps/mechanics/models.py:54 apps/sources/models.py:73
 msgid "Alto"
 msgstr ""
 
-#: apps/mechanics/models.py:55 apps/sources/models.py:74
 msgid "Medio"
 msgstr ""
 
-#: apps/mechanics/models.py:56 apps/sources/models.py:75
 msgid "Bajo"
 msgstr ""
 
-#: apps/mechanics/models.py:57 apps/sources/models.py:76
 msgid "Hipotético"
 msgstr ""
 
-#: apps/mechanics/models.py:63
 msgid "ruleset"
 msgstr ""
 
-#: apps/mechanics/models.py:64
 msgid "rulesets"
 msgstr ""
 
-#: apps/mechanics/models.py:83
 msgid "No se puede editar un ruleset ya publicado."
 msgstr ""
 
-#: apps/mechanics/models.py:85
 msgid "effective_to debe ser posterior a effective_from."
 msgstr ""
 
-#: apps/mechanics/models.py:112
 msgid "Entero"
 msgstr ""
 
-#: apps/mechanics/models.py:113
 msgid "Decimal"
 msgstr ""
 
-#: apps/mechanics/models.py:114
 msgid "Booleano"
 msgstr ""
 
-#: apps/mechanics/models.py:115
 msgid "Texto"
 msgstr ""
 
-#: apps/mechanics/models.py:116
 msgid "JSON"
 msgstr ""
 
-#: apps/mechanics/models.py:122
 msgid "parámetro de ruleset"
 msgstr ""
 
-#: apps/mechanics/models.py:123
 msgid "parámetros de ruleset"
 msgstr ""
 
-#: apps/mechanics/models.py:132
 msgid ""
 "No se pueden modificar los parámetros de un ruleset ya publicado. Crea una "
 "nueva versión del ruleset."
 msgstr ""
 
-#: apps/mechanics/models.py:144
 msgid "No se pueden eliminar los parámetros de un ruleset publicado."
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:13
-#: apps/mechanics/templates/mechanics/detail.html:22
-#: apps/mechanics/templates/mechanics/list.html:4
-#: apps/mechanics/templates/mechanics/list.html:7 templates/base.html:90
-#: templates/base.html:177 templates/core/healthz.html:44
 msgid "Mecánicas"
 msgstr "Mechanics"
 
-#: apps/mechanics/templates/mechanics/detail.html:37
 #, fuzzy
 #| msgid "calculadora/"
 msgid "Ir a la calculadora"
 msgstr "calculator/"
 
-#: apps/mechanics/templates/mechanics/detail.html:45
 msgid "Reglas vigentes"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:53
 #, fuzzy
 #| msgid "Cerrar sesión"
 msgid "Versión"
 msgstr "Log out"
 
-#: apps/mechanics/templates/mechanics/detail.html:57
 msgid "Vigente desde"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:62
 msgid "Vigente hasta"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:82
 msgid "Parámetros"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:87
 msgid "Clave"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:89
 #, fuzzy
 #| msgid "comunidad/"
 msgid "Unidad"
 msgstr "community/"
 
-#: apps/mechanics/templates/mechanics/detail.html:112
 msgid "Fuentes y evidencia"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:127
 msgid "Confianza:"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:137
 msgid "Sin reglas publicadas"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/detail.html:137
 msgid "No hay reglas publicadas para esta mecánica todavía."
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/list.html:24
 msgid "No hay mecánicas disponibles"
 msgstr ""
 
-#: apps/mechanics/templates/mechanics/list.html:24
 msgid "Las mecánicas del juego se agregarán pronto."
 msgstr ""
 
-#: apps/sources/models.py:15
 msgid "Oficial"
 msgstr ""
 
-#: apps/sources/models.py:16
 msgid "Investigación comunitaria"
 msgstr ""
 
-#: apps/sources/models.py:17
 msgid "Datamining"
 msgstr ""
 
-#: apps/sources/models.py:18
 msgid "Inferencia"
 msgstr ""
 
-#: apps/sources/models.py:19
 msgid "Hipótesis interna"
 msgstr ""
 
-#: apps/sources/models.py:29
 msgid "Vigente"
 msgstr ""
 
-#: apps/sources/models.py:30
 msgid "En revisión"
 msgstr ""
 
-#: apps/sources/models.py:31
 msgid "Obsoleta"
 msgstr ""
 
-#: apps/sources/models.py:32
 #, fuzzy
 #| msgid "Contraseña"
 msgid "Contradicha"
 msgstr "Password"
 
-#: apps/sources/models.py:40
 msgid "referencia de fuente"
 msgstr ""
 
-#: apps/sources/models.py:41
 msgid "referencias de fuente"
 msgstr ""
 
-#: apps/sources/models.py:81
 msgid "afirmación citada"
 msgstr ""
 
-#: apps/sources/models.py:82
 msgid "afirmaciones citadas"
 msgstr ""
 
-#: apps/trades/models.py:22 apps/trades/models.py:59
-#: apps/trades/templates/trades/observation_create.html:43
-#: apps/trades/templates/trades/session_create.html:33
 msgid "Good Friends"
 msgstr ""
 
-#: apps/trades/models.py:23 apps/trades/models.py:60
-#: apps/trades/templates/trades/observation_create.html:44
-#: apps/trades/templates/trades/session_create.html:34
 msgid "Great Friends"
 msgstr ""
 
-#: apps/trades/models.py:24 apps/trades/models.py:61
-#: apps/trades/templates/trades/observation_create.html:45
-#: apps/trades/templates/trades/session_create.html:35
 msgid "Ultra Friends"
 msgstr ""
 
-#: apps/trades/models.py:25 apps/trades/models.py:62
-#: apps/trades/templates/trades/observation_create.html:46
-#: apps/trades/templates/trades/session_create.html:36
 msgid "Best Friends"
 msgstr ""
 
-#: apps/trades/models.py:32 apps/trades/models.py:65
-#: apps/trades/templates/trades/dashboard.html:38
-#: apps/trades/templates/trades/observation_create.html:55
-#: apps/trades/templates/trades/session_create.html:45
 msgid "Normal"
 msgstr ""
 
-#: apps/trades/models.py:34 apps/trades/models.py:67
-#: apps/trades/templates/trades/observation_create.html:57
-#: apps/trades/templates/trades/session_create.html:47
 msgid "Lucky garantizado"
 msgstr ""
 
-#: apps/trades/models.py:41
 #, fuzzy
 #| msgid "intercambios/"
 msgid "sesión de intercambios"
 msgstr "trades/"
 
-#: apps/trades/models.py:42
 #, fuzzy
 #| msgid "intercambios/"
 msgid "sesiones de intercambios"
 msgstr "trades/"
 
-#: apps/trades/models.py:52
 msgid "Válido"
 msgstr ""
 
-#: apps/trades/models.py:53
 msgid "Excluido"
 msgstr ""
 
-#: apps/trades/models.py:54
 msgid "Sospechoso"
 msgstr ""
 
-#: apps/trades/models.py:55
 msgid "Duplicado"
 msgstr ""
 
-#: apps/trades/models.py:56
 msgid "Eliminado"
 msgstr ""
 
-#: apps/trades/models.py:70
 msgid "Manual"
 msgstr ""
 
-#: apps/trades/models.py:71
 msgid "Por lotes"
 msgstr ""
 
-#: apps/trades/models.py:72
 msgid "CSV"
 msgstr ""
 
-#: apps/trades/models.py:93
 msgid "DERIVADO: True si trade_type es lucky o lucky_guaranteed"
 msgstr ""
 
-#: apps/trades/models.py:123
 msgid "observación de intercambio"
 msgstr ""
 
-#: apps/trades/models.py:124
 msgid "observaciones de intercambios"
 msgstr ""
 
-#: apps/trades/templates/trades/bulk_add.html:4
 msgid "Añadir por lotes — Pogo-lab"
 msgstr ""
 
-#: apps/trades/templates/trades/bulk_add.html:8
 msgid "Añadir observaciones por lotes"
 msgstr ""
 
-#: apps/trades/templates/trades/bulk_add.html:15
 msgid "JSON de observaciones"
 msgstr ""
 
-#: apps/trades/templates/trades/bulk_add.html:23
 msgid "Guardar todas"
 msgstr ""
 
-#: apps/trades/templates/trades/bulk_add.html:29
 #, python-format
 msgid "%(counter)s observación guardada."
 msgid_plural "%(counter)s observaciones guardadas."
 msgstr[0] ""
 msgstr[1] ""
 
-#: apps/trades/templates/trades/bulk_add.html:41
-#: apps/trades/templates/trades/csv_import.html:46
-#: apps/trades/templates/trades/dashboard.html:44
-#: apps/trades/templates/trades/session_detail.html:89
 msgid "Volver a sesiones"
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:4
 msgid "Importar CSV — Pogo-lab"
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:8
 msgid "Importar CSV de observaciones"
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:16
 msgid "Archivo CSV"
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:21
 msgid ""
 "Campos: observed_at, friendship_level, trade_type, atk, def, hp, species"
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:23
 msgid "Usa el archivo docs/csv_template.csv como plantilla."
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:28
 msgid "Importar"
 msgstr ""
 
-#: apps/trades/templates/trades/csv_import.html:40
 #, python-format
 msgid "%(valid)s de %(total)s filas importadas correctamente."
 msgstr ""
 
-#: apps/trades/templates/trades/dashboard.html:4
 msgid "Dashboard — Pogo-lab"
 msgstr ""
 
-#: apps/trades/templates/trades/dashboard.html:8
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Dashboard de intercambios"
 msgstr "trades/"
 
-#: apps/trades/templates/trades/dashboard.html:18
-#: templates/experiments/dashboard.html:29
 msgid "Total de observaciones"
 msgstr ""
 
-#: apps/trades/templates/trades/observation_create.html:4
 msgid "Registrar intercambio — Pogo-lab"
 msgstr ""
 
-#: apps/trades/templates/trades/observation_create.html:10
 #, fuzzy
 #| msgid "Iniciar Sesión"
 msgid "Sesión"
 msgstr "Log In"
 
-#: apps/trades/templates/trades/observation_create.html:12
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Nuevo intercambio"
 msgstr "trades/"
 
-#: apps/trades/templates/trades/observation_create.html:16
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Registrar intercambio"
 msgstr "trades/"
 
-#: apps/trades/templates/trades/observation_create.html:20
 msgid "Observación guardada."
 msgstr ""
 
-#: apps/trades/templates/trades/observation_create.html:40
-#: apps/trades/templates/trades/session_detail.html:17
-#: apps/trades/templates/trades/session_detail.html:47
 #, fuzzy
 #| msgid "Estado"
 msgid "Amistad"
 msgstr "Status"
 
-#: apps/trades/templates/trades/observation_create.html:85
 msgid "Especie (opcional)"
 msgstr ""
 
-#: apps/trades/templates/trades/observation_create.html:94
 msgid "Guardar y siguiente"
 msgstr ""
 
-#: apps/trades/templates/trades/observation_create.html:104
 #, fuzzy
 #| msgid "Cerrar sesión"
 msgid "Volver a la sesión"
 msgstr "Log out"
 
-#: apps/trades/templates/trades/session_create.html:4
 msgid "Nueva sesión — Pogo-lab"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:9
-#: apps/trades/templates/trades/session_detail.html:9
 msgid "Sesiones"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:11
 msgid "Nueva"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:14
 msgid "Nueva sesión de intercambios"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:21
 msgid "Etiqueta (opcional)"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:25
 msgid "Ej: Sesión con Juan"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:30
 msgid "Amistad por defecto"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:42
 msgid "Tipo de intercambio por defecto"
 msgstr ""
 
-#: apps/trades/templates/trades/session_create.html:53
-#: apps/trades/templates/trades/session_list.html:26
 #, fuzzy
 #| msgid "Cerrar sesión"
 msgid "Crear sesión"
 msgstr "Log out"
 
-#: apps/trades/templates/trades/session_create.html:56
 msgid "Cancelar"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:25
 msgid "Nueva observación"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:29
 msgid "Añadir por lotes"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:33
 msgid "Importar CSV"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:37 templates/base.html:181
 msgid "Dashboard"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:46
 msgid "Fecha"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:53
 msgid "Estado"
 msgstr "Status"
 
-#: apps/trades/templates/trades/session_detail.html:84
+#, fuzzy
+#| msgid "Confirmar eliminación"
+msgid "Paginación"
+msgstr "Confirm deletion"
+
 msgid "Sin observaciones"
 msgstr ""
 
-#: apps/trades/templates/trades/session_detail.html:84
 msgid "Esta sesión aún no tiene observaciones registradas."
 msgstr ""
 
-#: apps/trades/templates/trades/session_list.html:4
 msgid "Mis sesiones de intercambios — Pogo-lab"
 msgstr ""
 
-#: apps/trades/templates/trades/session_list.html:9
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Sesiones de intercambios"
 msgstr "trades/"
 
-#: apps/trades/templates/trades/session_list.html:14
 #, fuzzy
 #| msgid "Cerrar sesión"
 msgid "Nueva sesión"
 msgstr "Log out"
 
-#: apps/trades/templates/trades/session_list.html:26
 msgid "Sin sesiones todavía"
 msgstr ""
 
-#: apps/trades/templates/trades/session_list.html:26
 msgid "Crea tu primera sesión de intercambios para empezar a registrar."
 msgstr ""
 
-#: config/urls.py:38
 #, fuzzy
 #| msgid "cuenta/"
 msgid "cuenta/login/"
 msgstr "account/"
 
-#: config/urls.py:43
 #, fuzzy
 #| msgid "cuenta/"
 msgid "cuenta/signup/"
 msgstr "account/"
 
-#: config/urls.py:47 config/urls.py:48
 msgid "cuenta/"
 msgstr "account/"
 
-#: config/urls.py:50
 msgid "mecanicas/"
 msgstr "mechanics/"
 
-#: config/urls.py:51
 msgid "guias/"
 msgstr "guides/"
 
-#: config/urls.py:52
 msgid "calculadora/"
 msgstr "calculator/"
 
-#: config/urls.py:53
 msgid "intercambios/"
 msgstr "trades/"
 
-#: config/urls.py:54
 msgid "analisis/"
 msgstr "analysis/"
 
-#: config/urls.py:55
 msgid "contribuciones/"
 msgstr "contributions/"
 
-#: config/urls.py:56
 msgid "comunidad/"
 msgstr "community/"
 
-#: config/urls.py:57
 msgid "dps/"
 msgstr ""
 
-#: templates/account/login.html:24 templates/account/signup.html:21
 msgid "Correo electrónico"
 msgstr "Email"
 
-#: templates/account/login.html:28 templates/account/signup.html:25
 msgid "tu@correo.com"
 msgstr ""
 
-#: templates/account/login.html:36 templates/account/signup.html:33
-#: templates/accounts/delete.html:17
 msgid "Contraseña"
 msgstr "Password"
 
-#: templates/account/login.html:50
 msgid "Recordarme"
 msgstr "Remember me"
 
-#: templates/account/signup.html:45
 msgid "Confirmar contraseña"
 msgstr "Confirm password"
 
-#: templates/account/signup.html:59
 msgid "Confirmo que tengo al menos 13 años."
 msgstr ""
 
-#: templates/accounts/delete.html:4 templates/accounts/delete.html:8
 msgid "Eliminar cuenta"
 msgstr "Delete account"
 
-#: templates/accounts/delete.html:13
 #, fuzzy
 #| msgid "Esta acción es irreversible. Todos tus datos serán eliminados."
 msgid "Esta acción es irreversible. Todos tus datos serán eliminados."
 msgstr "This action is irreversible. All your data will be deleted."
 
-#: templates/accounts/delete.html:33
 msgid "Confirmar eliminación"
 msgstr "Confirm deletion"
 
-#: templates/accounts/delete_done.html:4 templates/accounts/delete_done.html:13
 msgid "Cuenta eliminada"
 msgstr ""
 
-#: templates/accounts/delete_done.html:15
 msgid "Tu cuenta y todos tus datos han sido eliminados."
 msgstr ""
 
-#: templates/accounts/delete_done.html:19 templates/core/429.html:18
 msgid "Volver al inicio"
 msgstr ""
 
-#: templates/accounts/export.html:4 templates/accounts/export.html:8
 msgid "Exportar datos"
 msgstr "Export data"
 
-#: templates/accounts/export.html:12
 #, fuzzy
 #| msgid "Recibirás un enlace de descarga con todos tus datos."
 msgid ""
@@ -1826,289 +1351,226 @@ msgid ""
 "20)."
 msgstr "You will receive a download link with all your data."
 
-#: templates/accounts/export.html:18
 msgid "Solicitar exportación"
 msgstr "Request export"
 
-#: templates/base.html:12
 msgid ""
 "Plataforma de análisis estadístico para mecánicas de Pokémon GO — "
 "probabilidades, IV, Lucky e inferencia honesta."
 msgstr ""
 
-#: templates/base.html:33
 msgid "Plataforma de análisis estadístico para mecánicas de Pokémon GO."
 msgstr ""
 
-#: templates/base.html:39
 msgid "Análisis estadístico para Pokémon GO."
 msgstr ""
 
-#: templates/base.html:54
 msgid "Saltar al contenido principal"
 msgstr ""
 
-#: templates/base.html:68
 msgid "Abrir menú"
 msgstr ""
 
-#: templates/base.html:81
 msgid "Navegación principal"
 msgstr ""
 
-#: templates/base.html:99
 msgid "Idioma"
 msgstr ""
 
-#: templates/base.html:119 templates/base.html:120
 msgid "Alternar modo oscuro"
 msgstr ""
 
-#: templates/base.html:127
 msgid "Modo oscuro"
 msgstr ""
 
-#: templates/base.html:132
 msgid "Salir"
 msgstr ""
 
-#: templates/base.html:136
 msgid "Entrar"
 msgstr ""
 
-#: templates/base.html:159
 msgid ""
 "Análisis estadístico honesto y trazable para las mecánicas de Pokémon GO."
 msgstr ""
 
-#: templates/base.html:165
 msgid "Herramientas"
 msgstr ""
 
-#: templates/base.html:168
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora de IV"
 msgstr "Calculator"
 
-#: templates/base.html:169
 msgid "CP y Nivel"
 msgstr ""
 
-#: templates/base.html:171
 msgid "PvP Ranker"
 msgstr ""
 
-#: templates/base.html:172
 msgid "Captura"
 msgstr ""
 
-#: templates/base.html:174
 #, fuzzy
 #| msgid "Calculadora"
 msgid "Calculadora Shiny"
 msgstr "Calculator"
 
-#: templates/base.html:178
 msgid "Guía: CP y HP"
 msgstr ""
 
-#: templates/base.html:179
 #, fuzzy
 #| msgid "intercambios/"
 msgid "Guía: IV en intercambios"
 msgstr "trades/"
 
-#: templates/base.html:187
 #, fuzzy
 #| msgid "comunidad/"
 msgid "Comunidad"
 msgstr "community/"
 
-#: templates/base.html:193
 msgid "Mis sesiones"
 msgstr ""
 
-#: templates/base.html:203
 msgid "Privacidad"
 msgstr ""
 
-#: templates/base.html:204
 msgid "Términos"
 msgstr ""
 
-#: templates/base.html:205
 msgid "Descargo"
 msgstr ""
 
-#: templates/base.html:211
 #, fuzzy
 #| msgid "No afiliado a Niantic ni The Pokémon Company"
 msgid "No afiliado a Niantic, The Pokémon Company, Nintendo ni Creatures Inc."
 msgstr "Not affiliated with Niantic or The Pokémon Company"
 
-#: templates/base.html:212
 msgid ""
 "Los datos y análisis son proporcionados 'tal cual' con fines educativos."
 msgstr ""
 
-#: templates/core/429.html:4
 msgid "Demasiadas solicitudes"
 msgstr ""
 
-#: templates/core/429.html:15
 msgid ""
 "Has hecho demasiadas solicitudes. Por favor, espera unos minutos e inténtalo "
 "de nuevo."
 msgstr ""
 
-#: templates/core/healthz.html:4 templates/core/healthz.html:9
 msgid "Análisis estadístico para Pokémon GO"
 msgstr ""
 
-#: templates/core/healthz.html:6
 msgid ""
 "Plataforma de análisis estadístico para mecánicas de Pokémon GO. Calcula "
 "probabilidades de IV, registra intercambios, y obtén inferencia honesta y "
 "trazable."
 msgstr ""
 
-#: templates/core/healthz.html:10
 msgid ""
 "Calcula probabilidades de IV, registra intercambios, y obtén inferencia "
 "honesta y trazable."
 msgstr ""
 
-#: templates/core/healthz.html:24
 msgid "Ficha 01 · Matemática verificada"
 msgstr ""
 
-#: templates/core/healthz.html:27
 msgid "Pogo-lab"
 msgstr ""
 
-#: templates/core/healthz.html:30
 msgid "Matemática honesta para entender las mecánicas de Pokémon GO."
 msgstr ""
 
-#: templates/core/healthz.html:34
 msgid "Calcular probabilidades"
 msgstr ""
 
-#: templates/core/healthz.html:37
 #, fuzzy
 #| msgid "Mecánicas"
 msgid "Explorar mecánicas"
 msgstr "Mechanics"
 
-#: templates/core/healthz.html:48
 msgid "Trazable"
 msgstr ""
 
-#: templates/core/healthz.html:52
 msgid "Sesgo"
 msgstr ""
 
-#: templates/core/healthz.html:60
 msgid "Ciclo del producto"
 msgstr ""
 
-#: templates/core/healthz.html:64
 msgid "Entender"
 msgstr ""
 
-#: templates/core/healthz.html:65
 msgid "Mecánicas versionadas con fuentes trazables"
 msgstr ""
 
-#: templates/core/healthz.html:70
 msgid "Probabilidades exactas con matemática verificada"
 msgstr ""
 
-#: templates/core/healthz.html:74
 #, fuzzy
 #| msgid "Regístrate"
 msgid "Registrar"
 msgstr "Sign up"
 
-#: templates/core/healthz.html:75
 msgid "Intercambios con CSV o manualmente"
 msgstr ""
 
-#: templates/core/healthz.html:79
 msgid "Analizar"
 msgstr ""
 
-#: templates/core/healthz.html:80
 msgid "Inferencia estadística honesta"
 msgstr ""
 
-#: templates/core/healthz.html:84
 msgid "Decidir"
 msgstr ""
 
-#: templates/core/healthz.html:85
 msgid "Recomendaciones deterministas y trazables"
 msgstr ""
 
-#: templates/core/healthz.html:91
 msgid "¿Por qué Pogo-lab?"
 msgstr ""
 
-#: templates/core/healthz.html:94
 msgid "01 · Sin magia negra"
 msgstr ""
 
-#: templates/core/healthz.html:95
 msgid ""
 "Cada resultado muestra su regla, versión y fuente. No confíes en nuestra "
 "palabra: verifícalo."
 msgstr ""
 
-#: templates/core/healthz.html:98
 msgid "02 · Modelo correcto"
 msgstr ""
 
-#: templates/core/healthz.html:99
 msgid ""
 "Re-roll uniforme en [f,15], no clamping. Probado con hypothesis testing y "
 "simulación."
 msgstr ""
 
-#: templates/core/healthz.html:102
 msgid "03 · Procedencia separada"
 msgstr ""
 
-#: templates/core/healthz.html:103
 msgid ""
 "Oficial / comunidad / datamining / inferido — cada afirmación con su "
 "etiqueta de confianza."
 msgstr ""
 
-#: templates/core/healthz.html:106
 msgid "04 · Decisiones, no números"
 msgstr ""
 
-#: templates/core/healthz.html:107
 #, python-format
 msgid ""
 "Convertimos probabilidades en acciones: ¿cuántos intercambios necesitas para "
 "estar 95%% seguro?"
 msgstr ""
 
-#: templates/experiments/dashboard.html:4
 msgid "Dataset Comunitario"
 msgstr ""
 
-#: templates/experiments/dashboard.html:8
 msgid "Dataset Comunitario de Intercambios"
 msgstr ""
 
-#: templates/experiments/dashboard.html:16
 msgid "Advertencia sobre los datos"
 msgstr ""
 
-#: templates/experiments/dashboard.html:18
 msgid ""
 "Este dataset NO es una muestra aleatoria de la población de jugadores. Los "
 "datos provienen de entrenadores que eligen voluntariamente contribuir sus "
@@ -2117,134 +1579,106 @@ msgid ""
 "sobrerrepresentados. Interpreta los resultados con cautela."
 msgstr ""
 
-#: templates/experiments/dashboard.html:33
 msgid "Afortunados (Lucky)"
 msgstr ""
 
-#: templates/experiments/dashboard.html:37
 msgid "Normales"
 msgstr ""
 
-#: templates/experiments/dashboard.html:41
 msgid "Versión del dataset"
 msgstr ""
 
-#: templates/experiments/dashboard.html:45
 msgid "Fecha de construcción"
 msgstr ""
 
-#: templates/experiments/dashboard.html:50
 msgid "Muestra mínima alcanzada"
 msgstr ""
 
-#: templates/experiments/dashboard.html:53
 msgid "Muestra mínima no alcanzada"
 msgstr ""
 
-#: templates/experiments/dashboard.html:60
 msgid "Versiones de ruleset incluidas"
 msgstr ""
 
-#: templates/experiments/dashboard.html:70
 msgid "Distribución agregada"
 msgstr ""
 
-#: templates/experiments/dashboard.html:88
 msgid "Piso:"
 msgstr ""
 
-#: templates/experiments/dashboard.html:90
 msgid "Hundos:"
 msgstr ""
 
-#: templates/experiments/dashboard.html:103
 msgid "Metodología y limitaciones"
 msgstr ""
 
-#: templates/experiments/dashboard.html:106
 msgid ""
 "Los datos provienen de intercambios registrados por entrenadores que han "
 "dado su consentimiento explícito para contribuir de forma anonimizada al "
 "dataset comunitario."
 msgstr ""
 
-#: templates/experiments/dashboard.html:108
 msgid "Solo se incluyen observaciones marcadas como válidas."
 msgstr ""
 
-#: templates/experiments/dashboard.html:109
 msgid ""
 "Cada entrenador otorga consentimiento explícito (revocable en cualquier "
 "momento)."
 msgstr ""
 
-#: templates/experiments/dashboard.html:110
 msgid ""
 "Los datos están anonimizados: sin nombre de entrenador, correo, ubicación "
 "precisa ni marcas de tiempo exactas."
 msgstr ""
 
-#: templates/experiments/dashboard.html:111
 msgid ""
 "Los IV se agrupan por tipo de intercambio (Lucky/normal) y nivel de amistad "
 "— nunca se mezclan pisos distintos."
 msgstr ""
 
-#: templates/experiments/dashboard.html:112
 msgid ""
 "No se incluye país por fila. Cualquier agregado geográfico usa supresión de "
 "celdas pequeñas."
 msgstr ""
 
-#: templates/experiments/dashboard.html:113
 msgid ""
 "Sesgo de selección: los contribuyentes no son una muestra aleatoria (ver "
 "advertencia arriba)."
 msgstr ""
 
-#: templates/experiments/dashboard.html:120
 msgid "Descarga"
 msgstr ""
 
-#: templates/experiments/dashboard.html:123
 msgid "La descarga pública del dataset está disponible."
 msgstr ""
 
-#: templates/experiments/dashboard.html:127
 msgid "La descarga pública del dataset no está habilitada en este momento."
 msgstr ""
 
-#: templates/experiments/dashboard.html:128
 msgid ""
 "Habilitar la descarga pública requiere revisión legal de la licencia del "
 "dataset y que se alcance la muestra mínima."
 msgstr ""
 
-#: templates/experiments/dashboard.html:134
 msgid "Sin dataset disponible"
 msgstr ""
 
-#: templates/experiments/dashboard.html:134
 msgid ""
 "Aún no se ha construido ninguna versión del dataset comunitario. Cuando haya "
 "suficientes contribuciones, aquí aparecerá el dashboard."
 msgstr ""
 
-#: templates/legal/disclaimer.html:4 templates/legal/disclaimer.html:8
 msgid "Descargo de responsabilidad"
 msgstr ""
 
-#: templates/legal/disclaimer.html:11
 msgid "Última actualización: 2026-07-19."
 msgstr ""
 
-#: templates/legal/disclaimer.html:15
 #, fuzzy
 #| msgid "Confirmar eliminación"
 msgid "Afiliación"
 msgstr "Confirm deletion"
 
-#: templates/legal/disclaimer.html:16
 msgid ""
 "Pogo-lab no está afiliado, asociado, autorizado, respaldado por, ni de "
 "ninguna manera vinculado oficialmente a Niantic, Inc., The Pokémon Company, "
@@ -2253,11 +1687,9 @@ msgid ""
 "son marcas registradas de sus respectivos propietarios."
 msgstr ""
 
-#: templates/legal/disclaimer.html:18
 msgid "Precisión de los datos"
 msgstr ""
 
-#: templates/legal/disclaimer.html:19
 msgid ""
 "Los análisis, cálculos y mecánicas presentados en Pogo-lab se basan en "
 "investigaciones de la comunidad, datamining y documentación oficial cuando "
@@ -2267,11 +1699,9 @@ msgid ""
 "contenido."
 msgstr ""
 
-#: templates/legal/disclaimer.html:21
 msgid "Uso del servicio"
 msgstr ""
 
-#: templates/legal/disclaimer.html:22
 msgid ""
 "El uso de Pogo-lab y sus herramientas es bajo tu propio riesgo. Las "
 "decisiones que tomes en el juego basadas en nuestros análisis son tu "
@@ -2280,11 +1710,9 @@ msgid ""
 "la plataforma."
 msgstr ""
 
-#: templates/legal/disclaimer.html:24
 msgid "Contenido generado por usuarios"
 msgstr ""
 
-#: templates/legal/disclaimer.html:25
 msgid ""
 "Pogo-lab puede contener datos de observaciones contribuidos por usuarios. "
 "Estos datos no han sido verificados de forma independiente y pueden contener "
@@ -2292,30 +1720,27 @@ msgid ""
 "investigación y entretenimiento."
 msgstr ""
 
-#: templates/legal/privacy.html:4 templates/legal/privacy.html:8
 msgid "Política de privacidad"
 msgstr ""
 
-#: templates/legal/privacy.html:11 templates/legal/tos.html:11
 msgid "Última actualización: 2026-07-18."
 msgstr ""
 
-#: templates/legal/privacy.html:15
 msgid "Responsable del tratamiento"
 msgstr ""
 
-#: templates/legal/privacy.html:16
 msgid ""
 "El responsable del tratamiento de tus datos personales es Carlos M., persona "
 "natural con domicilio en Chile. Para cualquier asunto de privacidad puedes "
-"escribir a privacidad@pogo-lab.com."
+"escribir a carlos@tooltician.com."
 msgstr ""
+"The data controller of your personal data is Carlos M., a natural person "
+"domiciled in Chile. For any privacy matter you can write to "
+"carlos@tooltician.com."
 
-#: templates/legal/privacy.html:18
 msgid "Datos que recopilamos"
 msgstr ""
 
-#: templates/legal/privacy.html:19
 msgid ""
 "Recopilamos los siguientes datos cuando creas una cuenta: correo electrónico "
 "(necesario para la autenticación), nombre de usuario (público). Cuando "
@@ -2323,75 +1748,60 @@ msgid ""
 "intercambio, nivel de amistad, especie y marca de tiempo."
 msgstr ""
 
-#: templates/legal/privacy.html:21
 msgid "Datos que NO recopilamos"
 msgstr ""
 
-#: templates/legal/privacy.html:23
 msgid "Nombre real del entrenador"
 msgstr ""
 
-#: templates/legal/privacy.html:24
 msgid "Ubicación precisa (solo país agregado opcional)"
 msgstr ""
 
-#: templates/legal/privacy.html:25
 msgid "Identificadores de dispositivo"
 msgstr ""
 
-#: templates/legal/privacy.html:26
 msgid "Contenido de notas privadas"
 msgstr ""
 
-#: templates/legal/privacy.html:29
 msgid "Base legal"
 msgstr ""
 
-#: templates/legal/privacy.html:30
 msgid ""
 "Tratamos tus datos conforme a la legislación chilena de protección de datos "
 "(Ley 19.628 y, de forma inminente, la Ley 21.719). Las bases legales son:"
 msgstr ""
 
-#: templates/legal/privacy.html:32
 msgid ""
 "Ejecución de un contrato: la creación y gestión de tu cuenta y el uso de las "
 "herramientas del servicio."
 msgstr ""
 
-#: templates/legal/privacy.html:33
 msgid ""
 "Consentimiento explícito: para incluir tus observaciones en el dataset "
 "comunitario anonimizado. Puedes revocarlo en cualquier momento."
 msgstr ""
 
-#: templates/legal/privacy.html:34
 msgid ""
 "Interés legítimo: análisis agregados y anonimizados para comprender las "
 "mecánicas del juego — un tratamiento distinto al del dataset comunitario."
 msgstr ""
 
-#: templates/legal/privacy.html:36
 msgid ""
 "Si resides en la Unión Europea, también se aplica el Reglamento General de "
 "Protección de Datos (GDPR) en lo que corresponda."
 msgstr ""
 
-#: templates/legal/privacy.html:38
 msgid "Cookies"
 msgstr ""
 
-#: templates/legal/privacy.html:39
 msgid ""
 "Usamos cookies estrictamente necesarias para la sesión (sessionid, "
 "csrftoken). No usamos cookies de rastreo, publicidad ni análisis de terceros."
 msgstr ""
 
-#: templates/legal/privacy.html:41
 msgid "Conservación de datos"
 msgstr ""
 
-#: templates/legal/privacy.html:42
 msgid ""
 "Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, "
 "todos tus datos personales se eliminan irreversiblemente. Las contribuciones "
@@ -2401,49 +1811,39 @@ msgid ""
 "consentimiento para futuros builds puede revocarse en cualquier momento."
 msgstr ""
 
-#: templates/legal/privacy.html:44
 msgid "Tus derechos"
 msgstr ""
 
-#: templates/legal/privacy.html:46
 msgid ""
 "Acceso: exporta tus datos desde la sección de configuración de tu cuenta."
 msgstr ""
 
-#: templates/legal/privacy.html:47
 msgid "Rectificación: corrige tu información en cualquier momento."
 msgstr ""
 
-#: templates/legal/privacy.html:48
 msgid "Supresión: elimina tu cuenta y todos tus datos asociados."
 msgstr ""
 
-#: templates/legal/privacy.html:49
 msgid "Portabilidad: exporta tus observaciones en formato CSV."
 msgstr ""
 
-#: templates/legal/privacy.html:50
 msgid ""
 "Revocación del consentimiento: desmarca la contribución al dataset en "
 "cualquier momento."
 msgstr ""
 
-#: templates/legal/privacy.html:53
 msgid "Seguridad"
 msgstr ""
 
-#: templates/legal/privacy.html:54
 msgid ""
 "Implementamos medidas técnicas y organizativas para proteger tus datos: "
 "cifrado en tránsito (HTTPS), hashing seguro de contraseñas (Argon2), "
 "cabeceras de seguridad (CSP, HSTS), y dependencias auditadas regularmente."
 msgstr ""
 
-#: templates/legal/privacy.html:56
 msgid "Menores"
 msgstr ""
 
-#: templates/legal/privacy.html:57
 msgid ""
 "No recopilamos a sabiendas datos de menores de 13 años. Si eres padre, madre "
 "o tutor y tienes conocimiento de que un menor a tu cargo nos ha "
@@ -2451,54 +1851,47 @@ msgid ""
 "eliminarlos. Al registrarte, confirmas que tienes al menos 13 años."
 msgstr ""
 
-#: templates/legal/privacy.html:59
 msgid "Ubicación de los datos"
 msgstr ""
 
-#: templates/legal/privacy.html:60
 msgid "Tus datos se alojan en servidores ubicados en Santiago, Chile."
 msgstr ""
 
-#: templates/legal/privacy.html:62
 msgid "Cambios a esta política"
 msgstr ""
 
-#: templates/legal/privacy.html:63
 msgid ""
 "Actualizaremos esta política cuando sea necesario. Los cambios sustanciales "
 "se notificarán mediante un aviso en el sitio."
 msgstr ""
 
-#: templates/legal/privacy.html:65 templates/legal/tos.html:53
 msgid "Contacto"
 msgstr ""
 
-#: templates/legal/privacy.html:66
 msgid ""
 "Para ejercer tus derechos de privacidad (acceso, rectificación, supresión, "
-"portabilidad o revocación del consentimiento), escríbenos a privacidad@pogo-"
-"lab.com. Responderemos dentro de los plazos que exija la ley aplicable."
+"portabilidad o revocación del consentimiento), escríbenos a "
+"carlos@tooltician.com. Responderemos dentro de los plazos que exija la ley "
+"aplicable."
 msgstr ""
+"To exercise your privacy rights (access, rectification, deletion, "
+"portability or withdrawal of consent), write to carlos@tooltician.com. We "
+"will respond within the timeframes required by applicable law."
 
-#: templates/legal/tos.html:4 templates/legal/tos.html:8
 msgid "Términos de servicio"
 msgstr ""
 
-#: templates/legal/tos.html:15
 msgid "Aceptación de los términos"
 msgstr ""
 
-#: templates/legal/tos.html:16
 msgid ""
 "Al acceder y usar Pogo-lab, aceptas estos términos de servicio en su "
 "totalidad. Si no estás de acuerdo, por favor no uses el servicio."
 msgstr ""
 
-#: templates/legal/tos.html:18
 msgid "Descripción del servicio"
 msgstr ""
 
-#: templates/legal/tos.html:19
 msgid ""
 "Pogo-lab es una plataforma educativa y analítica que ayuda a entender las "
 "mecánicas de Pokémon GO (probabilidades de IV, intercambios Lucky, y temas "
@@ -2506,59 +1899,46 @@ msgid ""
 "análisis estadísticos y datasets comunitarios anonimizados."
 msgstr ""
 
-#: templates/legal/tos.html:21
 msgid "Registro y cuentas"
 msgstr ""
 
-#: templates/legal/tos.html:23
 msgid "Debes proporcionar información veraz durante el registro."
 msgstr ""
 
-#: templates/legal/tos.html:24
 msgid "Eres responsable de mantener la confidencialidad de tu contraseña."
 msgstr ""
 
-#: templates/legal/tos.html:25
 msgid "Debes tener al menos 13 años para crear una cuenta."
 msgstr ""
 
-#: templates/legal/tos.html:26
 msgid ""
 "Nos reservamos el derecho de suspender cuentas que violen estos términos."
 msgstr ""
 
-#: templates/legal/tos.html:29
 msgid "Conducta del usuario"
 msgstr ""
 
-#: templates/legal/tos.html:30
 msgid "Al usar el servicio, te comprometes a:"
 msgstr ""
 
-#: templates/legal/tos.html:32
 msgid "No falsificar datos de observaciones a propósito."
 msgstr ""
 
-#: templates/legal/tos.html:33
 msgid "No usar el servicio para spam, acoso o actividades ilegales."
 msgstr ""
 
-#: templates/legal/tos.html:34
 msgid "No intentar acceder a datos de otros usuarios sin autorización."
 msgstr ""
 
-#: templates/legal/tos.html:35
 msgid ""
 "No sobrecargar la infraestructura con solicitudes automatizadas excesivas."
 msgstr ""
 
-#: templates/legal/tos.html:38
 #, fuzzy
 #| msgid "contribuciones/"
 msgid "Datos y contribuciones"
 msgstr "contributions/"
 
-#: templates/legal/tos.html:39
 msgid ""
 "Al registrar observaciones de intercambios, conservas el control de tus "
 "datos. Nos otorgas una licencia no exclusiva para usarlos de forma "
@@ -2567,11 +1947,9 @@ msgid ""
 "explícito."
 msgstr ""
 
-#: templates/legal/tos.html:41
 msgid "Limitación de responsabilidad"
 msgstr ""
 
-#: templates/legal/tos.html:42
 msgid ""
 "Pogo-lab se proporciona \"tal cual\", sin garantías de ningún tipo. No nos "
 "hacemos responsables de decisiones tomadas basándose en los análisis o "
@@ -2579,11 +1957,9 @@ msgid ""
 "nuestras herramientas."
 msgstr ""
 
-#: templates/legal/tos.html:44
 msgid "Propiedad intelectual"
 msgstr ""
 
-#: templates/legal/tos.html:45
 msgid ""
 "El código fuente, los análisis, textos y gráficos originales de Pogo-lab son "
 "propiedad de sus autores y están protegidos por derechos de autor (© 2026, "
@@ -2592,22 +1968,18 @@ msgid ""
 "Pokémon GO y marcas relacionadas son propiedad de sus respectivos titulares."
 msgstr ""
 
-#: templates/legal/tos.html:47
 msgid "Modificaciones"
 msgstr ""
 
-#: templates/legal/tos.html:48
 msgid ""
 "Nos reservamos el derecho de modificar estos términos en cualquier momento. "
 "Los cambios entrarán en vigor al ser publicados. El uso continuado del "
 "servicio constituye la aceptación de los nuevos términos."
 msgstr ""
 
-#: templates/legal/tos.html:50
 msgid "Ley aplicable y jurisdicción"
 msgstr ""
 
-#: templates/legal/tos.html:51
 msgid ""
 "Estos términos se rigen por las leyes de la República de Chile. Cualquier "
 "disputa relacionada con estos términos será resuelta ante los tribunales "
@@ -2615,10 +1987,10 @@ msgid ""
 "inválida, las demás mantendrán su plena vigencia."
 msgstr ""
 
-#: templates/legal/tos.html:54
 msgid ""
-"Para consultas sobre estos términos, escríbenos a contacto@pogo-lab.com."
+"Para consultas sobre estos términos, escríbenos a carlos@tooltician.com."
 msgstr ""
+"For questions about these terms, write to carlos@tooltician.com."
 
 #~ msgid "DPS"
 #~ msgstr "DPS"

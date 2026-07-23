@@ -22,7 +22,17 @@ CACHES = {
 
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@pogo-lab.com")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="carlos@tooltician.com")
+
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "https://pogo-lab.tooltician.com",
+        "https://www.pogo-lab.tooltician.com",
+    ],
+)
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Plan 050: fail-closed email validation temporarily disabled for deploy.
 # TODO: re-enable after configuring a real SMTP provider on the OCI server.

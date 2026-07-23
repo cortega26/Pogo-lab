@@ -62,7 +62,7 @@ de producto y revisión legal.
 ## Pendiente humano — pasos para completar M7
 
 1. **Dominio y TLS:**
-   - Comprar `pogo-lab.com` (o similar) en un registrador.
+   - Usar el subdominio `pogo-lab.tooltician.com` bajo el dominio existente `tooltician.com` (sin compra nueva).
    - Apuntar DNS A/AAAA a la IP `146.181.47.12` (OCI Santiago).
    - Ejecutar certbot/Let's Encrypt para el certificado SSL.
    - Actualizar `infra/nginx/default.conf` con el dominio y redirigir HTTP→HTTPS.
@@ -88,7 +88,8 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 
 | Fecha | Estado | Nota |
 |---|---|---|
-| 2026-07-23 | 🟨 | Añadido monitor programado de capacidad OCI A1: consulta `VM.Standard.A1.Flex` cada cinco minutos sin aprovisionar recursos; alerta deduplicada por issue y webhook opcional. Requiere configurar secrets de Actions. |
+| 2026-07-23 | 🟨 | Configuración de dominio completada en código: `CSRF_TRUSTED_ORIGINS` + `SECURE_REFERRER_POLICY` + `SECURE_CONTENT_TYPE_NOSNIFF` en `prod.py`; `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP` en `infra/nginx/default.conf` (rate limiting ve la IP real del cliente tras el proxy). Guía operativa nueva en `docs/deploy-tooltician.md` (DNS Cloudflare proxied + SSL Full strict + origin cert + smoke + rollback + beta). Tests: 817 passed, ruff/mypy limpios. Pendiente humano: crear registro A `pogo-lab`→`146.181.47.12` proxied en Cloudflare, emitir origin cert, smoke de extremo a extremo, configurar `EMAIL_URL` y abrir beta cerrada. |
+| 2026-07-23 | 🟨 | Dominio decidido: `pogo-lab.tooltician.com` (subdominio de tooltician.com, sin compra nueva). Actualizados nginx `default.conf`, `prod.py` (`DEFAULT_FROM_EMAIL=carlos@tooltician.com`), scripts OCI, `.env-oci`, plantillas legales (tos/privacy) y `.po` es/en. Añadido monitor programado de capacidad OCI A1: consulta `VM.Standard.A1.Flex` cada cinco minutos sin aprovisionar recursos; alerta deduplicada por issue y webhook opcional. Requiere configurar secrets de Actions. |
 | 2026-07-16 | ⬜ | Hoja creada. |
 | 2026-07-17 | 🟨 | PR-20 hardening completo. Hosting decidido: OCI Santiago (AMD Micro, 1 GB). Desplegado en <http://146.181.47.12>. Pendiente: GitHub Actions secrets, SSL/Lets Encrypt, backup automático, revisión legal. |
 | 2026-07-18 | 🟨 | PR-21: deploy.yml + compose.prod/micro + OCI scripts + ADR-0009 + backup/restore. Legal templates pulidos (ToS/privacy/disclaimer). healthcheck.json fuera de i18n. Tests de vistas legales (11 nuevos, 491 total). Pendiente humano: revisión legal, smoke deploy, restore verify. |

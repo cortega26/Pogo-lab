@@ -198,10 +198,6 @@ Hay **3 bloqueantes** que resolver antes de la beta, todos de arreglo rápido:
   (ya se hace).
 - **Dominio:** `pogo-lab.com` **no** incorpora la cadena "pokemon/pokémon" — bien.
 
----
-
-## Plan de acción priorizado
-
 **Antes de la beta (bloqueantes, arreglo rápido):**
 
 1. B1 — Nombrar responsable + correo de contacto privado; quitar "abre un issue" de privacidad y ToS.
@@ -221,3 +217,19 @@ irreversible), Bj1–Bj4 (README, fecha del descargo, "control" vs "propiedad", 
 **Puntos de criterio a validar con abogado:** umbral de edad y trato de menores bajo la Ley 21.719; alcance y fecha
 de entrada en vigor de la 21.719; elección definitiva de base legal (consentimiento vs. interés legítimo); certeza
 de marca sobre el nombre "Pogo-lab".
+
+---
+
+## Actualización posterior (2026-07-23): resolución de dominio y correos
+
+- **Dominio:** el despliegue se alojará en el subdominio **`pogo-lab.tooltician.com`** bajo el dominio existente
+  `tooltician.com` (propiedad del responsable). No se adquiere `pogo-lab.com`.
+- **Correos de contacto:** `DEFAULT_FROM_EMAIL`, contacto de ToS y contacto de privacidad se unifican en
+  **`carlos@tooltician.com`** (buzón del responsable, con redirección a su cuenta personal). Esto cierra B1 (medio de
+  contacto privado) y Bj4 (dominio de correo controlado).
+- **ToS y privacidad:** plantillas `tos.html` y `privacy.html` actualizadas; catálogos `.po` (es/en) regenerados y
+  traducción `en` rellenada para las cadenas afectadas.
+- **Infra:** `infra/nginx/default.conf` fija `server_name pogo-lab.tooltician.com www.pogo-lab.tooltician.com`;
+  scripts OCI (`setup-oci.sh`, `assist-oci.sh`) y `.env-oci` usan el nuevo dominio por defecto.
+- **Pendiente humano (no bloqueante para código):** apuntar DNS A/AAAA a `146.181.47.12`, emitir certificado
+  Let's Encrypt, y revisión profesional de marca (el nombre "Pogo-lab" sigue sin contener "pokemon/pokémon").

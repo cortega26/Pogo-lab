@@ -10,6 +10,8 @@ a la documentación — la regla que evita el *drift*.
 | [`../AGENTS.md`](../AGENTS.md) | Reglas no-negociables, convenciones y principios de diseño | El *rationale* de decisiones (vive en `adr/`) |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Flujo de trabajo, TDD, commits, tooling y contratos de guardrails | Reglas de producto (viven en `AGENTS.md`) |
 | [`milestones/`](milestones/) | Estado de ejecución por milestone (tablero + hojas M0–M7) | El diseño (vive en `plan.md`) |
+| [`hosting-micro.md`](hosting-micro.md) | Topología de hosting OCI (A1 ideal / micro fallback), capacidad Always Free | — |
+| [`deploy-tooltician.md`](deploy-tooltician.md) | Despliegue en `pogo-lab.tooltician.com`: DNS Cloudflare, SSL Full (strict), smoke, beta | — |
 | [`../CLAUDE.md`](../CLAUDE.md) | Puntero a `AGENTS.md` para Claude Code | Todo lo demás |
 
 ## Reglas de la documentación (anti-drift)
