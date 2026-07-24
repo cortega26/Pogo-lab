@@ -66,8 +66,8 @@ de producto y revisión legal.
 1. **Dominio y TLS:** ✅ **HECHO (2026-07-23).**
    - Registro A `pogo-lab.tooltician.com` → `146.181.47.12` creado en Cloudflare (proxied/naranja).
    - nginx reconfigurado en la VM: `listen 443 ssl`, `server_name pogo-lab.tooltician.com`, `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP`.
-   - **Cloudflare Origin CA cert** (15 años, válido hasta 2041) instalado en `/etc/nginx/certs/{fullchain,privkey}.pem`. Reemplaza al self-signed interim.
-   - **SSL mode = Full (strict)** en Cloudflare (válida el cert del origin).
+   - **Cloudflare Origin CA cert** (15 años, válido hasta 2041) instalado en `/etc/nginx/certs/{fullchain,privkey}.pem`.
+   - **SSL mode = Full** (no strict). El modo Full (strict) no es usable a nivel de zona porque `tooltician.com` sirve también a GitHub Pages (sin cert SSL válido en el origin), y el SSL mode es una configuración por-zona, no por-hostname. Con el cert origin CA válido, Full ofrece cifrado end-to-end; la única diferencia con strict es que Cloudflare no valida el cert del origin (en la práctica no hay riesgo: controlamos el origin y el cert).
    - **Always Use HTTPS = on**, **HSTS at edge** (max-age=31536000, includeSubdomains, preload), **TLS 1.3 = on**, **min TLS = 1.2**.
    - `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DEFAULT_FROM_EMAIL`, `ALLAUTH_TRUSTED_CLIENT_IP_HEADER` actualizados en `.env` de la VM; gunicorn reiniciado.
    - `cache_ratelimit` table creada (faltaba → causaba 500 en POST login).
