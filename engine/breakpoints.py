@@ -12,7 +12,10 @@ from dataclasses import dataclass
 
 from engine.dps_data import FAST_MOVES, FastMove
 from engine.dps_data import SPECIES as DPS_SPECIES
-from engine.stats import cpm_for_level
+from engine.stats import CPM_TABLE, cpm_for_level
+
+_MIN_TABLE_LEVEL = min(CPM_TABLE)
+_MAX_TABLE_LEVEL = max(CPM_TABLE)
 
 
 @dataclass(frozen=True)
@@ -83,6 +86,24 @@ def find_breakpoints(
     if move is None:
         raise ValueError(f"Fast move '{fast_move_key}' no encontrado.")
 
+    if not (0 <= iv_atk <= 15):
+        raise ValueError(f"iv_atk debe estar entre 0 y 15 (recibido: {iv_atk}).")
+
+    if not math.isfinite(defender_def) or defender_def <= 0:
+        raise ValueError(
+            f"defender_def debe ser un número finito mayor que 0 (recibido: {defender_def})."
+        )
+
+    if min_level > max_level:
+        raise ValueError(
+            f"nivel: min_level ({min_level}) no puede ser mayor que max_level ({max_level})."
+        )
+    if max_level < _MIN_TABLE_LEVEL or min_level > _MAX_TABLE_LEVEL:
+        raise ValueError(
+            f"nivel: el rango [{min_level}, {max_level}] no intersecta la tabla CPM "
+            f"([{_MIN_TABLE_LEVEL}, {_MAX_TABLE_LEVEL}])."
+        )
+
     from engine.dps_data import type_multiplier as tm
 
     base_atk = species.stats.atk
@@ -139,25 +160,21 @@ def find_breakpoints(
 
 
 def get_fast_moves_for_species(species_key: str) -> list[tuple[str, FastMove]]:
-    """Devuelve los fast moves disponibles para una especie (simplificado: todos).
+    """Devuelve los fast moves para el selector de una especie.
+
+    Plan 047: no hay en este repo un learnset verificado (qué fast moves
+    aprende realmente cada especie en el juego), así que se devuelve
+    honestamente el catálogo completo de `FAST_MOVES` en vez de aparentar
+    un filtro que no está respaldado por datos reales. La UI que consume
+    esta función debe avisar de esta limitación (ver `breakpoints_page.html`).
 
     Args:
         species_key: Clave de la especie.
 
     Returns:
-        Lista de (key, FastMove).
+        Lista de (key, FastMove) — vacía si la especie no existe.
     """
-    species = DPS_SPECIES.get(species_key)
-    if species is None:
+    if species_key not in DPS_SPECIES:
         return []
 
-    # Devolver fast moves que coincidan con los tipos de la especie (STAB)
-    species_types = [species.type1]
-    if species.type2:
-        species_types.append(species.type2)
-
-    result = []
-    for key, move in FAST_MOVES.items():
-        result.append((key, move))
-
-    return sorted(result, key=lambda x: x[1].name)
+    return sorted(FAST_MOVES.items(), key=lambda x: x[1].name)

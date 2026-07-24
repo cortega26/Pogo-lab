@@ -225,21 +225,45 @@ uv run python manage.py makemigrations --check --dry-run
 
 ## 4. Fase 2 — Plan 047: validar breakpoints (dep. 046)
 
-**No se detalla en fixtures numéricas todavía** — dependen de los valores que
-salgan de la Fase 1 (mismo error de "escribir número antes de que la base
-cambie" que señaló la revisión). Al llegar aquí:
+**Decisión del usuario (2026-07-24), resolviendo el bloqueo de §11:** no hay
+datos de learnset (qué fast/charge move aprende cada especie) en el repo ni
+fuente primaria citable para fabricarlos. Se opta por **"deshabilitar
+temporalmente lo no verificable"**: en vez de aparentar que la lista de
+movimientos está filtrada por especie (falso hoy — devuelve el catálogo
+completo bajo un comentario engañoso que dice filtrar por STAB sin hacerlo),
+se hace **explícito y honesto** que la lista es el catálogo completo del
+motor, no un learnset verificado, mientras se avanza con el resto del plan
+que sí es derivable de reglas ya verificadas (fórmula PvE documentada en el
+propio módulo + tabla de tipos de la Fase 1 + tabla CPM).
 
-1. Releer `plans/047-validate-breakpoints.md` completo.
-2. Diseñar el modelo de learnsets (qué movimientos aprende cada especie) con
-   procedencia explícita — si no hay datos suficientes para una especie,
-   **ocultar/desactivar esa combinación con mensaje honesto**, no inventar.
-3. `find_breakpoints` rechaza: pareja especie/movimiento no aprendida,
-   `iv_atk` fuera de `[0, 15]`, `defender_def` no finito o `<= 0`, niveles
-   fuera de la tabla CPM.
-4. Fixtures manuales para `_pve_damage` (STAB, efectividad simple/doble,
-   clima, amistad) — recién ahora, sobre los valores ya corregidos de 046.
-5. Subir cobertura de `engine/breakpoints.py` sobre el 31% actual con golden
-   vectors reales, no snapshots opacos.
+Alcance de esta fase:
+
+1. `get_fast_moves_for_species`: eliminar el comentario/código muerto que
+   afirma filtrar por STAB sin hacerlo; documentar honestamente la
+   limitación (catálogo completo, no learnset verificado).
+2. UI de breakpoints: aviso visible de que los movimientos no están
+   verificados contra el learnset real de la especie.
+3. `find_breakpoints` rechaza (con test que falla primero):
+   `iv_atk` fuera de `[0, 15]`; `defender_def` no finito o `<= 0` (fixes el
+   `ZeroDivisionError` real con `defender_def=0`); `min_level > max_level`
+   o ambos fuera del rango de la tabla CPM canónica.
+4. Fixtures manuales para `_pve_damage` (STAB on/off, efectividad
+   simple/doble usando los valores ya corregidos en Fase 1, clima,
+   amistad) — derivables por cálculo puro de la fórmula ya documentada,
+   sin requerir fuente externa nueva.
+5. Eliminar la duplicación de "todos los movimientos" entre
+   `engine/breakpoints.py::get_fast_moves_for_species` y
+   `apps/calculators/views.py::_move_choices_for` (el selector debe llamar
+   al mismo helper del engine, no reimplementar el loop).
+6. Subir cobertura de `engine/breakpoints.py` sobre el 31% actual con estos
+   golden vectors.
+
+**Estado: DONE.** Cobertura 31%→100%. Suite 1251 passed; ruff/format/mypy/
+lint-imports limpios. Golden vectors de `_pve_damage` verificados con un
+cálculo independiente antes de escribirlos (se detectó y corrigió un error
+aritmético propio: 247 en vez de 185 para el caso combinado — la lección es
+no confiar en aritmética mental para fixtures, siempre verificar con
+código). `_move_choices_for` ya no duplica el loop de `FAST_MOVES`.
 
 ## 5. Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — **tiene un STOP**
 

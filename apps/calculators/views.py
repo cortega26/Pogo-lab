@@ -1,10 +1,8 @@
 from django.shortcuts import render
 
-from engine.breakpoints import find_breakpoints
+from engine.breakpoints import find_breakpoints, get_fast_moves_for_species
 from engine.catch import catch_multiplier, catch_probability
 from engine.costs import power_up_cost
-from engine.dps_data import FAST_MOVES as FM
-from engine.dps_data import SPECIES as DPS_SPECIES
 from engine.probability import p_at_least_one, p_zero, trades_for_confidence
 from engine.pvp_rank import top_spreads
 from engine.shadow import compare_shadow_purified
@@ -732,10 +730,7 @@ def _breakpoints_result(params):
 
 
 def _move_choices_for(species_key):
-    sp = DPS_SPECIES.get(species_key)
-    if sp is None:
-        return []
-    choices = []
-    for key, move in FM.items():
-        choices.append((key, f"{move.name} ({move.type})"))
-    return sorted(choices, key=lambda x: x[1])
+    # Delegar en engine.breakpoints.get_fast_moves_for_species (plan 047):
+    # selector y engine deben consultar la misma fuente, no duplicar el loop.
+    moves = get_fast_moves_for_species(species_key)
+    return [(key, f"{move.name} ({move.type})") for key, move in moves]

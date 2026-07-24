@@ -35,17 +35,18 @@
 
 ## Fase 2 — Plan 047: validar breakpoints (dep. 046)
 
-- [ ] Releer `plans/047-validate-breakpoints.md` completo (post-046)
-- [ ] Diseñar modelo de learnsets con procedencia explícita; ocultar combinaciones sin datos suficientes (mensaje honesto, no inventar)
-- [ ] `find_breakpoints` rechaza pareja especie/movimiento no aprendida
-- [ ] `find_breakpoints` rechaza `iv_atk` fuera de `[0, 15]`
-- [ ] `find_breakpoints` rechaza `defender_def` no finito o `<= 0` (fix del ZeroDivisionError)
-- [ ] `find_breakpoints` rechaza niveles fuera de la tabla CPM
-- [ ] Fixtures manuales para `_pve_damage` (STAB, efectividad simple/doble, clima, amistad) sobre valores ya corregidos en 046
-- [ ] Subir cobertura de `engine/breakpoints.py` por encima del 31% con golden vectors reales
-- [ ] Selector de movimientos (`_move_choices_for` en vistas) y engine consultan la misma función — sin duplicar lista
-- [ ] Suite + ruff + mypy verdes
-- [ ] Actualizar `plans/README.md` fila 047 → DONE
+- [x] Bloqueo de learnsets documentado (spec.md §11) y resuelto por el usuario: deshabilitar/hacer honesto lo no verificable, avanzar con el resto
+- [x] `get_fast_moves_for_species`: quitado comentario/código muerto de "filtro STAB" falso; docstring honesto
+- [x] UI de breakpoints: aviso visible "se muestran todos los fast moves del motor, aún no verificamos cuáles aprende cada especie"
+- [x] Test (TDD-red confirmado, 8 fallos): `find_breakpoints` rechaza `iv_atk` fuera de `[0, 15]`
+- [x] Test: `find_breakpoints` rechaza `defender_def` no finito (`inf`/`nan`) o `<= 0` (incl. el `ZeroDivisionError` real reproducido antes del fix)
+- [x] Test: `find_breakpoints` rechaza `min_level > max_level` o rango completamente fuera de la tabla CPM; test adicional para rango parcialmente solapado (se salta niveles fuera de tabla sin crashear)
+- [x] Fixtures manuales para `_pve_damage` (sin modificadores, STAB, SE/doble-SE/NVE, clima, amistad, combinado, daño mínimo=1) — verificadas con cálculo independiente antes de escribirlas (un error mental propio corregido: 247→185)
+- [x] `_move_choices_for` (apps/calculators/views.py) delega en `get_fast_moves_for_species`; imports `FM`/`DPS_SPECIES` no usados eliminados
+- [x] Cobertura de `engine/breakpoints.py`: 31% → **100%** (2 tests extra para tipo secundario STAB y rango parcialmente fuera de tabla)
+- [x] Suite completa 1251 passed; ruff/format/mypy (164 files)/lint-imports (engine-purity KEPT) verdes
+- [x] Actualizar `plans/README.md` fila 047 → DONE
+- [x] Commit de cierre de fase 2
 
 ## Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — tiene STOP real
 
