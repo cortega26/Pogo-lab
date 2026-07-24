@@ -1,13 +1,11 @@
 """Tests de validación de settings de producción (plan 050).
 
-NOTE: The fail-closed validation in prod.py is temporarily disabled for
-deploy. These tests are skipped until the SMTP provider is configured
-on the OCI server and the validation is re-enabled.
+The fail-closed validation in prod.py is now active (Brevo SMTP configured).
 """
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="Plan 050 validation temporarily disabled for deploy")
+# Plan 050 validation is active again (Brevo SMTP wired). Tests run normally.
 
 
 class TestProdSettingsFailClosed:
@@ -49,3 +47,60 @@ class TestProdSettingsFailClosed:
             del sys.modules["config.settings.prod"]
         mod = importlib.import_module("config.settings.prod")
         assert mod.EMAIL_URL == "smtp://user:pass@smtp.example.com:587"
+
+
+class TestProdSettingsSchemeValidation:
+    """Validación de esquema de EMAIL_URL (no substring) — edge cases."""
+
+    @pytest.mark.parametrize(
+        "scheme,url",
+        [
+            ("smtp+tls", "smtp+tls://user:pass@smtp.example.com:587"),
+            ("smtp+ssl", "smtp+ssl://user:pass@smtp.example.com:465"),
+            ("smtps", "smtps://user:pass@smtp.example.com:465"),
+        ],
+    )
+    def test_prod_accepts_secure_smtp_schemes(self, monkeypatch, scheme, url):
+        """Esquemas SMTP seguros (TLS/SSL/smtps) cargan sin error."""
+        import importlib
+        import sys
+
+        monkeypatch.setenv("EMAIL_URL", url)
+        if "config.settings.prod" in sys.modules:
+            del sys.modules["config.settings.prod"]
+        mod = importlib.import_module("config.settings.prod")
+        assert url == mod.EMAIL_URL
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "locmem://",
+            "dummy://",
+            "file:///tmp/emails",
+            "console://",
+        ],
+    )
+    def test_prod_rejects_insecure_schemes(self, monkeypatch, url):
+        """Esquemas inseguros son rechazados."""
+        import importlib
+        import sys
+
+        monkeypatch.setenv("EMAIL_URL", url)
+        if "config.settings.prod" in sys.modules:
+            del sys.modules["config.settings.prod"]
+        from django.core.exceptions import ImproperlyConfigured
+
+        with pytest.raises(ImproperlyConfigured, match="inseguros"):
+            importlib.import_module("config.settings.prod")
+
+    def test_prod_accepts_smtp_host_containing_locmem_substring(self, monkeypatch):
+        """Un host SMTP legítimo que contenga 'locmem' NO se rechaza (validación por esquema, no substring)."""
+        import importlib
+        import sys
+
+        # El host contiene "locmem" como subcadena, pero el esquema es smtp.
+        monkeypatch.setenv("EMAIL_URL", "smtp://user:pass@locmem-host.example.com:587")
+        if "config.settings.prod" in sys.modules:
+            del sys.modules["config.settings.prod"]
+        mod = importlib.import_module("config.settings.prod")
+        assert "locmem-host.example.com" in mod.EMAIL_URL

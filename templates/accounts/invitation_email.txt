@@ -1,0 +1,13 @@
+Hola,
+
+Has recibido una invitación para unirte a la beta cerrada de Pogo-lab.
+
+Para completar tu registro, abre este enlace:
+
+{{ signup_url }}
+
+Este enlace expira el {{ invitation.expires_at|date:"Y-m-d H:i" }} (UTC).
+
+Si no esperabas esta invitación, ignora este correo.
+
+— Equipo Pogo-lab

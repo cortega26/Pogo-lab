@@ -430,23 +430,20 @@ class TestPlan044SecretBoundaries:
 class TestPlan050FailClosedEmail:
     """Plan 050: producción falla sin EMAIL_URL o con backend inseguro.
 
-    NOTE: Validation temporarily disabled for deploy — re-enable after
-    configuring SMTP on the OCI server. The source-code check below verifies
-    the validation logic exists (even if commented out).
+    Validation is active (Brevo SMTP configured). The source-code check
+    below verifies the validation logic exists and is not commented out.
     """
 
     def test_prod_settings_validate_email_url(self):
-        """Verifica que prod.py contiene la lógica de validación de EMAIL_URL."""
+        """Verifica que prod.py contiene la lógica de validación de EMAIL_URL activa."""
         from pathlib import Path
 
         prod = Path("config/settings/prod.py").read_text()
         assert "EMAIL_URL" in prod, "prod.py debe validar EMAIL_URL (plan 050)"
-        assert (
-            "console" in prod.lower()
-            or "locmem" in prod.lower()
-            or "raise" in prod.lower()
-            or "ImproperlyConfigured" in prod
-        ), "prod.py debe rechazar backends inseguros (plan 050)"
+        # La validación no debe estar comentada (no debe empezar cada línea con '#').
+        assert "raise ImproperlyConfigured" in prod, (
+            "prod.py debe rechazar backends inseguros con raise ImproperlyConfigured (plan 050)"
+        )
 
 
 class TestPlan049AccountErasure:

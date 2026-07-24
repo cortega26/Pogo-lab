@@ -23,6 +23,13 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
+# En tests el registro por invitación está desactivado por defecto; cada test
+# que lo necesite lo activa explícitamente con override_settings.
+INVITATION_ONLY = False
+INVITATION_EXPIRY_DAYS = 14
+# Base URL para enlaces de invitación en tests (no se envía correo real).
+INVITATION_BASE_URL = "https://testserver.example"
+
 RATELIMIT_ENABLE = False
 
 # CSP relajada para tests (admin inline scripts, htmx nonce, etc.)

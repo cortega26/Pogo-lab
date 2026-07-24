@@ -1,3 +1,7 @@
+from urllib.parse import urlparse
+
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *
 
 DEBUG = env.bool("DEBUG", default=False)
@@ -29,6 +33,9 @@ CACHES = {
 
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 
+# Beta cerrada activa en producción: signup solo por invitación.
+INVITATION_ONLY = env.bool("INVITATION_ONLY", default=True)
+
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="carlos@tooltician.com")
 
 CSRF_TRUSTED_ORIGINS = env.list(
@@ -41,20 +48,24 @@ CSRF_TRUSTED_ORIGINS = env.list(
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# Plan 050: fail-closed email validation temporarily disabled for deploy.
-# TODO: re-enable after configuring a real SMTP provider on the OCI server.
-# EMAIL_URL = env("EMAIL_URL", default="")
-# if not EMAIL_URL:
-#     raise ImproperlyConfigured(
-#         "Producción exige EMAIL_URL (backend de correo transaccional). "
-#         "Consola/locmem/dummy NO son válidos para producción."
-#     )
-# _insecure_backends = ("consolemail", "locmem", "dummy", "file")
-# if any(b in EMAIL_URL.lower() for b in _insecure_backends):
-#     raise ImproperlyConfigured(
-#         "Producción no permite backends de correo inseguros "
-#         "(console/locmem/dummy/file). Define un proveedor real en EMAIL_URL."
-#     )
+# Plan 050: fail-closed email validation. Producción exige un proveedor SMTP real
+# (Brevo por defecto). console/locmem/dummy/file NO son válidos en producción.
+EMAIL_URL = env("EMAIL_URL", default="")
+if not EMAIL_URL:
+    raise ImproperlyConfigured(
+        "Producción exige EMAIL_URL (backend de correo transaccional). "
+        "Consola/locmem/dummy NO son válidos para producción."
+    )
+# Validación por esquema (no por substring) para evitar falsos positivos
+# cuando un host legítimo contiene una subcadena como "locmem".
+_email_scheme = urlparse(EMAIL_URL).scheme.lower().split("+", 1)[0]
+_insecure_schemes = {"console", "consolemail", "locmem", "dummy", "file", ""}
+if _email_scheme in _insecure_schemes:
+    raise ImproperlyConfigured(
+        f"Producción no permite backends de correo inseguros (esquema "
+        f"'{_email_scheme}'). Define un proveedor SMTP real en EMAIL_URL "
+        f"(smtp://, smtps://, smtp+tls:// o smtp+ssl://)."
+    )
 
 LOGGING = {
     "version": 1,

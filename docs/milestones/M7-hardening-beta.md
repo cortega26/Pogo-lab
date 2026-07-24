@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | 🟨 Técnico completo; pendiente humano: dominio/TLS y apertura de beta |
+| **Estado** | 🟨 Técnico completo; pendiente humano: apertura de beta (decisión operativa) |
 | **Tamaño** | M |
 | **Depende de** | M1 … M6 |
 | **PRs** | PR-20, PR-21 |
-| **Actualizado** | 2026-07-19 |
+| **Actualizado** | 2026-07-24 |
 
 ## Objetivo
 
@@ -53,7 +53,7 @@ de producto y revisión legal.
 ## Criterios de aceptación
 
 - [x] **Definición de terminado** del plan (§O) — hardening completo.
-- [x] Entorno desplegado accesible + beta cerrada operativa. **ENTORNO DESPLEGADO EN https://pogo-lab.tooltician.com (2026-07-23). Beta cerrada pendiente: requiere `EMAIL_URL` + mecanismo de invitaciones.**
+- [x] Entorno desplegado accesible + beta cerrada operativa. **ENTORNO DESPLEGADO EN https://pogo-lab.tooltician.com (2026-07-23). Beta cerrada implementada (2026-07-24): mecanismo de invitaciones por correo vía Brevo + `INVITATION_ONLY=True` en prod. Pendiente smoke end-to-end del flujo de invitación en prod y apertura operativa.**
 
 ## Demo verificable
 
@@ -73,7 +73,7 @@ de producto y revisión legal.
    - `cache_ratelimit` table creada (faltaba → causaba 500 en POST login).
 
 2. **Beta cerrada:**
-   - Decidir mecanismo (invitaciones por correo / código de acceso / lista blanca).
+   - Decidir mecanismo (invitaciones por correo / código de acceso / lista blanca). **HECHO (2026-07-24): mecanismo de invitaciones por correo implementado en `apps/accounts/` (modelo `Invitation` + middleware `InvitationGateMiddleware` + adapter allauth `InvitationAdapter` + admin action `send_invitations` que envía por Brevo + señal `consume_invitation_on_signup`). 20 tests en `tests/test_invitations.py`. `INVITATION_ONLY=True` en prod por defecto; False en dev/test.**
    - Configurar `ACCOUNT_EMAIL_VERIFICATION = "mandatory"` (ya está en prod).
    - Aviso legal en signup + consentimiento GDPR/chileno.
 
@@ -92,6 +92,7 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 
 | Fecha | Estado | Nota |
 |---|---|---|
+| 2026-07-24 | 🟨 | **Brevo SMTP wired + beta cerrada por invitación implementada.** `EMAIL_URL` configurado en `.env` y `.env-oci` (Login `b31878001@smtp-brevo.com` con `@` URL-encoded como `%40`, SMTP key `xsmtpsib-...`, `smtp-relay.brevo.com:587` con TLS). Plan 050 fail-closed validation re-activado en `prod.py` (descomentado + import `ImproperlyConfigured`); 3 tests de `test_settings.py` + 3 de `test_edge_cases.py` des-skippeados; `test_plans_regression.py` aprieta el check de código fuente. Email de prueba enviado a carlos@tooltician.com. Sistema de invitaciones: modelo `Invitation` (token `secrets.token_urlsafe`, `expires_at` automático, constraint unique pending por email), `InvitationGateMiddleware` (carga `?invite=<token>` en sesión), `InvitationAdapter` (cierra `is_open_for_signup` salvo sesión con email invitado), admin action `send_invitations` (envía correo por Brevo + registra `AuditEvent`). 20 tests nuevos en `tests/test_invitations.py`. 861 tests verdes. Pendiente humano: agregar IP del host OCI al allowlist de Brevo, verificar `noreply@tooltician.com` como sender en Brevo, smoke de extremo a extremo del flujo signup→email→verify→login en prod. |
 | 2026-07-23 | ✅ | **Entorno desplegado y verificado en https://pogo-lab.tooltician.com.** DNS Cloudflare proxied (A → 146.181.47.12), **Cloudflare Origin CA cert** (15 años, hasta 2041) instalado en nginx, **SSL mode = Full (strict)**, Always Use HTTPS + HSTS at edge + TLS 1.3 + min TLS 1.2, `set_real_ip_from` Cloudflare, `.env` VM actualizado (ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS/DEFAULT_FROM_EMAIL/ALLAUTH_TRUSTED_CLIENT_IP_HEADER), `cache_ratelimit` table creada. Rate limiting con IP real del cliente (IPv4+IPv6). Smoke verde: healthz, locales es/en, login (POST 200), legales, calculadora, cabeceras HSTS+CSP+XCTO+Referrer, redirect HTTP→HTTPS, TLS 1.1 rechazado. Pendiente: `EMAIL_URL` + invitaciones para beta cerrada. |
 | 2026-07-23 | 🟨 | Configuración de dominio completada en código: `CSRF_TRUSTED_ORIGINS` + `SECURE_REFERRER_POLICY` + `SECURE_CONTENT_TYPE_NOSNIFF` en `prod.py`; `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP` en `infra/nginx/default.conf` (rate limiting ve la IP real del cliente tras el proxy). Guía operativa nueva en `docs/deploy-tooltician.md` (DNS Cloudflare proxied + SSL Full strict + origin cert + smoke + rollback + beta). Tests: 817 passed, ruff/mypy limpios. Pendiente humano: crear registro A `pogo-lab`→`146.181.47.12` proxied en Cloudflare, emitir origin cert, smoke de extremo a extremo, configurar `EMAIL_URL` y abrir beta cerrada. |
 | 2026-07-23 | 🟨 | Dominio decidido: `pogo-lab.tooltician.com` (subdominio de tooltician.com, sin compra nueva). Actualizados nginx `default.conf`, `prod.py` (`DEFAULT_FROM_EMAIL=carlos@tooltician.com`), scripts OCI, `.env-oci`, plantillas legales (tos/privacy) y `.po` es/en. Añadido monitor programado de capacidad OCI A1: consulta `VM.Standard.A1.Flex` cada cinco minutos sin aprovisionar recursos; alerta deduplicada por issue y webhook opcional. Requiere configurar secrets de Actions. |

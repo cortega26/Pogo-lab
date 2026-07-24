@@ -1,8 +1,10 @@
+import secrets
 from typing import ClassVar
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -67,3 +69,80 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Perfil de {self.user.email}"
+
+
+class Invitation(models.Model):
+    """Invitación a la beta cerrada.
+
+    Una invitación se asocia a un email y se canjea una sola vez al registrarse
+    el usuario invitado. El token es opaco (secrets.token_urlsafe) y se envía por
+    correo transaccional (Brevo). No almacena PII más allá del email del invitado.
+    """
+
+    email = models.EmailField(_("email invitado"))
+    token = models.CharField(
+        _("token"),
+        max_length=64,
+        unique=True,
+        db_index=True,
+        default=secrets.token_urlsafe,
+        editable=False,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitations_created",
+        verbose_name=_("creada por"),
+    )
+    consumed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitations_consumed",
+        verbose_name=_("canjeada por"),
+    )
+    sent_at = models.DateTimeField(_("enviada el"), null=True, blank=True)
+    consumed_at = models.DateTimeField(_("canjeada el"), null=True, blank=True)
+    expires_at = models.DateTimeField(_("expira el"), null=True, blank=True)
+    created_at = models.DateTimeField(_("creada el"), default=timezone.now)
+
+    class Meta:
+        verbose_name = _("invitación")
+        verbose_name_plural = _("invitaciones")
+        ordering = ("-created_at",)
+        constraints: ClassVar[list] = [
+            # Una invitación pendiente (no consumida) por email.
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(consumed_by__isnull=True),
+                name="unique_pending_invitation_per_email",
+            ),
+        ]
+
+    def __str__(self):
+        status = "pendiente"
+        if self.consumed_by_id is not None:
+            status = "consumada"
+        elif self.expires_at and self.expires_at < timezone.now():
+            status = "expirada"
+        return f"Invitación a {self.email} ({status})"
+
+    @property
+    def is_valid(self) -> bool:
+        """True si la invitación está pendiente y no ha expirado."""
+        if self.consumed_by_id is not None:
+            return False
+        return not (self.expires_at is not None and self.expires_at < timezone.now())
+
+    def save(self, *args, **kwargs):
+        from datetime import timedelta
+
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+        if self.expires_at is None and not self.pk:
+            expiry_days = getattr(settings, "INVITATION_EXPIRY_DAYS", 14)
+            self.expires_at = timezone.now() + timedelta(days=expiry_days)
+        super().save(*args, **kwargs)

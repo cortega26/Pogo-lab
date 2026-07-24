@@ -163,20 +163,31 @@ resultado en el registro de avance de `docs/milestones/M7-hardening-beta.md`.
 Ver también `docs/milestones/M7-hardening-beta.md` § "Pendiente humano — pasos para
 completar M7".
 
-1. **Mecanismo de acceso.** Decidir uno de:
-   - **Invitaciones por correo** (django-allauth las soporta con
-     `INVITATIONS_INVITATION_EXPIRY` + `INVITATIONS_INVITATION_ONLY`). Recomendado para
-     beta cerrada: tú generas cada invitación.
-   - **Código de acceso** en middleware/decorador (simple, pero hay que rotarlo).
-   - **Lista blanca** de correos permitidos en signup (vía setting o tabla).
+1. **Mecanismo de acceso.** **IMPLEMENTADO (2026-07-24):** invitaciones por correo.
+   - Modelo `apps.accounts.models.Invitation` (token `secrets.token_urlsafe`,
+     `expires_at` automático con `INVITATION_EXPIRY_DAYS=14`, constraint de una
+     invitación pendiente por email).
+   - `apps.accounts.middleware.InvitationGateMiddleware` valida `?invite=<token>`
+     en la URL de signup y carga el email en sesión.
+   - `apps.accounts.adapter.InvitationAdapter` cierra `is_open_for_signup` salvo
+     que la sesión tenga un email de invitación válido (renderiza
+     `templates/account/signup_closed.html` cuando está cerrado).
+   - Admin action `send_invitations` en `apps/accounts/admin.py` envía el correo
+     de invitación vía Brevo y registra un `AuditEvent` (`invitation_sent`).
+   - Señal `consume_invitation_on_signup` marca la invitación como consumida al
+     crearse un usuario con el email invitado.
+   - `INVITATION_ONLY=True` en `prod.py` por defecto; `False` en `dev.py`/`test.py`.
+   - 20 tests en `tests/test_invitations.py` cubren modelo, middleware, adapter,
+     señal, admin action y flujo end-to-end.
 
 2. **Email transaccional.** `ACCOUNT_EMAIL_VERIFICATION = "mandatory"` ya está en
-   `prod.py`. **Requiere** configurar `EMAIL_URL` con un proveedor real (Mailgun,
-   Brevo, Amazon SES). Mientras esté comentado el bloque fail-closed de `prod.py`, el
-   registro de usuarios **no enviará correos de verificación** y la beta no funciona.
-   - Descomentar el bloque `EMAIL_URL` en `config/settings/prod.py` una vez
-     configurado el proveedor.
-   - Probar el flujo completo: signup → correo → verificación → login.
+   `prod.py`. **CONFIGURADO (2026-07-24):** Brevo SMTP relay wired en `.env` y
+   `.env-oci` (`EMAIL_URL=smtp+tls://b31878001%40smtp-brevo.com:...@smtp-relay.brevo.com:587`,
+   `DEFAULT_FROM_EMAIL=noreply@tooltician.com`). Plan 050 fail-closed validation
+   re-activado en `prod.py`. Test de envío real pasado (correo entregado a
+   carlos@tooltician.com). Pendiente humano: agregar IP del host OCI al allowlist
+   de Brevo (Settings → SMTP & API) y verificar `noreply@tooltician.com` como
+   sender o dominio verificado en Brevo.
 
 3. **Aviso legal + consentimiento.** Las plantillas `privacy.html` y `tos.html` ya
    citan a Carlos M. y `carlos@tooltician.com`. Falta:

@@ -257,7 +257,7 @@ class TestPlan054EdgeCases:
         long_error = "x" * 1000
         with (
             patch.object(AnalysisResult.objects, "bulk_create", side_effect=Exception(long_error)),
-            pytest.raises(Exception, match=""),
+            pytest.raises(Exception, match="x{1000}"),
         ):
             run_personal_analysis(user.pk)
 
@@ -425,11 +425,9 @@ class TestPlan056EdgeCases:
 class TestPlan050EdgeCases:
     """Edge cases de fail-closed email validation.
 
-    NOTE: validation is temporarily disabled for deploy. These tests
-    are skipped until SMTP is configured on the OCI server.
+    Plan 050 validation is active (Brevo SMTP configured).
     """
 
-    @pytest.mark.skip(reason="Plan 050 validation temporarily disabled for deploy")
     def test_prod_rejects_locmem_backend(self, monkeypatch):
         """locmem:// es rechazado en producción."""
         import importlib
@@ -443,7 +441,6 @@ class TestPlan050EdgeCases:
         with pytest.raises(ImproperlyConfigured):
             importlib.import_module("config.settings.prod")
 
-    @pytest.mark.skip(reason="Plan 050 validation temporarily disabled for deploy")
     def test_prod_rejects_dummy_backend(self, monkeypatch):
         """dummy:// es rechazado en producción."""
         import importlib
@@ -457,7 +454,6 @@ class TestPlan050EdgeCases:
         with pytest.raises(ImproperlyConfigured):
             importlib.import_module("config.settings.prod")
 
-    @pytest.mark.skip(reason="Plan 050 validation temporarily disabled for deploy")
     def test_prod_rejects_file_backend(self, monkeypatch):
         """file:// es rechazado en producción."""
         import importlib

@@ -14,6 +14,9 @@ env = environ.Env(
     TIME_ZONE=(str, "UTC"),
     EMAIL_URL=(str, "console://"),
     CACHE_URL=(str, "locmem://"),
+    INVITATION_ONLY=(bool, False),
+    INVITATION_EXPIRY_DAYS=(int, 14),
+    INVITATION_BASE_URL=(str, ""),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -61,6 +64,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "apps.accounts.middleware.InvitationGateMiddleware",
     "apps.core.middleware.CorrelationIdMiddleware",
 ]
 
@@ -144,6 +148,19 @@ ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/"
+
+# Beta cerrada: registro solo por invitación cuando INVITATION_ONLY=True.
+# El middleware apps.accounts.middleware.InvitationGateMiddleware valida el
+# token en ?invite=<token> y lo guarda en sesión; el adapter allauth comprueba
+# la sesión antes de permitir signup. INVITATION_EXPIRY_DAYS controla la vida
+# del token una vez enviado.
+INVITATION_ONLY = env("INVITATION_ONLY")
+INVITATION_EXPIRY_DAYS = env("INVITATION_EXPIRY_DAYS")
+INVITATION_BASE_URL = env("INVITATION_BASE_URL")
+
+# allauth: adapter que bloquea signup cuando INVITATION_ONLY=True sin invitación.
+# El adapter también valida en clean_email que el email coincida con el invitado.
+ACCOUNT_ADAPTER = "apps.accounts.adapter.InvitationAdapter"
 
 EMAIL_CONFIG = env.email_url("EMAIL_URL", default="consolemail://")
 vars().update(EMAIL_CONFIG)
