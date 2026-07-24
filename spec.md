@@ -310,3 +310,17 @@ request/thread-local.
 
 (Se completa a medida que se avanza. No editar retroactivamente sin dejar
 rastro de qué decía antes.)
+
+### Bloqueo real — Plan 047 (learnsets), 2026-07-24
+
+Al empezar la Fase 2 se confirmó (grep + lectura de `engine/dps_data.py`)
+que `SpeciesInfo` no tiene ningún campo de learnset (qué fast/charge moves
+aprende cada especie); solo existen `FAST_MOVES`/`CHARGE_MOVES` como
+catálogos globales sin asociación a especie. El plan 047 exige: *"Si no
+hay datos verificados suficientes, ocultar/desactivar la calculadora con
+mensaje honesto en vez de inventar compatibilidad."* No hay ninguna fuente
+primaria en el repo para esto, y por la regla de procedencia (§0) no puede
+fabricarse desde memoria/entrenamiento. Es la misma clase de bloqueo ya
+anticipado para el plan 048 — decisión de producto/dato, no resoluble
+leyendo código o corriendo tests. **Se detiene la Fase 2 aquí y se
+pregunta al usuario** (ver conversación) antes de tocar `get_fast_moves_for_species`.
