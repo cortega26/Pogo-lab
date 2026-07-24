@@ -6,7 +6,7 @@ Procedencia: oficial (mecánica heredada de los juegos principales).
   - Doble súper efectivo: ×1.6² = ×2.56
   - Poco efectivo: ×0.625
   - Doble poco efectivo: ×0.625² = ×0.390625
-  - Inmune: ×0.39 (en GO no hay inmunidad real, usa ×0.39)
+  - Inmune: ×0.390625 (en GO no hay inmunidad real, usa doble resistencia)
 """
 
 from __future__ import annotations

@@ -12,6 +12,13 @@
     </p>
   </div>
 
+  {% if level_invalid %}
+  <div class="mb-6 border-2 border-danger-500 bg-danger-50 p-3 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert">
+    <span class="font-semibold">{% trans "Nivel no válido:" %}</span>
+    {% blocktrans with lvl=level %}el nivel solicitado no está soportado; se usó el nivel {{ lvl }}.{% endblocktrans %}
+  </div>
+  {% endif %}
+
   <div class="mb-6">
     <form method="GET" class="flex flex-wrap gap-3 items-end">
       <div>
