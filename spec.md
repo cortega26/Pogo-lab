@@ -265,6 +265,18 @@ aritmético propio: 247 en vez de 185 para el caso combinado — la lección es
 no confiar en aritmética mental para fixtures, siempre verificar con
 código). `_move_choices_for` ya no duplica el loop de `FAST_MOVES`.
 
+**Revisión de sub-agente fresco (checkpoint §10):** confirmó todas las
+afirmaciones anteriores (incluido el recálculo independiente de 8/8 golden
+vectors) y el aviso de "no verificado" está bien puesto (única plantilla
+con el selector; el swap HTMX solo reemplaza la tabla de resultados, no el
+selector, así que el aviso queda siempre visible). Encontró **1 hueco
+real**: el paso 3 del plan pedía property tests (niveles ordenados, daño
+monótono, `max_results` respetado, nunca NaN/inf) que no se habían escrito
+pese al 100% de cobertura por líneas. **Corregido:** se añadió
+`TestFindBreakpointsProperties` con `hypothesis` (`@given` sobre especie,
+movimiento, iv_atk, defender_def, max_results reales) verificando las 4
+propiedades en un solo test combinado. Suite final: 1252 passed.
+
 ## 5. Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — **tiene un STOP**
 
 El propio plan dice: *"los tests actuales se derivan del mismo algoritmo y no

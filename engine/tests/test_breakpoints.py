@@ -11,6 +11,8 @@ verificadas en este repo — no se afirma ninguna fuente externa nueva.
 import math
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from engine.breakpoints import (
     Breakpoint,
@@ -19,7 +21,11 @@ from engine.breakpoints import (
     get_fast_moves_for_species,
 )
 from engine.dps_data import FAST_MOVES
+from engine.dps_data import SPECIES as DPS_SPECIES
 from engine.stats import cpm_for_level
+
+_SPECIES_KEYS = list(DPS_SPECIES.keys())
+_MOVE_KEYS = list(FAST_MOVES.keys())
 
 
 class TestPveDamageFormula:
@@ -159,3 +165,45 @@ class TestGetFastMovesForSpecies:
         result = get_fast_moves_for_species("mewtwo")
         assert len(result) == len(FAST_MOVES)
         assert {key for key, _ in result} == set(FAST_MOVES.keys())
+
+
+class TestFindBreakpointsProperties:
+    """Plan 047, paso 3: propiedades que deben valer para cualquier input
+    válido, no solo los casos puntuales de arriba. Cierra un hueco señalado
+    en la revisión de esta fase (property tests pedidos por el plan que no
+    se habían escrito)."""
+
+    @given(
+        species_key=st.sampled_from(_SPECIES_KEYS),
+        move_key=st.sampled_from(_MOVE_KEYS),
+        iv_atk=st.integers(min_value=0, max_value=15),
+        defender_def=st.floats(
+            min_value=1.0, max_value=1000.0, allow_nan=False, allow_infinity=False
+        ),
+        max_results=st.integers(min_value=1, max_value=30),
+    )
+    def test_invariants_hold_for_any_valid_input(
+        self, species_key, move_key, iv_atk, defender_def, max_results
+    ):
+        bps = find_breakpoints(species_key, move_key, iv_atk, defender_def, max_results=max_results)
+
+        # Nunca más resultados de los pedidos.
+        assert len(bps) <= max_results
+
+        levels = [bp.level for bp in bps]
+        damages = [bp.damage for bp in bps]
+
+        # Niveles estrictamente ascendentes y sin duplicados.
+        assert levels == sorted(levels)
+        assert len(set(levels)) == len(levels)
+
+        # Un breakpoint es, por definición, un aumento de daño: la secuencia
+        # de daños en los breakpoints devueltos es estrictamente creciente.
+        assert damages == sorted(damages)
+        assert len(set(damages)) == len(damages)
+
+        # Nunca NaN/inf, y el daño mínimo del engine es 1 (ver _pve_damage).
+        for bp in bps:
+            assert math.isfinite(bp.damage)
+            assert math.isfinite(bp.atk_effective)
+            assert bp.damage >= 1
