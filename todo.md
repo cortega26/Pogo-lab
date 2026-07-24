@@ -25,7 +25,7 @@
 - [x] Añadir constante `COMBAT_DATA_VERSION = "combat-data-v1"` (identificador opaco, sin rótulo de versión oficial no verificada)
 - [x] Gate anti-segunda-tabla: `engine/tests/test_no_duplicate_type_chart.py` (AST-based, falla si reaparece un dict grande de claves 2-tupla fuera de `engine/types.py`)
 - [x] `uv run pytest engine/tests/test_combat_data_parity.py engine/tests/test_dps.py engine/tests/test_types.py engine/tests/test_no_duplicate_type_chart.py -q` verde
-- [x] `uv run pytest -q` verde (1222 passed, 0 skipped — sube de 883 por los 335 tests nuevos de paridad)
+- [x] `uv run pytest -q` verde (sube de 883 por los tests nuevos de paridad/gate/vistas)
 - [x] `uv run ruff check . && uv run ruff format --check .` limpio
 - [x] `uv run mypy config engine apps tests` limpio (163 files)
 - [x] `uv run lint-imports` verde (engine-purity KEPT)

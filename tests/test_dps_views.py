@@ -37,16 +37,27 @@ class TestDpsBrowser:
         assert resp.status_code == 200
 
     def test_invalid_level_does_not_500_and_label_matches_computation(self, client):
-        """Plan 046: `?level=999` (fuera de la tabla CPM) no debe crashear ni
-        mostrar una etiqueta de nivel distinta de la usada para calcular."""
+        """Plan 046: `?level=999` (fuera de la tabla CPM) no debe crashear,
+        debe avisar visiblemente, y la etiqueta mostrada debe coincidir con
+        el nivel realmente usado para calcular (nunca "nivel 999" con CPM 40)."""
         resp = client.get(reverse("dps_browser"), {"tipo": "fire", "level": "999"})
         assert resp.status_code == 200
         assert resp.context["level"] == 40
+        assert resp.context["level_invalid"] is True
+        assert "no válido" in resp.content.decode()
 
-    def test_non_numeric_level_falls_back_to_default(self, client):
+    def test_non_numeric_level_falls_back_to_default_with_visible_notice(self, client):
         resp = client.get(reverse("dps_browser"), {"tipo": "fire", "level": "abc"})
         assert resp.status_code == 200
         assert resp.context["level"] == 40
+        assert resp.context["level_invalid"] is True
+
+    def test_no_level_param_is_not_flagged_as_invalid(self, client):
+        """No pedir nivel (navegación normal) no es lo mismo que pedir uno inválido."""
+        resp = client.get(reverse("dps_browser"), {"tipo": "fire"})
+        assert resp.status_code == 200
+        assert resp.context["level"] == 40
+        assert resp.context["level_invalid"] is False
 
 
 class TestDpsByType:

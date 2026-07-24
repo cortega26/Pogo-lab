@@ -10,10 +10,23 @@ comparación programática en esta sesión — no se afirma verificación extern
 
 import pytest
 
-from engine.dps_data import type_multiplier
+from engine.dps_data import COMBAT_DATA_VERSION, type_multiplier
 from engine.types import PokemonType, type_effectiveness
 
 ALL_TYPE_VALUES = [t.value for t in PokemonType]
+
+
+class TestCombatDataVersion:
+    """El snapshot es un identificador opaco, no un rótulo de versión oficial."""
+
+    def test_is_a_non_empty_opaque_string(self):
+        assert isinstance(COMBAT_DATA_VERSION, str)
+        assert COMBAT_DATA_VERSION.strip() != ""
+
+    def test_does_not_claim_an_official_game_version(self):
+        """No debe parecer un rótulo tipo 'v0.295+' que implique verificación
+        externa no realizada (regla de procedencia, spec.md §0)."""
+        assert not COMBAT_DATA_VERSION.startswith("v")
 
 
 class TestCombatDataParity:

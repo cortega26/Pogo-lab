@@ -29,18 +29,32 @@ from .services import (
 _VALID_INT_LEVELS = {int(lv) for lv in CPM_TABLE if float(lv).is_integer()}
 
 
-def _parse_level(raw: str | None, default: int = 40) -> int:
+def _parse_level(raw: str | None, default: int = 40) -> tuple[int, bool]:
+    """Parsea el nivel de la query string.
+
+    Returns:
+        Tupla (nivel_a_usar, hubo_valor_invalido). El segundo elemento solo es
+        `True` si el usuario envió un `raw` no vacío que no corresponde a un
+        nivel soportado — nunca cuando simplemente no se pidió nivel. Esto
+        evita el bug del plan 046 (`?level=999` se mostraba como "nivel 999"
+        pero calculaba con nivel 40): la vista debe poder avisar que rechazó
+        el valor pedido, no solo corregirlo en silencio.
+    """
+    if raw in (None, ""):
+        return default, False
     try:
-        level = int(raw) if raw not in (None, "") else default
+        level = int(raw)
     except (ValueError, TypeError):
-        return default
-    return level if level in _VALID_INT_LEVELS else default
+        return default, True
+    if level in _VALID_INT_LEVELS:
+        return level, False
+    return default, True
 
 
 def dps_browser(request):
     attack_type = request.GET.get("tipo", "")
     sort_by = request.GET.get("sort", "dps")
-    level = _parse_level(request.GET.get("level"), 40)
+    level, level_invalid = _parse_level(request.GET.get("level"), 40)
     search_q = request.GET.get("q", "").strip().lower()
 
     type_stats = get_type_stats()
@@ -71,6 +85,7 @@ def dps_browser(request):
         "effectiveness": effectiveness,
         "move_effectiveness": move_effectiveness,
         "level": level,
+        "level_invalid": level_invalid,
         "search_q": request.GET.get("q", ""),
     }
 
@@ -84,7 +99,7 @@ def dps_by_type(request, tipo: str):
     if tipo_lower not in ALL_TYPES:
         raise Http404()
 
-    level = _parse_level(request.GET.get("level"), 40)
+    level, level_invalid = _parse_level(request.GET.get("level"), 40)
     sort_by = request.GET.get("sort", "dps")
     type_filter = request.GET.get("type_filter", "")
     search_q = request.GET.get("q", "").strip().lower()
@@ -113,6 +128,7 @@ def dps_by_type(request, tipo: str):
         "effectiveness": effectiveness,
         "move_effectiveness": move_effectiveness,
         "level": level,
+        "level_invalid": level_invalid,
         "search_q": request.GET.get("q", ""),
     }
 
@@ -154,7 +170,7 @@ def move_browser(request):
 def pokemon_compare(request):
     a_key = request.GET.get("a", "").strip().lower()
     b_key = request.GET.get("b", "").strip().lower()
-    level = _parse_level(request.GET.get("level"), 40)
+    level, level_invalid = _parse_level(request.GET.get("level"), 40)
 
     def build(species_key: str) -> dict | None:
         if species_key not in SPECIES:
@@ -190,6 +206,7 @@ def pokemon_compare(request):
         "left": left,
         "right": right,
         "level": level,
+        "level_invalid": level_invalid,
         "pagina_titulo": "Comparar Pokémon",
     }
     return render(request, "dps/compare.html", context)

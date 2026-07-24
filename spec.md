@@ -73,8 +73,31 @@ uv run mypy config engine apps tests → 0 errors, 161 files
 ## 3. Fase 1 — Plan 046: unificar datos de combate — **DONE**
 
 Implementado y verificado en esta sesión (rama
-`fix/plans-046-061-combat-data-integrity`). Suite completa 1222 passed,
+`fix/plans-046-061-combat-data-integrity`). Suite completa 1226 passed,
 ruff/format/mypy/lint-imports/makemigrations limpios.
+
+**Revisión de sub-agente fresco (checkpoint §10):** confirmó las 11 diffs y
+el resto de la implementación, pero encontró 2 huecos reales que se
+corrigieron antes de cerrar la fase:
+
+1. `apps/dps/views.py::_parse_level` corregía el mismatch etiqueta/CPM pero
+   lo hacía en silencio, sin aviso visible — contradecía lo que esta misma
+   sección prometía ("siempre error controlado"). Fix: `_parse_level` ahora
+   devuelve `(nivel, hubo_valor_invalido)`; las vistas exponen
+   `level_invalid` en el contexto y las plantillas (`_ranking.html`,
+   `compare.html`) muestran un aviso visible reusando el patrón `{% if
+   error %}` ya establecido en `apps/calculators/templates/`.
+2. El gate anti-segunda-tabla solo detectaba diccionarios literales de
+   clave 2-tupla; no detectaba el patrón de asignación por doble subíndice
+   (`TABLA[a][b] = valor`) que usa el propio `engine/types.py`. Se añadió
+   un segundo detector AST (conteo de asignaciones por doble subíndice
+   sobre el mismo nombre, umbral 30) — verificado que dispara con un
+   archivo señuelo de 35 asignaciones y no da falso positivo hoy.
+
+Hallazgos menores también corregidos: docstring de `engine/types.py`
+decía "Inmune: ×0.39" (ahora ×0.390625, consistente con la constante real);
+`COMBAT_DATA_VERSION` ahora tiene tests propios (no queda como código
+muerto sin consumidor).
 
 ### 3.1 Evidencia verificada en esta sesión
 
