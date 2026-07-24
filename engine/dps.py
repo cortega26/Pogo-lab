@@ -20,6 +20,8 @@ Supuestos:
 import math
 from dataclasses import dataclass
 
+from engine.stats import cpm_for_level
+
 from .dps_data import (
     BEST_MOVESETS,
     CHARGE_MOVES,
@@ -28,7 +30,6 @@ from .dps_data import (
     type_multiplier,
 )
 
-CPM_40: float = 0.790300
 BOSS_DEFENSE: float = 200.0
 TDO_NORMALIZER: float = 1000.0
 STAB_BONUS: float = 1.2
@@ -54,35 +55,14 @@ class DamageResult:
     level: int
 
 
-CPM_VALUES: dict[int, float] = {
-    1: 0.094000,
-    5: 0.290249,
-    10: 0.422500,
-    15: 0.517394,
-    20: 0.597400,
-    25: 0.667934,
-    30: 0.731700,
-    35: 0.761684,
-    40: 0.790300,
-    45: 0.819300,
-    50: 0.845299,
-}
-
-
-def _cp_multiplier(level: int) -> float:
-    if level in CPM_VALUES:
-        return CPM_VALUES[level]
-    sorted_levels = sorted(CPM_VALUES.keys())
-    for i in range(len(sorted_levels) - 1):
-        if sorted_levels[i] <= level <= sorted_levels[i + 1]:
-            lo, hi = sorted_levels[i], sorted_levels[i + 1]
-            t = (level - lo) / (hi - lo) if hi != lo else 0
-            return CPM_VALUES[lo] + t * (CPM_VALUES[hi] - CPM_VALUES[lo])
-    return CPM_40
-
-
 def effective_atk(base_atk: int, iv: int = 15, level: int = 40) -> float:
-    return (base_atk + iv) * _cp_multiplier(level)
+    """Ataque efectivo a un nivel dado.
+
+    Raises:
+        ValueError: si `level` no está en la tabla CPM canónica
+            (`engine.stats.CPM_TABLE`) — nunca se hace fallback silencioso.
+    """
+    return (base_atk + iv) * cpm_for_level(level)
 
 
 def base_damage(
@@ -106,7 +86,7 @@ def _has_stab(pokemon_types: list[str], move_type: str) -> bool:
 
 
 def _hp(base_sta: int, iv: int = 15, level: int = 40) -> float:
-    return (base_sta + iv) * _cp_multiplier(level)
+    return (base_sta + iv) * cpm_for_level(level)
 
 
 def compute_edps(
