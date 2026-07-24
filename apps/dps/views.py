@@ -12,6 +12,7 @@ from engine.dps_data import (
     FAST_MOVES,
     SPECIES,
 )
+from engine.stats import CPM_TABLE
 
 from .services import (
     get_move_list,
@@ -21,12 +22,19 @@ from .services import (
     get_type_stats,
 )
 
+# Niveles enteros soportados por el módulo DPS (subconjunto entero de la tabla
+# CPM canónica). Plan 046: un nivel inválido cae al default, pero el default
+# se usa tanto para calcular como para mostrar — nunca queda una etiqueta
+# ("nivel 999") desincronizada del CPM realmente usado.
+_VALID_INT_LEVELS = {int(lv) for lv in CPM_TABLE if float(lv).is_integer()}
+
 
 def _parse_level(raw: str | None, default: int = 40) -> int:
     try:
-        return int(raw) if raw not in (None, "") else default
+        level = int(raw) if raw not in (None, "") else default
     except (ValueError, TypeError):
         return default
+    return level if level in _VALID_INT_LEVELS else default
 
 
 def dps_browser(request):

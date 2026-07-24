@@ -1,9 +1,11 @@
 """Datos estáticos del modelo de DPS/TDO para Pokémon GO.
 
 Fuentes:
-  - Type chart: datamining confirmado (Bulbapedia, Game Master).
-  - Stats base: Game Master v0.295+.
-  - Moves: Game Master v0.295+ (PvE stats).
+  - Type chart: derivada de `engine.types.TYPE_CHART` (fuente única
+    designada por el plan 046; ver `engine/types.py` para su procedencia).
+    No se mantiene una segunda tabla 18x18 a mano — evita que diverjan.
+  - Stats base / Moves: snapshot `COMBAT_DATA_VERSION` (ver definición más
+    abajo); sin afirmar verificación contra una versión de Game Master real.
 
 Convenciones:
   - Tipos en inglés (minúscula) para compatibilidad con el schema del engine.
@@ -13,6 +15,11 @@ Convenciones:
 
 from dataclasses import dataclass
 from enum import Enum
+
+COMBAT_DATA_VERSION = "combat-data-v1"
+"""Identificador opaco de snapshot (plan 046). No es una versión de juego
+verificada externamente — solo marca que este módulo deriva su type chart de
+`engine.types` desde esta revisión, para poder referenciarlo en fixtures."""
 
 
 class PokemonType(Enum):
@@ -57,132 +64,26 @@ TYPE_COLORS: dict[PokemonType, str] = {
     PokemonType.FAIRY: "#D685AD",
 }
 
-# Type effectiveness chart (18x18).
-# Keys: (attack_type, defender_type). Values: 1.6 (super effective), 1.0 (neutral),
-# 0.625 (not very effective), 0.39 (immune/double resist — min posible en GO).
-TYPE_EFFECTIVENESS: dict[tuple[str, str], float] = {
-    ("normal", "rock"): 0.625,
-    ("normal", "ghost"): 0.39,
-    ("normal", "steel"): 0.625,
-    ("fire", "fire"): 0.625,
-    ("fire", "water"): 0.625,
-    ("fire", "grass"): 1.6,
-    ("fire", "ice"): 1.6,
-    ("fire", "bug"): 1.6,
-    ("fire", "rock"): 0.625,
-    ("fire", "dragon"): 0.625,
-    ("fire", "steel"): 1.6,
-    ("water", "fire"): 1.6,
-    ("water", "water"): 0.625,
-    ("water", "grass"): 0.625,
-    ("water", "ground"): 1.6,
-    ("water", "rock"): 1.6,
-    ("water", "dragon"): 0.625,
-    ("electric", "water"): 1.6,
-    ("electric", "electric"): 0.625,
-    ("electric", "grass"): 0.625,
-    ("electric", "ground"): 0.39,
-    ("electric", "flying"): 1.6,
-    ("electric", "dragon"): 0.625,
-    ("grass", "fire"): 0.625,
-    ("grass", "water"): 1.6,
-    ("grass", "grass"): 0.625,
-    ("grass", "poison"): 0.625,
-    ("grass", "ground"): 1.6,
-    ("grass", "flying"): 0.625,
-    ("grass", "bug"): 0.625,
-    ("grass", "rock"): 1.6,
-    ("grass", "dragon"): 0.625,
-    ("grass", "steel"): 0.625,
-    ("ice", "fire"): 0.625,
-    ("ice", "water"): 0.625,
-    ("ice", "grass"): 1.6,
-    ("ice", "ice"): 0.625,
-    ("ice", "ground"): 1.6,
-    ("ice", "flying"): 1.6,
-    ("ice", "dragon"): 1.6,
-    ("ice", "steel"): 0.625,
-    ("fighting", "normal"): 1.6,
-    ("fighting", "ice"): 1.6,
-    ("fighting", "poison"): 0.625,
-    ("fighting", "flying"): 0.625,
-    ("fighting", "psychic"): 0.625,
-    ("fighting", "bug"): 0.625,
-    ("fighting", "rock"): 1.6,
-    ("fighting", "ghost"): 0.39,
-    ("fighting", "dark"): 1.6,
-    ("fighting", "steel"): 1.6,
-    ("fighting", "fairy"): 0.625,
-    ("poison", "poison"): 0.625,
-    ("poison", "ground"): 0.625,
-    ("poison", "rock"): 0.625,
-    ("poison", "ghost"): 0.625,
-    ("poison", "steel"): 0.39,
-    ("poison", "fairy"): 1.6,
-    ("ground", "fire"): 1.6,
-    ("ground", "grass"): 0.625,
-    ("ground", "electric"): 1.6,
-    ("ground", "poison"): 1.6,
-    ("ground", "flying"): 0.39,
-    ("ground", "bug"): 0.625,
-    ("ground", "rock"): 1.6,
-    ("ground", "steel"): 1.6,
-    ("flying", "grass"): 1.6,
-    ("flying", "electric"): 0.625,
-    ("flying", "fighting"): 1.6,
-    ("flying", "bug"): 1.6,
-    ("flying", "rock"): 0.625,
-    ("flying", "steel"): 0.625,
-    ("psychic", "fighting"): 1.6,
-    ("psychic", "poison"): 1.6,
-    ("psychic", "psychic"): 0.625,
-    ("psychic", "steel"): 0.625,
-    ("psychic", "dark"): 0.39,
-    ("bug", "fire"): 0.625,
-    ("bug", "grass"): 1.6,
-    ("bug", "fighting"): 0.625,
-    ("bug", "poison"): 0.625,
-    ("bug", "flying"): 0.625,
-    ("bug", "psychic"): 1.6,
-    ("bug", "ghost"): 0.625,
-    ("bug", "dark"): 1.6,
-    ("bug", "steel"): 0.625,
-    ("bug", "fairy"): 0.625,
-    ("rock", "fire"): 1.6,
-    ("rock", "water"): 0.625,
-    ("rock", "grass"): 0.625,
-    ("rock", "fighting"): 0.625,
-    ("rock", "ground"): 0.625,
-    ("rock", "flying"): 1.6,
-    ("rock", "bug"): 1.6,
-    ("rock", "ice"): 1.6,
-    ("rock", "steel"): 0.625,
-    ("ghost", "normal"): 0.39,
-    ("ghost", "psychic"): 1.6,
-    ("ghost", "ghost"): 1.6,
-    ("ghost", "dark"): 0.625,
-    ("dragon", "dragon"): 1.6,
-    ("dragon", "steel"): 0.625,
-    ("dragon", "fairy"): 0.39,
-    ("dark", "fighting"): 0.625,
-    ("dark", "psychic"): 1.6,
-    ("dark", "ghost"): 1.6,
-    ("dark", "dark"): 0.625,
-    ("dark", "fairy"): 0.625,
-    ("steel", "fire"): 0.625,
-    ("steel", "water"): 0.625,
-    ("steel", "electric"): 0.625,
-    ("steel", "ice"): 1.6,
-    ("steel", "rock"): 1.6,
-    ("steel", "steel"): 0.625,
-    ("steel", "fairy"): 1.6,
-    ("fairy", "fire"): 0.625,
-    ("fairy", "fighting"): 1.6,
-    ("fairy", "poison"): 0.625,
-    ("fairy", "dragon"): 1.6,
-    ("fairy", "dark"): 1.6,
-    ("fairy", "steel"): 0.625,
-}
+# Type effectiveness (18x18), derivada por cálculo de engine.types.TYPE_CHART.
+# Keys: (attack_type, defender_type). Solo se listan pares != 1.0 (neutro).
+# No se hardcodea aquí: una segunda tabla a mano es exactamente el bug que
+# corrigió el plan 046 (11 divergencias reales encontradas contra el SSOT).
+
+
+def _build_type_effectiveness() -> dict[tuple[str, str], float]:
+    from engine.types import TYPE_CHART as _CANONICAL_TYPE_CHART
+    from engine.types import PokemonType as _CanonicalType
+
+    result: dict[tuple[str, str], float] = {}
+    for attacker in _CanonicalType:
+        for defender in _CanonicalType:
+            mult = _CANONICAL_TYPE_CHART[attacker][defender]
+            if mult != 1.0:
+                result[(attacker.value, defender.value)] = mult
+    return result
+
+
+TYPE_EFFECTIVENESS: dict[tuple[str, str], float] = _build_type_effectiveness()
 
 
 @dataclass(frozen=True)

@@ -36,6 +36,18 @@ class TestDpsBrowser:
         resp = client.get(reverse("dps_browser"))
         assert resp.status_code == 200
 
+    def test_invalid_level_does_not_500_and_label_matches_computation(self, client):
+        """Plan 046: `?level=999` (fuera de la tabla CPM) no debe crashear ni
+        mostrar una etiqueta de nivel distinta de la usada para calcular."""
+        resp = client.get(reverse("dps_browser"), {"tipo": "fire", "level": "999"})
+        assert resp.status_code == 200
+        assert resp.context["level"] == 40
+
+    def test_non_numeric_level_falls_back_to_default(self, client):
+        resp = client.get(reverse("dps_browser"), {"tipo": "fire", "level": "abc"})
+        assert resp.status_code == 200
+        assert resp.context["level"] == 40
+
 
 class TestDpsByType:
     def test_valid_type_returns_200(self, client):

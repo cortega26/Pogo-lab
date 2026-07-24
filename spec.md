@@ -1,173 +1,289 @@
-# Spec — Implementación de los hallazgos TODO restantes de `plans/`
+# Spec — Cierre de hallazgos P0/P1 restantes de `plans/` (batch 2026-07-21)
 
 > **SSOT para esta sesión.** Lee este archivo antes de cada cambio. Cada
 > implementación sigue TDD: test que falle primero, luego código, luego suite
 > verde, luego marca en `todo.md`.
+>
+> Este documento **reemplaza el estado** de la versión anterior (commit
+> `4112545`/`217864f`/`c1e4376`), que quedó desactualizada: las fases 1, 2, 3
+> (parcial) y 5 ya se completaron en sesiones previas y están verificadas en
+> `plans/README.md`. Solo se detalla aquí lo que sigue **TODO/PARTIAL**.
+
+## 0. Regla de procedencia (no negociable, motivo del audit M2)
+
+Esta sesión toca datos de combate (type chart, CPM, stat product) donde la
+tentación de citar "la mecánica conocida de Pokémon" es alta. **Prohibido**:
+
+- Afirmar que un valor está "verificado contra Game Master" o contra una
+  versión oficial (`v0.295+`, etc.) sin un archivo/URL real que lo respalde.
+- Usar "es de conocimiento general" como justificación de un fixture.
+
+**Permitido y exigido:**
+
+- Justificar cada fixture nuevo como *"derivado de `engine/types.py` (SSOT
+  designado por el plan 046) + comparación exhaustiva de 324 celdas"* —
+  la comparación programática ya se corrió en esta sesión y es evidencia
+  primaria real, reproducible con el script en §3.1.
+- Cualquier `data_version`/snapshot que se introduzca usa un identificador
+  opaco (ej. `combat-data-v1`) con la nota "derivado de `engine/types.py`",
+  nunca un rótulo que implique verificación externa no realizada.
+- Si en cualquier plan (especialmente 048) no hay una fuente primaria citable
+  para un valor y no puede derivarse por cálculo puro desde reglas ya
+  verificadas (CPM, stats base), **STOP**: documentar el bloqueo aquí y
+  preguntar al usuario. Esto no es una "duda resoluble leyendo el spec" —
+  es una decisión de producto/dato que solo el usuario puede tomar.
 
 ## 1. Metas
 
-1. **Archivar planes DONE restantes.** Los planes 022–043 (Batch 3) y
-   044–050, 059 (Batch 4) ya están DONE y archivados en `plans/archive/`.
-2. **Implementar los planes TODO restantes** en orden de prioridad y
-   dependencia, verificando cada uno con tests antes de marcarlo DONE.
-3. **No tocar los planes OPTION (062–064)**: requieren decisión de producto.
-4. Los planes 046–048, 052–055 son XL/L y dependen de 046 (datos canónicos)
-   o 056 (PostgreSQL gate). Se abordan si el tiempo lo permite; si no, se
-   documenta el avance parcial.
-5. Cada plan termina con la suite completa verde (`uv run pytest -q`) y
-   `uv run ruff check .` limpio.
+1. Cerrar, en orden de dependencia, los planes que siguen **TODO/PARTIAL**
+   en `plans/README.md`: **046 → 047 → 048 → 053 → 060 → 061**.
+2. Una tabla de tipos única (`engine/types.py`); eliminar la duplicada de
+   `engine/dps_data.py` sin romper la firma pública `type_multiplier(str, str,
+   str | None)` que consumen `engine/dps.py` y `engine/breakpoints.py`.
+3. Ningún nivel/IV/parámetro fuera de rango debe degradarse en silencio
+   (fallback a CPM 40, división por cero, etc.) — falla controlada o rechazo.
+4. Cada plan cerrado deja: test que fallaba antes del fix, fixtures nuevas
+   documentadas con su procedencia, `plans/README.md` actualizado a DONE,
+   y la fila correspondiente en este spec + `todo.md` marcada.
+5. Trabajo en rama `fix/plans-046-061-combat-data-integrity` (no en `main`
+   directo, dado el riesgo P0/HIGH de estos cambios sobre calculadoras que
+   ya sirven tráfico real). Merge a `main` solo tras suite verde + revisión
+   de sub-agente fresco.
 
-## 2. Inventario del estado actual (verificado contra código vivo)
+## 2. Inventario verificado (commit base `f12a9dc`, 2026-07-24)
 
-Baseline al iniciar esta sesión (commit `a285ad3`):
+```
+uv run pytest -q            → 883 passed, 0 skipped
+uv run ruff check .         → All checks passed
+uv run ruff format --check . → 190 files already formatted
+uv run mypy config engine apps tests → 0 errors, 161 files
+```
 
-- `uv run pytest -q --ignore=tests/test_e2e.py` → 757 passed, 4 skipped
-- `uv run ruff check .` → All checks passed
-- `uv run ruff format --check .` → 175 files already formatted
-- `uv run mypy config engine apps tests` → 0 errors in 152 files
-
-| Plan | Estado verificado | Evidencia |
+| Plan | Estado (plans/README.md) | Esta sesión |
 |---|---|---|
-| 029 | **Parcial** | UniqueConstraint existe en `apps/trades/models.py:133`; migration `0002_add_dedup_unique_constraint.py` existe; pero `register_observation` no captura `IntegrityError` |
-| 039 | **DONE** | `tests/test_dps_views.py` existe con 21 tests |
-| 046 | **TODO** | Datos de combate no unificados (XL) |
-| 047 | **TODO** | Breakpoints sin golden vectors (dep 046) |
-| 048 | **TODO** | PvP ranking sin corregir (dep 046) |
-| 051 | **TODO** | Rate limiting usa LocMem; no shared cache; topología proxy no documentada |
-| 052 | **TODO** | Publicación comunidad sin cuarentena (dep 056) |
-| 053 | **TODO** | Contratos calculadoras sin validar (dep 046) |
-| 054 | **TODO** | Analysis runs no atómicos (dep 056) |
-| 055 | **TODO** | Trade ingestion sin endurecer (dep 056) |
-| 056 | **TODO** | No hay gate PostgreSQL en CI |
-| 057 | **TODO** | Bootstrap no determinista; `seed` vs `seed_content` duplican slug |
-| 058 | **TODO** | Docs de milestones/estado no reconciliadas (dep 045–057) |
-| 060 | **TODO** | App boundaries sin mecanizar (dep 052, 054, 055) |
-| 061 | **TODO** | AuditEvent mutable, correlation_id no propagado (dep 060) |
+| 029, 039, 044, 045, 049–052, 054–059 | DONE (archived o no) | No tocar |
+| **046** | TODO | **Fase 1 — implementar ahora** |
+| **047** | TODO (dep 046) | Fase 2 |
+| **048** | TODO (dep 046) | Fase 3 — **tiene un STOP real, ver §5** |
+| **053** | TODO (dep 046) | Fase 4 |
+| **060** | TODO | Fase 5 |
+| **061** | PARTIAL (dep 060) | Fase 6 |
+| 062–064 | OPTION | **No tocar** — decisión de producto, no autorizada |
 
-## 3. Orden de ejecución
+## 3. Fase 1 — Plan 046: unificar datos de combate — **DONE**
 
-### Fase 1 — Quick wins (sin dependencias, S/M)
+Implementado y verificado en esta sesión (rama
+`fix/plans-046-061-combat-data-integrity`). Suite completa 1222 passed,
+ruff/format/mypy/lint-imports/makemigrations limpios.
 
-1. **029** — IntegrityError catch en `register_observation` (constraint ya existe)
-2. **039** — Verificar que los 21 tests pasan y marcar DONE
-3. **057** — Bootstrap determinista: `seed` orquesta `seed_content`, `.env.example` puerto 5433, `make bootstrap` levanta DB
-4. **056** — PostgreSQL CI gate: settings `test_postgres.py`, service en CI, `make test-postgres`
+### 3.1 Evidencia verificada en esta sesión
 
-### Fase 2 — Seguridad/producción (P0, dependen de 056 o topología)
+Script comparativo real (no memoria): construye las 324 celdas de
+`engine.types.TYPE_CHART` y las 324 celdas equivalentes derivadas de
+`engine.dps_data.TYPE_EFFECTIVENESS` (con default 1.0 para pares ausentes) y
+las compara con tolerancia `1e-9`. Resultado exacto:
 
-1. **051** — Rate limiting: función de key probada, caché compartida (PostgreSQL-backed)
-2. **058** — Reconciliar docs de estado (tras 057)
+```
+Total diffs: 11
+('dragon', 'fairy'):   types.py=0.390625  dps_data=0.39
+('electric', 'ground'):types.py=0.390625  dps_data=0.39
+('fighting', 'ghost'): types.py=0.390625  dps_data=0.39
+('ghost', 'normal'):   types.py=0.390625  dps_data=0.39
+('ground', 'flying'):  types.py=0.390625  dps_data=0.39
+('normal', 'ghost'):   types.py=0.390625  dps_data=0.39
+('poison', 'grass'):   types.py=1.6       dps_data=1.0   ← semántico (falta SE)
+('poison', 'steel'):   types.py=0.390625  dps_data=0.39
+('psychic', 'dark'):   types.py=0.390625  dps_data=0.39
+('rock', 'grass'):     types.py=1.0       dps_data=0.625 ← semántico (no existe)
+('rock', 'water'):     types.py=1.0       dps_data=0.625 ← semántico (no existe)
+```
 
-### Fase 3 — Arquitectura (P2, dependen de 052/054/055)
+8 son de precisión (`0.39` vs `0.390625`, mismo signo/dirección — redondeo).
+3 son semánticas: falta Poison→Grass súper efectivo; Rock→Water y Rock→Grass
+no existen en la mecánica real (`engine/types.py` los deja en 1.0 por
+`dict.fromkeys` default) pero `dps_data.py` los marca como resistidos.
 
-1. **060** — App boundaries: DAG permitido, import-linter contracts
-2. **061** — AuditEvent inmutable: admin readonly, bloquear update/delete, propagar correlation_id
+`engine/types.py` es internamente consistente (18 tipos × 18 tipos completos,
+cada fila tiene el número esperado de entradas SE/NVE/inmune sin huecos) y es
+el que el propio plan 046 designa como SSOT. **No se re-verifica contra una
+fuente externa** — eso violaría §0. Se adopta por: (a) mandato explícito del
+plan 046, (b) consistencia interna verificable en el propio archivo.
 
-### Fase 4 — Datos canónicos (XL, dependen de 046)
+### 3.2 Segundo bug confirmado: fallback silencioso de nivel/CPM
 
-1. **046** — Datos de combate canónicos (evaluación de alcance)
-2. **047** — Validar breakpoints (dep 046)
-3. **048** — Corregir PvP ranking (dep 046)
+`engine/dps.py::_cp_multiplier(level: int)` usa una tabla `CPM_VALUES`
+**distinta** de `engine.stats.CPM_TABLE` (tercera tabla duplicada). Si
+`level` no está en el rango de interpolación, cae al `return CPM_40` final
+sin avisar. `apps/dps/views.py::_parse_level` acepta cualquier `int` sin
+rango. Combinados: `?level=999` renderiza "nivel 999" en la plantilla pero
+calcula con el CPM de nivel 40.
 
-### Fase 5 — Producción/semántica (L, dependen de 056)
+### 3.3 Diseño
 
-1. **052** — Gobernar publicación comunidad
-2. **053** — Validar contratos calculadoras
-3. **054** — Analysis runs atómicos
-4. **055** — Endurecer trade ingestion
+- `engine/types.py` es la única fuente de efectividad de tipos.
+- `engine/dps_data.py::type_multiplier(attack_type: str, defender_type1: str,
+  defender_type2: str | None) -> float` se reimplementa como adaptador: castea
+  los strings a `PokemonType` y delega en `engine.types.type_effectiveness`.
+  Se elimina el diccionario `TYPE_EFFECTIVENESS` (o se deja como alias
+  `= None` marcado deprecated si algo externo lo importa — verificar
+  `codegraph_callers` antes de borrar).
+- `engine/dps.py` reutiliza `engine.stats.CPM_TABLE`/`cpm_for_level` en vez de
+  su propio `CPM_VALUES`/`_cp_multiplier`. Los niveles fuera de tabla
+  **lanzan `ValueError`**, nunca hacen fallback.
+- `apps/dps/views.py::_parse_level` y `apps/calculators/views.py` (breakpoints,
+  DPS) capturan ese `ValueError` y devuelven un error de UI legible (no 500,
+  no fallback silencioso, no CPM_40 con etiqueta mentirosa).
+- Metadato de snapshot: constante `COMBAT_DATA_VERSION = "combat-data-v1"` en
+  `engine/types.py` (o módulo nuevo `engine/combat_data_version.py`) con
+  docstring "derivado de engine/types.py, ver plans/046". Sin rótulo de
+  versión de juego real.
+- Gate anti-regresión: test que falla si aparece una segunda estructura
+  `dict[tuple[str, str], float]` o `dict[Enum, dict[Enum, float]]` de 18×18
+  en el árbol `engine/` fuera de `engine/types.py` (búsqueda AST o grep
+  estructural sobre nombres de módulo, no un simple grep de texto frágil).
 
-> **Nota de alcance:** Las Fases 4–5 son de esfuerzo L/XL. Si un plan excede
-> el alcance razonable, se documenta el avance parcial y se deja en TODO.
+### 3.4.5 Deltas de fixtures documentados (implementado)
 
-## 4. Detalles de implementación por plan
+Solo 2 fixtures de `engine/tests/test_dps.py` dependían de un valor de los 11
+corregidos, y ambas por la misma causa (precisión, no semántica):
 
-### Plan 029 — IntegrityError catch en register_observation
+| Test | Antes | Después | Causa |
+|---|---|---|---|
+| `test_normal_vs_ghost_is_immune` | `== 0.39` | `pytest.approx(0.390625)` | normal→ghost es uno de los 8 pares de precisión (§3.1) |
+| `test_ground_vs_flying_is_immune` | `== 0.39` | `pytest.approx(0.390625)` | ground→flying es uno de los 8 pares de precisión (§3.1) |
 
-- **Archivo:** `apps/trades/services.py`, función `register_observation`.
-- **Cambio:** Envolver `TradeObservation.objects.create(...)` en
-  `try/except IntegrityError`; en el catch, re-buscar el duplicado y
-  retornarlo. Importar `IntegrityError` de `django.db.utils`.
-- **Test:** Test que simula la carrera (mock `create` para lanzar
-  `IntegrityError`, verifica que retorna el existing).
-- **Verificación:** `uv run pytest apps/trades/ -v` verde.
+Ninguna otra fixture de DPS/PvP/breakpoints usa las celdas semánticas
+corregidas (poison/grass, rock/water, rock/grass) en sus escenarios de
+prueba actuales, así que no hubo más deltas numéricos en esta fase.
 
-### Plan 039 — DPS view tests
+### 3.4 Pasos (orden de ejecución)
 
-- **Verificación:** `uv run pytest tests/test_dps_views.py -v` verde (21 tests).
-- Marcar DONE en README.
+1. `engine/tests/test_combat_data_parity.py` (nuevo): test matricial 324
+   celdas que compara `dps_data.type_multiplier` contra
+   `engine.types.type_effectiveness` para **todo par de tipos**, más 3 tests
+   puntuales para los semánticos (`poison/grass == 1.6`, `rock/water == 1.0`,
+   `rock/grass == 1.0`). **Debe fallar primero** contra el código actual.
+2. Reimplementar `dps_data.type_multiplier` sobre `engine.types`; eliminar
+   `TYPE_EFFECTIVENESS`. Confirmar con `codegraph_callers` que nadie más
+   importa `TYPE_EFFECTIVENESS` directamente antes de borrar.
+3. Test de nivel inválido: `engine/tests/test_dps.py` nuevo caso —
+   `effective_atk(base, level=999)` (o la función que corresponda tras
+   unificar con `engine.stats`) lanza `ValueError`; vista captura y no 500.
+4. Unificar `engine/dps.py` sobre `engine.stats.CPM_TABLE`/`cpm_for_level`;
+   eliminar `CPM_VALUES`/`_cp_multiplier` propios.
+5. Recalcular fixtures de `engine/tests/test_dps.py` que dependan de los 11
+   valores corregidos o del CPM unificado. **Para cada fixture que cambie de
+   valor: registrar aquí (en una tabla nueva bajo este punto) el before/after
+   y la celda de tipo que lo causa** — no aceptar el nuevo número sin
+   explicar de qué diff viene.
+6. Añadir el gate anti-segunda-tabla (paso 3.3).
+7. Suite completa + ruff + mypy + `lint-imports` + `makemigrations --check`.
+8. Actualizar `plans/README.md` fila 046 → DONE (con commit real).
 
-### Plan 057 — Bootstrap determinista
+### 3.5 Verificación
 
-- **Archivos:** `Makefile` (`bootstrap` levanta DB, espera health, migra,
-  siembra), `apps/mechanics/management/commands/seed.py` (orquesta
-  `seed_content` o delega), `.env.example` (puerto 5433).
-- **STOP:** Si `iv-en-intercambios` tiene dos versiones editoriales
-  distintas, no elegir por fecha — registrar diferencia y pedir decisión.
-- **Test:** Idempotencia (`make bootstrap` x2), checksum de slug.
+```bash
+uv run pytest engine/tests/test_combat_data_parity.py engine/tests/test_dps.py engine/tests/test_types.py -q
+uv run pytest -q
+uv run ruff check . && uv run ruff format --check .
+uv run mypy config engine apps tests
+uv run lint-imports
+uv run python manage.py makemigrations --check --dry-run
+```
 
-### Plan 056 — PostgreSQL CI gate
+### 3.6 Criterios de terminado
 
-- **Archivos:** `config/settings/test_postgres.py` (URL obligatoria con
-  guard anti DB no-test), `.github/workflows/ci.yml` (service postgres:16,
-  job con `pytest -m postgres`), `Makefile` (`test-postgres`), `pyproject.toml`
-  (marker `postgres`).
-- **STOP:** Si `DATABASE_URL` no identifica DB de test.
-- **Verificación:** `DATABASE_URL=postgres://...pogo_test... pytest -m postgres -q` verde.
+- Una sola tabla de tipos en todo `engine/`; los 324 pares coinciden byte
+  a byte entre cualquier consumidor y `engine.types.TYPE_CHART`.
+- Ningún nivel fuera de la tabla CPM produce resultado silencioso; siempre
+  error controlado con el nivel real en el mensaje.
+- Cada delta de fixture DPS está documentado con su causa (§3.4.5).
+- Gate anti-segunda-tabla en verde y falla si se reintroduce una duplicada.
 
-### Plan 051 — Rate limiting robusto
+## 4. Fase 2 — Plan 047: validar breakpoints (dep. 046)
 
-- **STOP:** Si la topología real incluye CDN/LB adicional no documentado.
-  El plan 024 ya configuró `RATELIMIT_IP_META_KEY = "HTTP_X_REAL_IP"`.
-  Este plan añade: función de key probada (IPv4/IPv6, spoof), caché compartida
-  (PostgreSQL-backed), test multiworker (requiere 056).
-- **Si la topología no está documentada:** dejar 024 como interim y
-  documentar el bloqueo.
+**No se detalla en fixtures numéricas todavía** — dependen de los valores que
+salgan de la Fase 1 (mismo error de "escribir número antes de que la base
+cambie" que señaló la revisión). Al llegar aquí:
 
-### Plan 058 — Reconciliar docs
+1. Releer `plans/047-validate-breakpoints.md` completo.
+2. Diseñar el modelo de learnsets (qué movimientos aprende cada especie) con
+   procedencia explícita — si no hay datos suficientes para una especie,
+   **ocultar/desactivar esa combinación con mensaje honesto**, no inventar.
+3. `find_breakpoints` rechaza: pareja especie/movimiento no aprendida,
+   `iv_atk` fuera de `[0, 15]`, `defender_def` no finito o `<= 0`, niveles
+   fuera de la tabla CPM.
+4. Fixtures manuales para `_pve_damage` (STAB, efectividad simple/doble,
+   clima, amistad) — recién ahora, sobre los valores ya corregidos de 046.
+5. Subir cobertura de `engine/breakpoints.py` sobre el 31% actual con golden
+   vectors reales, no snapshots opacos.
 
-- **Archivos:** `README.md`, `AGENTS.md`, `docs/milestones/`.
-- **Verificación:** `rg -n "aún no hay código|Estado.*✅|\[ \]"` no encuentra
-  contradicciones.
+## 5. Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — **tiene un STOP**
 
-### Plan 060 — App boundaries
+El propio plan dice: *"los tests actuales se derivan del mismo algoritmo y no
+constituyen un oráculo externo"*; y que corregir el bug de HP truncado
+**altera el top de Medicham** (cambio visible al usuario). Combinado con la
+regla de procedencia (§0): **no puedo generar golden vectors de PvP desde
+memoria/entrenamiento** sin violar la prohibición de fabricar verificación.
 
-- **Depende de:** 052, 054, 055 (que dependen de 056). Si esos no están
-  hechos, se puede avanzar el inventario de imports y el ADR, pero los
-  contratos de import-linter se diseñan sobre el estado final.
-- **STOP:** Si romper el ciclo exige mover modelos/migraciones.
+**Plan de acción al llegar a esta fase:**
 
-### Plan 061 — AuditEvent inmutable
+1. Implementar el fix determinista (HP entero vía `engine.stats.hp`, sin
+   truncar el stat product completo) — esto es cálculo puro sobre reglas ya
+   verificadas (CPM, stats base), no requiere fuente externa nueva.
+2. Antes de publicar/mergear el cambio de ranking visible: **detenerse y
+   preguntarle al usuario** si (a) tiene una fuente real (PvPoke, export
+   propio) para validar el nuevo top de al menos una especie conocida, o
+   (b) acepta el cambio solo como "corrección determinista sin oráculo
+   externo" con nota de migración visible en la UI/changelog.
+   Esto **no** es una duda resoluble leyendo el spec o corriendo tests —
+   es la decisión de producto que el plan mismo exige.
+3. Cachear rankings (4096 spreads recalculados por request hoy) con clave
+   determinista `(species, base stats, max_cp, level_cap)`.
 
-- **Depende de:** 060. Admin readonly, bloquear update/delete, propagar
-  correlation_id desde el middleware a todos los `AuditEvent.log` calls.
-- **Test:** admin POST/delete bloqueados, `.save()` bloqueado, PII centinela.
+## 6. Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046)
 
-## 5. Verificación
+Detallar al llegar: releer `plans/053-validate-calculator-contracts.md`,
+inventariar las 8 calculadoras y sus parámetros de entrada/share-URL, definir
+contrato de validación reutilizable (probablemente un decorador o función
+`_validate_calc_params` compartida en `apps/calculators/`).
 
-### Por plan
+## 7. Fase 5 — Plan 060: límites entre apps (independiente)
 
-1. Test específico del plan pasa.
-2. `uv run pytest -q --ignore=tests/test_e2e.py` verde.
-3. `uv run ruff check .` limpio.
-4. `uv run ruff format --check .` limpio.
-5. `uv run mypy config engine apps tests` limpio (si se tocaron archivos tipados).
-6. `uv run python manage.py makemigrations --check --dry-run` sin cambios (si aplica).
+Detallar al llegar: releer `plans/060-enforce-application-boundaries.md`,
+generar mapa de imports actual (`lint-imports` + inspección), definir DAG
+permitido en un ADR nuevo, mecanizar con contratos de `import-linter`.
 
-### Tests end-to-end (`tests/`)
+## 8. Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
 
-- `tests/test_plans_regression.py` — ya tiene 37 tests de los planes anteriores.
-- Se añaden tests nuevos para cada plan implementado en esta sesión.
-- `uv run pytest tests/test_plans_regression.py -v` debe pasar.
+Detallar al llegar: releer `plans/061-enforce-audit-event-integrity.md`.
+Ya sabido de antemano (confirmado en el propio plan): admin no es
+completamente readonly (`has_add/change/delete_permission` no están
+bloqueados), `AuditEvent.log` defaultea `correlation_id=""` y la mayoría de
+llamadas no propaga el ID real que el middleware ya coloca en
+request/thread-local.
 
-### Loop de revisión (cada ~20 iteraciones)
-
-- Sub-agente con "review spec.md and the current implementation for gaps".
-
-## 6. Convenciones (de AGENTS.md)
+## 9. Convenciones (de AGENTS.md, sin cambios)
 
 - Español neutral (sin voseo).
-- Sin comentarios salvo que se pidan.
-- TDD en `engine/`: fixtures a mano primero.
+- Sin comentarios en el código salvo que expliquen un WHY no obvio.
+- TDD en `engine/`: fixtures a mano primero, con procedencia documentada
+  (§0) — nunca "valores conocidos" sin cita.
 - `engine/` puro: sin imports de Django.
-- Sin commits salvo que se pidan.
-- Suite verde obligatoria.
+- Commits solo cuando se pide explícitamente completar una fase (no dejar
+  WIP a medio verificar commiteado).
+- Suite verde obligatoria antes de marcar cualquier plan DONE.
+
+## 10. Loop de revisión
+
+- Cada ~20 iteraciones (o al cerrar cada fase, lo que ocurra primero):
+  sub-agente fresco con prompt "review spec.md and the current
+  implementation for gaps" — no debe ver el resto de esta conversación,
+  solo el spec + el estado real del código/tests en la rama.
+- Si el sub-agente encuentra una discrepancia, se resuelve antes de avanzar
+  a la siguiente fase; se registra la resolución en §11.
+
+## 11. Bitácora de decisiones y bloqueos
+
+(Se completa a medida que se avanza. No editar retroactivamente sin dejar
+rastro de qué decía antes.)

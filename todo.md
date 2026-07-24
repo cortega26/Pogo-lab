@@ -1,134 +1,100 @@
-# TODO — Implementación de los hallazgos TODO restantes de `plans/`
+# TODO — Cierre de hallazgos P0/P1 restantes de `plans/`
 
 > Spec canónico: `spec.md`. Marca `[x]` al completar cada sub-tarea verificada.
-> Baseline: 757 passed, 4 skipped, ruff/mypy limpios.
+> Baseline (commit `f12a9dc`): 883 passed, 0 skipped; ruff/format/mypy limpios.
+> Rama: `fix/plans-046-061-combat-data-integrity`.
 
-## Fase 0 — Archivar planes DONE (ya archivados)
+## Fase 0 — Ya cerrado en sesiones previas (verificado contra `plans/README.md`, no re-tocar)
 
-- [x] Archivar planes 022–043, 044–050, 059 (46 archivos en `plans/archive/`)
-- [x] Actualizar `plans/README.md` (marcar archived)
+- [x] 029, 039, 044, 045, 049–052, 054–059 — DONE
+- [x] Baseline de gates confirmado en esta sesión (883 pass, ruff/format/mypy limpios)
 
-## Fase 1 — Quick wins (sin dependencias)
+## Fase 1 — Plan 046: unificar datos de combate — **DONE**
 
-### Plan 029 — IntegrityError catch en register_observation
+- [x] Correr comparación programática de las 324 celdas (`types.py` vs `dps_data.py`) — 11 diffs confirmados y documentados en `spec.md` §3.1
+- [x] `engine/tests/test_combat_data_parity.py`: test matricial 324 celdas (falló primero: 22 fallos, confirmado TDD-red)
+- [x] Test puntual: `poison→grass == 1.6`
+- [x] Test puntual: `rock→water == 1.0`
+- [x] Test puntual: `rock→grass == 1.0`
+- [x] Confirmar con `codegraph_impact`/grep quién importa `TYPE_EFFECTIVENESS`/`EFFECTIVENESS` (`apps/dps/services.py`, alias directo — sin más consumidores externos)
+- [x] Reimplementar `TYPE_EFFECTIVENESS` como derivado de `engine.types.TYPE_CHART` (`_build_type_effectiveness()`); `type_multiplier` y el alias `EFFECTIVENESS` quedan intactos en su firma
+- [x] Test: nivel fuera de rango en DPS lanza `ValueError` (no fallback a CPM_40) — `effective_atk(300, iv=15, level=999)` confirmado
+- [x] Unificar `engine/dps.py` sobre `engine.stats.CPM_TABLE`/`cpm_for_level`; eliminados `CPM_VALUES`/`_cp_multiplier`/`CPM_40` propios
+- [x] `apps/dps/views.py::_parse_level` valida contra niveles enteros válidos de `CPM_TABLE`; nivel inválido cae a 40 y el label mostrado siempre coincide con lo calculado (tests `test_invalid_level_does_not_500...`, `test_non_numeric_level_falls_back...`)
+- [x] Recalcular fixtures de `engine/tests/test_dps.py` afectadas — solo 2 (`normal/ghost`, `ground/flying`, ambas de precisión); documentadas en `spec.md` §3.4.5
+- [x] Añadir constante `COMBAT_DATA_VERSION = "combat-data-v1"` (identificador opaco, sin rótulo de versión oficial no verificada)
+- [x] Gate anti-segunda-tabla: `engine/tests/test_no_duplicate_type_chart.py` (AST-based, falla si reaparece un dict grande de claves 2-tupla fuera de `engine/types.py`)
+- [x] `uv run pytest engine/tests/test_combat_data_parity.py engine/tests/test_dps.py engine/tests/test_types.py engine/tests/test_no_duplicate_type_chart.py -q` verde
+- [x] `uv run pytest -q` verde (1222 passed, 0 skipped — sube de 883 por los 335 tests nuevos de paridad)
+- [x] `uv run ruff check . && uv run ruff format --check .` limpio
+- [x] `uv run mypy config engine apps tests` limpio (163 files)
+- [x] `uv run lint-imports` verde (engine-purity KEPT)
+- [x] `uv run python manage.py makemigrations --check --dry-run` sin cambios
+- [x] Actualizar `plans/README.md` fila 046 → DONE
+- [x] Commit de cierre de fase 1
 
-- [ ] Verificar drift: `git diff --stat 40b1540..HEAD -- apps/trades/models.py apps/trades/services.py`
-- [ ] Confirmar UniqueConstraint existe en `apps/trades/models.py`
-- [ ] Confirmar migration `0002_add_dedup_unique_constraint.py` existe
-- [ ] Escribir test que simula IntegrityError en `register_observation`
-- [ ] Añadir `try/except IntegrityError` en `register_observation` (`apps/trades/services.py`)
-- [ ] `uv run pytest apps/trades/ -v` verde
-- [ ] `uv run ruff check apps/trades/services.py`
-- [ ] Actualizar `plans/README.md` fila 029 → DONE
+## Fase 2 — Plan 047: validar breakpoints (dep. 046)
 
-### Plan 039 — DPS view tests (verificar ya hecho)
+- [ ] Releer `plans/047-validate-breakpoints.md` completo (post-046)
+- [ ] Diseñar modelo de learnsets con procedencia explícita; ocultar combinaciones sin datos suficientes (mensaje honesto, no inventar)
+- [ ] `find_breakpoints` rechaza pareja especie/movimiento no aprendida
+- [ ] `find_breakpoints` rechaza `iv_atk` fuera de `[0, 15]`
+- [ ] `find_breakpoints` rechaza `defender_def` no finito o `<= 0` (fix del ZeroDivisionError)
+- [ ] `find_breakpoints` rechaza niveles fuera de la tabla CPM
+- [ ] Fixtures manuales para `_pve_damage` (STAB, efectividad simple/doble, clima, amistad) sobre valores ya corregidos en 046
+- [ ] Subir cobertura de `engine/breakpoints.py` por encima del 31% con golden vectors reales
+- [ ] Selector de movimientos (`_move_choices_for` en vistas) y engine consultan la misma función — sin duplicar lista
+- [ ] Suite + ruff + mypy verdes
+- [ ] Actualizar `plans/README.md` fila 047 → DONE
 
-- [ ] `uv run pytest tests/test_dps_views.py -v` verde (21 tests)
-- [ ] `uv run ruff check tests/test_dps_views.py`
-- [ ] Actualizar `plans/README.md` fila 039 → DONE
+## Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — tiene STOP real
 
-### Plan 057 — Bootstrap determinista
+- [ ] Implementar HP entero real en `IVSpread` (usar `engine.stats.hp`, no `stam_val` continuo truncado al final)
+- [ ] Corregir `stat_product` para no perder precisión antes de tiempo
+- [ ] **STOP — preguntar al usuario** antes de publicar el cambio de ranking visible: ¿hay fuente real para validar al menos un caso (ej. Medicham), o se acepta como corrección determinista sin oráculo externo + nota de migración?
+- [ ] Cachear `rank_for_league` con clave determinista `(species, base stats, max_cp, level_cap)`
+- [ ] Fixtures actualizadas con nota explícita de "antes/después" y causa (no aceptar a ciegas)
+- [ ] Suite + ruff + mypy verdes
+- [ ] Actualizar `plans/README.md` fila 048 → DONE
 
-- [ ] Inventariar slugs de `seed` vs `seed_content`
-- [ ] Verificar conflicto de slug `iv-en-intercambios`
-- [ ] Hacer que `seed` orqueste `seed_content` (o delegar)
-- [ ] Corregir `.env.example` puerto 5433
-- [ ] `make bootstrap`: levanta DB, espera health, migra, siembra
-- [ ] Test idempotencia (`make bootstrap` x2)
-- [ ] Actualizar README/CONTRIBUTING/AGENTS
-- [ ] `uv run pytest -q` verde
-- [ ] Actualizar `plans/README.md` fila 057 → DONE
+## Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046)
 
-### Plan 056 — PostgreSQL CI gate
+- [ ] Releer `plans/053-validate-calculator-contracts.md` completo (post-046/047/048)
+- [ ] Inventariar las 8 calculadoras y sus parámetros de entrada + share-URL
+- [ ] Diseñar contrato de validación reutilizable (`apps/calculators/`)
+- [ ] Aplicar a cada calculadora; ningún input inválido produce 500
+- [ ] Tests de contrato por calculadora (happy path + bordes)
+- [ ] Suite + ruff + mypy verdes
+- [ ] Actualizar `plans/README.md` fila 053 → DONE
 
-- [ ] Crear `config/settings/test_postgres.py` (URL obligatoria, guard anti DB no-test)
-- [ ] Añadir service postgres:16 en `.github/workflows/ci.yml`
-- [ ] Añadir job/matriz con `pytest -m postgres`
-- [ ] Añadir marker `postgres` en `pyproject.toml`
-- [ ] `make test-postgres` en Makefile
-- [ ] Guard que rechace `DATABASE_URL` no-test
-- [ ] `docker compose up -d db` + `DATABASE_URL=... pytest -m postgres -q` verde
-- [ ] Actualizar `plans/README.md` fila 056 → DONE
+## Fase 5 — Plan 060: límites entre apps
 
-## Fase 2 — Seguridad/producción
-
-### Plan 051 — Rate limiting robusto
-
-- [ ] Verificar topología de proxy (STOP si no documentada)
-- [ ] Función de key probada (IPv4/IPv6, listas, spoof, ausencia)
-- [ ] Caché compartida (PostgreSQL-backed o documentar excepción)
-- [ ] Separar grupos y combinar IP con identidad normalizada
-- [ ] Test multiworker (requiere 056)
-- [ ] `uv run pytest tests/test_security.py apps/accounts/ -q` verde
-- [ ] Actualizar `plans/README.md` fila 051 → DONE
-
-### Plan 058 — Reconciliar docs
-
-- [ ] Construir matriz evidencia→estado
-- [ ] Corregir AGENTS/README/tablero/M7/M8
-- [ ] `rg -n "aún no hay código|Estado.*✅|\[ \]"` sin contradicciones
-- [ ] Actualizar `plans/README.md` fila 058 → DONE
-
-## Fase 3 — Arquitectura
-
-### Plan 060 — App boundaries
-
-- [ ] Generar mapa actual de imports
-- [ ] Definir DAG permitido en ADR
-- [ ] Extraer AuditEvent.log de modelos a servicios
-- [ ] Mover mark_observation/mark_dataset_suspicious
-- [ ] Añadir contratos import-linter para capas/apps
+- [ ] Releer `plans/060-enforce-application-boundaries.md` completo
+- [ ] Generar mapa actual de imports entre apps
+- [ ] Definir DAG permitido en un ADR nuevo
+- [ ] Extraer `AuditEvent.log` de modelos a servicios donde corresponda
+- [ ] Mecanizar límites con contratos de `import-linter`
 - [ ] `uv run lint-imports` verde
-- [ ] `uv run pytest -q` verde
+- [ ] Suite verde
 - [ ] Actualizar `plans/README.md` fila 060 → DONE
 
-### Plan 061 — AuditEvent inmutable
+## Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
 
-- [ ] Admin completamente readonly
-- [ ] Bloquear update/delete de instancias persistidas
-- [ ] Centralizar creación en servicio con correlation_id
-- [ ] Actualizar casos de uso para pasar request ID
-- [ ] Tests de admin POST/delete, .save(), PII centinela
-- [ ] `uv run pytest apps/audit/ tests/test_security.py tests/test_account.py -q` verde
+- [ ] Releer `plans/061-enforce-audit-event-integrity.md` completo
+- [ ] Admin de `AuditEvent` completamente readonly (bloquear add/change/delete)
+- [ ] Bloquear `save()`/`delete()` de instancias ya persistidas a nivel de modelo
+- [ ] Propagar `correlation_id` real (middleware → thread-local → todos los `AuditEvent.log`)
+- [ ] Test: admin POST/delete bloqueados
+- [ ] Test: `.save()` de instancia existente bloqueado
+- [ ] Test: centinela de PII ausente en metadata
+- [ ] Suite + ruff + mypy verdes
 - [ ] Actualizar `plans/README.md` fila 061 → DONE
 
-## Fase 4 — Datos canónicos (XL, dep 046)
+## Revisiones periódicas (sub-agente fresco)
 
-### Plan 046 — Datos de combate canónicos
-
-- [ ] Evaluación de alcance (¿requiere datamining completo?)
-- [ ] Si excede alcance: documentar avance parcial
-
-### Plan 047 — Validar breakpoints (dep 046)
-
-- [ ] Pendiente hasta 046
-
-### Plan 048 — Corregir PvP ranking (dep 046)
-
-- [ ] Pendiente hasta 046
-
-## Fase 5 — Producción/semántica (L, dep 056)
-
-### Plan 052 — Gobernar publicación comunidad
-
-- [ ] Pendiente hasta 056
-
-### Plan 053 — Validar contratos calculadoras
-
-- [ ] Pendiente hasta 046
-
-### Plan 054 — Analysis runs atómicos
-
-- [ ] Pendiente hasta 056
-
-### Plan 055 — Endurecer trade ingestion
-
-- [ ] Pendiente hasta 056
-
-## Revisiones periódicas
-
-- [ ] Iteración ~20: sub-agente "review spec.md and current implementation for gaps"
-- [ ] Iteración ~40: sub-agente review
+- [ ] Tras cerrar Fase 1 (o iteración ~20, lo que ocurra primero): sub-agente "review spec.md and the current implementation for gaps"
+- [ ] Tras cerrar Fase 3
+- [ ] Tras cerrar Fase 6 (revisión final antes de proponer merge a main)
 
 ## Notas de bloqueo
 

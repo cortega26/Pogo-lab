@@ -26,7 +26,8 @@ class TestTypeEffectiveness:
         assert type_multiplier("fire", "water", None) == 0.625
 
     def test_normal_vs_ghost_is_immune(self):
-        assert type_multiplier("normal", "ghost", None) == 0.39
+        # 0.390625 exacto (plan 046: dps_data usaba 0.39 aproximado)
+        assert type_multiplier("normal", "ghost", None) == pytest.approx(0.390625)
 
     def test_electric_vs_flying_is_super_effective(self):
         assert type_multiplier("electric", "flying", None) == 1.6
@@ -36,7 +37,8 @@ class TestTypeEffectiveness:
         assert type_multiplier("fighting", "dark", "fairy") == pytest.approx(1.0, abs=0.01)
 
     def test_ground_vs_flying_is_immune(self):
-        assert type_multiplier("ground", "flying", None) == 0.39
+        # 0.390625 exacto (plan 046: dps_data usaba 0.39 aproximado)
+        assert type_multiplier("ground", "flying", None) == pytest.approx(0.390625)
 
     def test_dragon_vs_steel_is_not_very_effective(self):
         assert type_multiplier("dragon", "steel", None) == 0.625
@@ -60,6 +62,13 @@ class TestEffectiveAtk:
         """Mewtwo: base 300 + 15 IV, CPM 0.7903 = 248.9"""
         atk = effective_atk(300, iv=15, level=40)
         assert atk == pytest.approx(248.9, abs=0.1)
+
+    def test_invalid_level_raises_instead_of_silent_cpm40_fallback(self):
+        """Plan 046: nivel fuera de la tabla CPM debe fallar, no calcular con
+        CPM 40 en silencio (bug real: `?level=999` mostraba "nivel 999" pero
+        calculaba con nivel 40)."""
+        with pytest.raises(ValueError, match="999"):
+            effective_atk(300, iv=15, level=999)
 
 
 class TestBaseDamage:
