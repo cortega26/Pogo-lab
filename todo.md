@@ -47,6 +47,7 @@
 - [x] Suite completa 1251 passed; ruff/format/mypy (164 files)/lint-imports (engine-purity KEPT) verdes
 - [x] Actualizar `plans/README.md` fila 047 → DONE
 - [x] Commit de cierre de fase 2
+- [x] Revisión de sub-agente: confirmó todo, encontró 1 hueco real (faltaban property tests del paso 3 del plan) → corregido con `TestFindBreakpointsProperties` (hypothesis); suite final 1252 passed
 
 ## Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — tiene STOP real
 
