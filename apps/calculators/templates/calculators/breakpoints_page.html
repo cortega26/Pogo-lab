@@ -16,7 +16,9 @@
       <div><label class="field-label" for="bp-move">{% trans "Fast Move" %}</label>
         <select name="move" id="bp-move" class="input-field">
           {% for val, label in move_choices %}<option value="{{ val }}" {% if val == move_key %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select></div>
+        </select>
+        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{% trans "Se muestran todos los fast moves del motor: aún no verificamos cuáles aprende cada especie en el juego real." %}</p>
+      </div>
       <div><label class="field-label" for="bp-iv">{% trans "IV Ataque (0–15)" %}</label>
         <input type="number" name="iv_atk" id="bp-iv" value="{{ iv_atk }}" min="0" max="15" class="input-field font-mono"></div>
       <div><label class="field-label" for="bp-def">{% trans "Defensa del Boss" %}</label>
