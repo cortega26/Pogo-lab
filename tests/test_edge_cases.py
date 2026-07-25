@@ -277,8 +277,8 @@ class TestPlan052EdgeCases:
 
     def test_quarantined_dataset_excluded_from_public(self, user):
         """Un dataset cuarentenado no es público."""
-        from apps.audit.services import mark_dataset_suspicious
         from apps.contributions.models import DatasetVersion
+        from apps.contributions.services import mark_dataset_suspicious
 
         version = DatasetVersion.objects.create(
             number=1,

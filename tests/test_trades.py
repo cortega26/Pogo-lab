@@ -16,6 +16,7 @@ from apps.trades.services import (
     dashboard_stats,
     export_csv,
     import_csv,
+    mark_observation,
     parse_csv_row,
     register_observation,
 )
@@ -1128,3 +1129,58 @@ class TestTradeViews:
         )
         assert resp.status_code == 200
         assert "<html" not in resp.content.decode()
+
+
+class TestMarkObservation:
+    """Moderación de observaciones (plan 060: movido desde apps.audit.services
+    — apps.trades es el dueño del agregado TradeObservation)."""
+
+    @pytest.mark.django_db
+    def test_mark_observation_suspicious(self, user):
+        from apps.audit.models import AuditEvent
+
+        obs = TradeObservation.objects.create(
+            owner=user,
+            observed_at=_utc(2026, 7, 15),
+            friendship_level="best",
+            trade_type="lucky",
+            is_lucky=True,
+            atk=15,
+            iv_def=15,
+            hp=15,
+            state="valid",
+        )
+
+        mark_observation(obs.pk, "suspicious", reason="Estadísticamente atípico", actor=user)
+
+        obs.refresh_from_db()
+        assert obs.state == "suspicious"
+        assert obs.exclusion_reason == "Estadísticamente atípico"
+
+        events = AuditEvent.objects.filter(verb="observation_marked_suspicious")
+        assert events.count() == 1
+        assert events[0].actor == user
+
+    @pytest.mark.django_db
+    def test_mark_observation_duplicate(self, user):
+        from apps.audit.models import AuditEvent
+
+        obs = TradeObservation.objects.create(
+            owner=user,
+            observed_at=_utc(2026, 7, 15),
+            friendship_level="good",
+            trade_type="normal",
+            is_lucky=False,
+            atk=10,
+            iv_def=10,
+            hp=10,
+            state="valid",
+        )
+
+        mark_observation(obs.pk, "duplicate", reason="Hash duplicado", actor=user)
+
+        obs.refresh_from_db()
+        assert obs.state == "duplicate"
+
+        events = AuditEvent.objects.filter(verb="observation_marked_duplicate")
+        assert events.count() == 1

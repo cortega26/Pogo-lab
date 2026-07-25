@@ -21,6 +21,8 @@ Formato: MADR simplificado ([`0000-template.md`](0000-template.md)).
 | [0007](0007-i18n-contenido-indexable.md) | i18n con contenido indexable renderizado en servidor | Aceptada |
 | [0008](0008-user-custom-email.md) | Modelo User custom con email como login | Aceptada |
 | [0009](0009-hosting-oracle-cloud.md) | Hosting en Oracle Cloud Infrastructure (OCI) | Aceptada |
+| [0010](0010-dps-calculator-module.md) | Módulo de calculadora DPS | Aceptada |
+| [0011](0011-limites-entre-apps.md) | Límites entre apps: audit como sink, modelos sin side effects cross-app | Aceptada |
 
 **Nuevo ADR:** copia `0000-template.md`, numéralo secuencialmente, enlázalo en esta tabla. Un ADR **Aceptada** no se
 reescribe: si cambia la decisión, se crea uno nuevo y el anterior pasa a **Reemplazada por [ADR-XXXX]** u **Obsoleta**.

@@ -84,16 +84,24 @@
 - [x] Commit de cierre de fase 4
 - [x] Revisión de sub-agente: confirmó los 5 bugs reales (reproducidos contra el commit padre) y el fuzz test sustantivo; encontró 1 hueco real (cp/shiny/shadow revalidaban el default ya sustituido, no el input crudo — "abc" nunca se rechazaba) → corregido en los 3 lugares + valores no numéricos agregados al fuzz test; suite final 1270 passed
 
-## Fase 5 — Plan 060: límites entre apps
+## Fase 5 — Plan 060: límites entre apps — DONE
 
-- [ ] Releer `plans/060-enforce-application-boundaries.md` completo
-- [ ] Generar mapa actual de imports entre apps
-- [ ] Definir DAG permitido en un ADR nuevo
-- [ ] Extraer `AuditEvent.log` de modelos a servicios donde corresponda
-- [ ] Mecanizar límites con contratos de `import-linter`
-- [ ] `uv run lint-imports` verde
-- [ ] Suite verde
-- [ ] Actualizar `plans/README.md` fila 060 → DONE
+- [x] Releer `plans/060-enforce-application-boundaries.md` completo
+- [x] Generar mapa actual de imports entre apps (`rg '^from apps\.'`) — confirmado el ciclo exacto de la evidencia (contributions.models -> audit.models; audit.services -> contributions.models + trades.models)
+- [x] `apps.contributions.models`: quitado el import de `AuditEvent`; `grant_consent`/`revoke_consent` quedan como mutación pura (mantuvieron su firma — ~40 tests de setup dependían de ella)
+- [x] `apps.contributions.services.grant_consent`/`revoke_consent`: orquestan mutación + auditoría; replicada con cuidado la semántica exacta de revoke (auditar solo si había consentimiento activo antes, no en doble-revoke — test `test_double_revoke_does_not_double_log`)
+- [x] Vista de producción (`apps/contributions/views.py`) actualizada para usar los servicios, no el modelo; tests nuevos que verifican el AuditEvent end-to-end vía la vista real (`test_grant_view_creates_audit_event`, `test_revoke_view_creates_audit_event`)
+- [x] `mark_observation` movido a `apps.trades.services` (dueño de `TradeObservation`)
+- [x] `mark_dataset_suspicious` movido a `apps.contributions.services` (dueño de `DatasetVersion`)
+- [x] `apps/audit/services.py` eliminado (quedó vacío); `apps.audit` es sink puro
+- [x] Tests reubicados a las apps dueñas (`tests/test_trades.py::TestMarkObservation`, `apps/contributions/tests/test_contributions.py::TestMarkDatasetSuspicious`); `apps/audit/tests/test_audit.py` solo conserva `TestAuditEvent`
+- [x] `pyproject.toml`: `root_packages` incluye `"apps"`; 2 contratos `forbidden` nuevos (`audit-is-a-sink-not-a-source`, `domain-models-do-not-import-audit`)
+- [x] Verificado que los contratos detectan la regresión real (reintroduje el import viejo temporalmente, `lint-imports` lo cachó incluyendo la ruta transitiva vía `experiments.models`)
+- [x] ADR nuevo `docs/adr/0011-limites-entre-apps.md` (+ agregado ADR-0010 al índice, faltaba de antes)
+- [x] `uv run lint-imports` verde (3 contratos, 0 rotos)
+- [x] Suite completa 1274 passed; ruff/format/mypy(163 files)/makemigrations verdes
+- [x] Actualizar `plans/README.md` fila 060 → DONE
+- [x] Commit de cierre de fase 5
 
 ## Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
 

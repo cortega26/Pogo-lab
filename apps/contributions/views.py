@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
 from django_ratelimit.core import is_ratelimited
 
-from .models import DataContributionConsent
+from .services import grant_consent, revoke_consent
 
 CONSENT_TEXT_VERSION = "1.0.0"
 SCOPE = "community_dataset"
@@ -47,7 +47,7 @@ def _safe_referer(request: HttpRequest, default: str = "/") -> str:
 def grant_consent_view(request: HttpRequest) -> HttpResponse:
     if _is_rate_limited(request):
         return render(request, "core/429.html", status=429)
-    DataContributionConsent.grant_consent(request.user, SCOPE, CONSENT_TEXT_VERSION)
+    grant_consent(request.user, SCOPE, CONSENT_TEXT_VERSION)
     messages.success(request, _("Has dado tu consentimiento para contribuir."))
     return redirect(_safe_referer(request))
 
@@ -57,6 +57,6 @@ def grant_consent_view(request: HttpRequest) -> HttpResponse:
 def revoke_consent_view(request: HttpRequest) -> HttpResponse:
     if _is_rate_limited(request):
         return render(request, "core/429.html", status=429)
-    DataContributionConsent.revoke_consent(request.user, SCOPE)
+    revoke_consent(request.user, SCOPE)
     messages.info(request, _("Has revocado tu consentimiento."))
     return redirect(_safe_referer(request))

@@ -145,6 +145,86 @@ def _default_criteria() -> dict[str, Any]:
     return {"min_sample": 30, "state_filter": "valid"}
 
 
+def grant_consent(user, scope: str, text_version: str) -> DataContributionConsent:
+    """Otorga consentimiento y registra el AuditEvent correspondiente.
+
+    Plan 060: el modelo `DataContributionConsent.grant_consent` solo muta
+    datos; esta función orquesta la mutación + la auditoría, para que
+    `apps.contributions.models` no dependa de `apps.audit.models`."""
+    consent = DataContributionConsent.grant_consent(user, scope, text_version)
+    AuditEvent.log(
+        verb="consent_granted",
+        actor=user,
+        target_type="DataContributionConsent",
+        target_id=consent.pk,
+        metadata={"scope": scope, "text_version": text_version},
+    )
+    return consent
+
+
+def revoke_consent(user, scope: str) -> DataContributionConsent | None:
+    """Revoca consentimiento y registra el AuditEvent correspondiente.
+
+    Replica el comportamiento original del modelo: solo audita si había un
+    consentimiento ACTIVO que de verdad se revocó — no en un doble-revoke
+    sobre un consentimiento ya inactivo (por eso se verifica el estado
+    antes de mutar, no después)."""
+    was_active = DataContributionConsent.objects.filter(
+        user=user, scope=scope, is_active=True
+    ).exists()
+    consent = DataContributionConsent.revoke_consent(user, scope)
+    if consent is not None and was_active:
+        AuditEvent.log(
+            verb="consent_revoked",
+            actor=user,
+            target_type="DataContributionConsent",
+            target_id=consent.pk,
+            metadata={"scope": scope},
+        )
+    return consent
+
+
+def mark_dataset_suspicious(
+    dataset_id: int,
+    reason: str = "",
+    actor=None,
+) -> DatasetVersion:
+    """Marca una versión de dataset como sospechosa/en cuarentena.
+
+    Plan 060: movido desde apps.audit.services — apps.contributions es el
+    dueño del agregado DatasetVersion; apps.audit queda como sink puro
+    (modelo AuditEvent consultable), sin lógica de moderación propia."""
+    from django.utils import timezone
+
+    version = DatasetVersion.objects.get(pk=dataset_id)
+    version.publication_status = "quarantined"
+    version.is_public = False
+    version.moderation_reason = reason
+    version.moderated_at = timezone.now()
+    version.save(
+        update_fields=[
+            "publication_status",
+            "is_public",
+            "moderation_reason",
+            "moderated_at",
+            "updated_at",
+        ]
+    )
+
+    AuditEvent.log(
+        verb="dataset_marked_suspicious",
+        actor=actor,
+        target_type="DatasetVersion",
+        target_id=version.pk,
+        metadata={
+            "reason": reason,
+            "number": version.number,
+            "row_count": version.row_count,
+        },
+    )
+    return version
+
+
 def aggregate_community_distribution(
     dataset_version: DatasetVersion,
 ) -> list[dict[str, Any]]:

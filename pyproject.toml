@@ -116,7 +116,7 @@ directory = "htmlcov"
 packages = ["config/", "apps/", "engine/", "manage.py", "static/"]
 
 [tool.importlinter]
-root_packages = ["engine"]
+root_packages = ["engine", "apps"]
 include_external_packages = true
 exclude_type_checking_imports = false
 
@@ -125,6 +125,45 @@ name = "engine-purity"
 type = "forbidden"
 source_modules = ["engine"]
 forbidden_modules = ["django"]
+
+# Plan 060: apps.audit es un sink de auditoría (modelo AuditEvent consultable),
+# nunca un origen de coordinación cross-app. Ver docs/adr/0011-limites-entre-apps.md.
+[[tool.importlinter.contracts]]
+name = "audit-is-a-sink-not-a-source"
+type = "forbidden"
+source_modules = ["apps.audit"]
+forbidden_modules = [
+    "apps.trades",
+    "apps.contributions",
+    "apps.mechanics",
+    "apps.analysis",
+    "apps.experiments",
+    "apps.decisions",
+    "apps.accounts",
+    "apps.calculators",
+    "apps.dps",
+]
+
+# Plan 060: los modelos de dominio no deben emitir side effects cross-app
+# (ej. AuditEvent.log) directamente — esa orquestación vive en la capa de
+# servicio de cada app. Antes apps.contributions.models importaba
+# apps.audit.models para auditar consent grant/revoke, formando un ciclo con
+# apps.audit.services (ya eliminado) importando de vuelta a contributions.
+[[tool.importlinter.contracts]]
+name = "domain-models-do-not-import-audit"
+type = "forbidden"
+source_modules = [
+    "apps.trades.models",
+    "apps.contributions.models",
+    "apps.mechanics.models",
+    "apps.accounts.models",
+    "apps.analysis.models",
+    "apps.experiments.models",
+    "apps.decisions.models",
+    "apps.content.models",
+    "apps.sources.models",
+]
+forbidden_modules = ["apps.audit"]
 
 [build-system]
 requires = ["hatchling"]
