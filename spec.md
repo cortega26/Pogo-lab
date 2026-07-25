@@ -420,6 +420,22 @@ real capturado antes del fix:
 Suite completa 1268 passed; ruff/format/mypy(164 files)/lint-imports/
 makemigrations limpios.
 
+**Revisión de sub-agente fresco (checkpoint §10):** reprodujo de forma
+independiente los 5 bugs originales contra el commit padre (restaurando
+el código viejo y corriendo pytest real, no un script suelto) y confirmó
+que ya no ocurren; confirmó que el fuzz test es sustantivo (lo hizo
+fallar reintroduciendo deliberadamente el bug de `to_level=inf`).
+Encontró **1 hueco real**: en CP (patrón preexistente, no de esta sesión),
+shiny (`n`) y shadow (`iv_atk`/`iv_def`/`iv_stam`), la revalidación recibía
+`str(valor_ya_defaulteado)` en vez del input crudo — un IV/n no numérico
+como `"abc"` nunca llegaba a `_parse_int_in_range` como tal, porque
+`_int_or_default` ya lo había sustituido en silencio por el default antes
+de "validar" (que terminaba revalidando el default, siempre válido).
+**Corregido:** las tres re-validaciones ahora reciben `params.get(...)`
+directo. Se añadieron tests que fallaban primero (confirmado) para los
+tres casos, y se sumaron valores no numéricos (`"abc"`, inyección SQL de
+juguete) a `_SUSPICIOUS_VALUES` del fuzz test. Suite final: 1270 passed.
+
 ## 7. Fase 5 — Plan 060: límites entre apps (independiente)
 
 Detallar al llegar: releer `plans/060-enforce-application-boundaries.md`,

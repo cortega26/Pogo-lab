@@ -72,8 +72,12 @@ class TestSadPathCP:
         assert r.status_code == 200
 
     def test_non_numeric_iv(self):
+        """Plan 053 (revisión de Fase 4): el iv_atk crudo debe rechazarse
+        con error, no sustituirse en silencio por el default (10) antes de
+        validar — antes se revalidaba el default ya calculado, no el input."""
         r = Client().post("/es/calculadora/cp/", {"species": "pikachu", "iv_atk": "abc"})
-        assert r.status_code < 500
+        assert r.status_code == 200
+        assert r.context["error"] is not None
 
     def test_empty(self):
         assert Client().post("/es/calculadora/cp/", {}).status_code == 200
@@ -178,6 +182,13 @@ class TestSadPathShiny:
         assert r.status_code == 200
         assert "Error" in r.content.decode()
 
+    def test_non_numeric_n_is_rejected_not_silently_defaulted(self):
+        """Plan 053 (revisión de Fase 4): n="abc" debe rechazarse con error,
+        no sustituirse en silencio por el default (100) antes de validar."""
+        r = Client().post("/es/calculadora/shiny/", {"rate": "0.002", "n": "abc"})
+        assert r.status_code == 200
+        assert r.context["error"] is not None
+
 
 class TestSadPathShadow:
     def test_get(self):
@@ -206,6 +217,17 @@ class TestSadPathShadow:
         )
         assert r.status_code == 200
         assert "Error" in r.content.decode()
+
+    def test_non_numeric_iv_is_rejected_not_silently_defaulted(self):
+        """Plan 053 (revisión de Fase 4): iv_atk="abc" debe rechazarse con
+        error, no sustituirse en silencio por el default (15) antes de
+        validar."""
+        r = Client().post(
+            "/es/calculadora/shadow/",
+            {"species": "machamp", "level": "40.0", "iv_atk": "abc"},
+        )
+        assert r.status_code == 200
+        assert r.context["error"] is not None
 
     def test_empty(self):
         assert Client().post("/es/calculadora/shadow/", {}).status_code == 200
@@ -267,6 +289,8 @@ _SUSPICIOUS_VALUES = st.one_of(
     st.just(""),
     st.just("0"),
     st.just("-1"),
+    st.just("abc"),
+    st.just("15; DROP TABLE x"),
     st.integers(min_value=-(10**9), max_value=10**9).map(str),
 )
 
