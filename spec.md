@@ -277,7 +277,50 @@ pese al 100% de cobertura por líneas. **Corregido:** se añadió
 movimiento, iv_atk, defender_def, max_results reales) verificando las 4
 propiedades en un solo test combinado. Suite final: 1252 passed.
 
-## 5. Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — **tiene un STOP**
+## 5. Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — **DONE**
+
+**Decisión del usuario (2026-07-24), resolviendo el STOP:** implementar el
+fix determinista y publicarlo con nota de migración (sin esperar un
+oráculo externo), ya que el cálculo es puro sobre reglas ya verificadas
+en este repo (`engine.stats.cp`/`hp`, CPM_TABLE).
+
+**Fix:** `stat_product` multiplicaba `stam_eff * cpm` continuo en vez del
+HP entero real (`engine.stats.hp`: `max(10, floor(stam_eff*cpm))`).
+`IVSpread.hp` además era una `@property` que siempre devolvía `0` (código
+muerto — el comentario decía "se completa en el constructor" pero nunca
+pasaba). Ahora `hp` es un campo real poblado en `rank_for_league`, y
+`stat_product` usa `engine.stats.hp()` para el componente HP.
+
+**Evidencia concreta del cambio visible (antes/después), Medicham Great
+League (121/152/155, max_cp=1500, level_cap=50):**
+
+```
+ANTES (bug)  #1: IVs 5/15/15, nivel 50.0, CP 1499, stat_product 2122457
+DESPUÉS (fix) #1: empate IVs 5/15/14 (CP 1494) y 5/15/15 (CP 1499),
+               ambos stat_product 2109813 (gana 5/15/14 por orden de
+               generación en el empate exacto)
+```
+
+Calculado ejecutando ambas versiones del algoritmo (la anterior reimplementada
+localmente para comparar, no una fuente externa) contra el código real de este
+repo — ver commit para el script de comparación usado.
+
+**Nota de migración (mecanismo + registro):** `PVP_RANK_VERSION` pasa de un
+"v1" implícito (no documentado, previo a este plan) a `"pvp-rank-v2"`
+(`engine/pvp_rank.py`). La clave de caché de `apps.calculators.services
+.top_spreads_cached` incluye esta versión, así que un despliegue nunca
+sirve un ranking v1 obsoleto desde caché — el bump de versión ES el
+mecanismo técnico de migración, documentado además en el docstring del
+módulo y aquí. También se agregó caché determinista (antes recalculaba
+4096 combinaciones × niveles en cada request) y se expone `hp` en la UI
+(`_pvp_result.html`, nueva columna).
+
+**Verificación:** 1254 passed (era 1252 antes de esta fase); coverage de
+`engine/pvp_rank.py` 98% (única línea sin cubrir es un `return` defensivo
+inalcanzable preexistente, fuera de alcance de este plan); ruff/format/mypy
+(164 files)/lint-imports/makemigrations limpios.
+
+## 5.1 Fase 3 — texto original del plan (referencia)
 
 El propio plan dice: *"los tests actuales se derivan del mismo algoritmo y no
 constituyen un oráculo externo"*; y que corregir el bug de HP truncado

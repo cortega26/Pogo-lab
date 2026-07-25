@@ -1,11 +1,23 @@
 """Stat Product y ranking de IV para PvP.
 
-Procedencia: comunidad (PvPoke, alta confianza).
-Stat Product = ATK_eff * DEF_eff * STAM_eff (a un nivel dado).
+Procedencia: comunidad (PvPoke, alta confianza) para el concepto de Stat
+Product; los componentes ATK_eff/DEF_eff/HP se calculan con las mismas
+funciones ya verificadas de `engine.stats` (`cp`, `hp`, FOR006/FOR007).
+Stat Product = ATK_eff * DEF_eff * HP_entero (a un nivel dado).
 Para ranking, se generan las 4096 combinaciones de IV (0-15 cada stat)
 y se ordenan por stat product descendente, respetando el cap de CP de la liga.
 
 Regla: a igual stat product, gana el que tiene menor ATK (optimización PvP clásica).
+
+PVP_RANK_VERSION documenta una corrección de cálculo (plan 048, 2026-07-24):
+antes de "v2" el HP se multiplicaba como `stam_eff * cpm` continuo en vez del
+HP entero real que usa el propio juego (`engine.stats.hp`: floor + mínimo 10).
+Esto podía alterar el orden del ranking frente al valor real. La corrección es
+cálculo puro sobre reglas ya verificadas en este repo (CPM, stats base) — no
+requirió ni afirma una fuente externa nueva. Nota de migración: un ranking
+calculado con v1 puede diferir del recalculado con v2 para la misma especie;
+la clave de caché en `apps.calculators.services` incluye esta versión para
+que un despliegue nunca sirva un ranking v1 obsoleto.
 """
 
 from __future__ import annotations
@@ -14,6 +26,9 @@ from dataclasses import dataclass
 from itertools import product
 
 from engine.stats import CPM_TABLE, cp
+from engine.stats import hp as compute_hp
+
+PVP_RANK_VERSION = "pvp-rank-v2"
 
 
 @dataclass(frozen=True, order=True)
@@ -26,11 +41,7 @@ class IVSpread:
     level: float
     cp_value: int
     stat_product: int
-
-    @property
-    def hp(self) -> int:
-        """HP calculado en este nivel con estos IVs."""
-        return 0  # se completa en el constructor
+    hp: int
 
 
 def stat_product(
@@ -42,10 +53,13 @@ def stat_product(
     iv_stam: int,
     cpm: float,
 ) -> int:
-    """Stat Product entero: floor(ATK_eff * DEF_eff * STAM_eff * CPM³).
+    """Stat Product entero: floor(ATK_eff * DEF_eff * HP_entero).
 
-    Se usa floor porque los stats se truncan en el juego en cada paso.
-    En la práctica: se multiplican las stats efectivas reales.
+    HP_entero usa `engine.stats.hp()` (FOR007: max(10, floor(Stam_eff*CPM))):
+    en Pokémon GO el HP es el único de los tres stats que el juego trunca a
+    entero antes de estas cuentas (igual criterio que `engine.stats.cp()`
+    usa para CP); ATK/DEF permanecen continuos. Antes (plan 048) se
+    multiplicaba `stam_eff * cpm` continuo en vez del HP entero real.
 
     Args:
         base_atk, base_def, base_stam: Stats base de la especie.
@@ -57,8 +71,8 @@ def stat_product(
     """
     atk_val = (base_atk + iv_atk) * cpm
     def_val = (base_def + iv_def) * cpm
-    stam_val = (base_stam + iv_stam) * cpm
-    return int(atk_val * def_val * stam_val)
+    hp_val = compute_hp(base_stam, iv_stam, cpm)
+    return int(atk_val * def_val * hp_val)
 
 
 def generate_all_ivs() -> list[tuple[int, int, int]]:
@@ -101,6 +115,7 @@ def rank_for_league(
         best_level = min_level
         best_cp = 0
         best_sp = 0
+        best_hp = 0
 
         # Buscar el mejor nivel para esta combinación de IV
         for lv in valid_levels:
@@ -113,6 +128,7 @@ def rank_for_league(
             best_level = lv
             best_cp = cp_val
             best_sp = stat_product(base_atk, base_def, base_stam, atk_iv, def_iv, stam_iv, cpm_val)
+            best_hp = compute_hp(base_stam, stam_iv, cpm_val)
 
         if best_cp > 0:
             results.append(
@@ -123,6 +139,7 @@ def rank_for_league(
                     level=best_level,
                     cp_value=best_cp,
                     stat_product=best_sp,
+                    hp=best_hp,
                 )
             )
 
