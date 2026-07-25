@@ -102,6 +102,7 @@
 - [x] Suite completa 1274 passed; ruff/format/mypy(163 files)/makemigrations verdes
 - [x] Actualizar `plans/README.md` fila 060 → DONE
 - [x] Commit de cierre de fase 5
+- [x] Revisión de sub-agente: confirmó producción (AuditEvent vía vista real) y doble-revoke correctos; encontró 1 hallazgo real (`apps/core/metrics.py` código muerto rompía la invariante "core sin imports hacia arriba" que afirma la ADR) → eliminado (sin consumidores en todo el repo); ADR-0011 actualizado; suite sin cambio (1274 passed)
 
 ## Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
 
