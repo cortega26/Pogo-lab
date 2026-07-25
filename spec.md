@@ -361,12 +361,64 @@ memoria/entrenamiento** sin violar la prohibición de fabricar verificación.
 3. Cachear rankings (4096 spreads recalculados por request hoy) con clave
    determinista `(species, base stats, max_cp, level_cap)`.
 
-## 6. Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046)
+## 6. Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046) — **DONE**
 
-Detallar al llegar: releer `plans/053-validate-calculator-contracts.md`,
-inventariar las 8 calculadoras y sus parámetros de entrada/share-URL, definir
-contrato de validación reutilizable (probablemente un decorador o función
-`_validate_calc_params` compartida en `apps/calculators/`).
+### 6.1 Bugs reales confirmados antes de tocar código
+
+Reproducidos con `pytest` (no solo leídos del plan), cada uno con traceback
+real capturado antes del fix:
+
+1. **Codec genérico (`decode_calc_share`)**: JSON que decodifica a una
+   lista (no dict) → `AttributeError: 'list' object has no attribute
+   'get'` sin capturar (el `payload.get("v")` vivía fuera del `try`).
+   Payload sin clave `t` → `KeyError` sin capturar.
+2. **Costo de power-up**: `to_level="inf"` → `OverflowError: cannot
+   convert float infinity to integer` en `_level_to_powerup_index`
+   (`round((inf-1)*2)`), no es `ValueError`/`KeyError` → 500 real
+   confirmado vía `pytest` (Django logea "Internal Server Error").
+3. **Shiny**: `rate="1.0", n="-1"` → `p_at_least_one` hace `0.0 **
+   (negativo)` → `ZeroDivisionError` sin capturar → 500 real confirmado.
+4. **Shadow**: `iv_atk="99"` se aceptaba sin validar — no crashea, pero
+   calcula y muestra un CP/HP "real" con un IV imposible (bug semántico,
+   coincide con la evidencia del plan).
+5. **`_get_params`**: descartaba el `calc_type` devuelto por
+   `decode_calc_share` — una share URL de PvP se aceptaba en la
+   calculadora de CP (cálculo cruzado, confirmado).
+
+### 6.2 Alcance implementado (sin framework nuevo, según pide el plan)
+
+- `decode_calc_share`: límite de longitud (`MAX_SHARE_URL_LENGTH=2048`),
+  valida que el payload sea `dict`, valida versión, valida presencia de
+  `t` — todo como `ValueError` controlado, nunca
+  `AttributeError`/`KeyError`.
+- `_get_params`: rechaza (cae a defaults) si el `calc_type` decodificado
+  no coincide con la vista actual.
+- Nuevo helper `_parse_finite_float` (mismo estilo que
+  `_parse_int_in_range`/`_parse_confidence` ya existentes): rechaza
+  no-finito y aplica rango. Aplicado a: `from_level`/`to_level` (costo),
+  `level`/`ball`/`berry`/`throw`/`medal` (captura), `rate`/`confidence`
+  (shiny), `level` (shadow).
+- `_parse_int_in_range` (ya existente) reutilizado para
+  `iv_atk`/`iv_def`/`iv_stam` de shadow y `n` de shiny.
+- Fuzz test genérico con `hypothesis` (`TestCalculatorFuzzing`) sobre 19
+  combinaciones (endpoint, campo) × valores sospechosos (`nan`, `inf`,
+  `-inf`, enteros extremos) — cierra el paso 5 del plan de forma amplia,
+  no solo para los 5 casos puntuales encontrados.
+- No se construyó un sistema de Forms/schema genérico nuevo: los helpers
+  ya existentes (`_parse_int_in_range`, `_parse_confidence`) eran
+  suficientes y solo faltaba aplicarlos consistentemente + el nuevo
+  `_parse_finite_float` para los casos de nan/inf. Coherente con la nota
+  del plan: "no añadir framework genérico sin necesidad".
+- `tests/test_calculator_views.py` (mencionado en la verificación del plan
+  original) no se creó como archivo nuevo: la infraestructura ya
+  existente (`tests/test_sad_paths.py`, con la convención establecida
+  "cada calculadora devuelve 200 con error, nunca 500") ya cubría
+  exactamente ese propósito — se extendió en vez de fragmentar.
+
+### 6.3 Verificación
+
+Suite completa 1268 passed; ruff/format/mypy(164 files)/lint-imports/
+makemigrations limpios.
 
 ## 7. Fase 5 — Plan 060: límites entre apps (independiente)
 

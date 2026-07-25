@@ -1,3 +1,5 @@
+import math
+
 from django.shortcuts import render
 
 from engine.breakpoints import find_breakpoints, get_fast_moves_for_species
@@ -152,14 +154,36 @@ def _int_or_default(val, default=0):
         return default
 
 
+def _parse_finite_float(raw, *, default, label, lo=None, hi=None):
+    """Parsea un float exigiendo que sea finito (rechaza nan/inf) y, si se
+    dan límites, que esté dentro de rango. Lanza ValueError controlado en
+    vez de dejar que nan/inf lleguen al engine (plan 053)."""
+    try:
+        value = float(raw) if raw not in (None, "") else default
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} debe ser un número.") from exc
+    if not math.isfinite(value):
+        raise ValueError(f"{label} debe ser un número finito.")
+    if lo is not None and value < lo:
+        raise ValueError(f"{label} debe ser mayor o igual a {lo}.")
+    if hi is not None and value > hi:
+        raise ValueError(f"{label} debe ser menor o igual a {hi}.")
+    return value
+
+
 def _get_params(request, _calc_type, defaults):
-    """Extrae params de POST, share URL o defaults."""
+    """Extrae params de POST, share URL o defaults.
+
+    Plan 053: si la share URL fue generada por OTRA calculadora, se
+    descarta (cae a defaults) en vez de aceptarse como si fuera válida
+    para `_calc_type` (evita cálculo cruzado entre calculadoras)."""
     if request.method == "POST":
         return dict(request.POST.items())
     if "share" in request.GET:
         try:
-            _, params = decode_calc_share(request.GET["share"])
-            return params
+            calc_type, params = decode_calc_share(request.GET["share"])
+            if calc_type == _calc_type:
+                return params
         except ValueError:
             pass
     return dict(defaults)
@@ -264,6 +288,12 @@ def _cost_result(params):
 
     if params:
         try:
+            from_level = _parse_finite_float(
+                params.get("from_level"), default=20.0, label="from_level", lo=1.0, hi=55.0
+            )
+            to_level = _parse_finite_float(
+                params.get("to_level"), default=40.0, label="to_level", lo=1.0, hi=55.0
+            )
             cost = power_up_cost(from_level, to_level, is_lucky=is_lucky, is_shadow=is_shadow)
             result = {
                 "from_level": from_level,
@@ -413,6 +443,22 @@ def _catch_result(params):
 
     if params:
         try:
+            level = _parse_finite_float(
+                params.get("level"), default=15.0, label="level", lo=1.0, hi=55.0
+            )
+            ball = _parse_finite_float(
+                params.get("ball"), default=1.0, label="ball", lo=0.01, hi=10.0
+            )
+            berry = _parse_finite_float(
+                params.get("berry"), default=1.5, label="berry", lo=0.01, hi=10.0
+            )
+            throw = _parse_finite_float(
+                params.get("throw"), default=1.15, label="throw", lo=0.01, hi=10.0
+            )
+            medal = _parse_finite_float(
+                params.get("medal"), default=1.3, label="medal", lo=0.01, hi=10.0
+            )
+
             mult = catch_multiplier(
                 ball=ball, berry=berry, curveball=curveball, throw=throw, medal=medal
             )
@@ -558,6 +604,16 @@ def _shiny_result(params):
 
     if params:
         try:
+            rate = _parse_finite_float(
+                params.get("rate"), default=0.002, label="rate", lo=0.0, hi=1.0
+            )
+            n_encounters = _parse_int_in_range(
+                str(n_encounters), default=100, lo=0, hi=100_000_000, label="n"
+            )
+            confidence = _parse_finite_float(
+                params.get("confidence"), default=0.95, label="confidence", lo=0.0, hi=1.0
+            )
+
             p = p_at_least_one(rate, n_encounters)
             p0 = p_zero(rate, n_encounters)
             for_conf = trades_for_confidence(rate, confidence)
@@ -622,6 +678,13 @@ def _shadow_result(params):
 
     if params:
         try:
+            level = _parse_finite_float(
+                params.get("level"), default=40.0, label="level", lo=1.0, hi=55.0
+            )
+            iv_atk = _parse_int_in_range(str(iv_atk), default=15, lo=0, hi=15, label="IV Ataque")
+            iv_def = _parse_int_in_range(str(iv_def), default=15, lo=0, hi=15, label="IV Defensa")
+            iv_stam = _parse_int_in_range(str(iv_stam), default=15, lo=0, hi=15, label="IV Stamina")
+
             species = SPECIES_DB.get(species_id, SPECIES_DB["machamp"])
             r = compare_shadow_purified(
                 species.base_atk,
