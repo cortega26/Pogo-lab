@@ -4,7 +4,6 @@ from engine.breakpoints import find_breakpoints, get_fast_moves_for_species
 from engine.catch import catch_multiplier, catch_probability
 from engine.costs import power_up_cost
 from engine.probability import p_at_least_one, p_zero, trades_for_confidence
-from engine.pvp_rank import top_spreads
 from engine.shadow import compare_shadow_purified
 from engine.stats import SPECIES_CHOICES, SPECIES_DB, compute_cp_hp
 from engine.types import PokemonType, weaknesses
@@ -16,6 +15,7 @@ from .services import (
     decode_share_url,
     encode_calc_share,
     encode_share_url,
+    top_spreads_cached,
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -319,7 +319,7 @@ def _pvp_result(params):
     if params:
         try:
             species = SPECIES_DB.get(species_id, SPECIES_DB["medicham"])
-            ranking = top_spreads(
+            ranking = top_spreads_cached(
                 species.base_atk,
                 species.base_def,
                 species.base_stam,
@@ -338,6 +338,7 @@ def _pvp_result(params):
                         "stam": s.stam_iv,
                         "level": f"{s.level:.1f}",
                         "cp": s.cp_value,
+                        "hp": s.hp,
                         "stat_product": s.stat_product,
                     }
                     for i, s in enumerate(ranking)

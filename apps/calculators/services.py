@@ -22,6 +22,7 @@ from engine.probability import (
     per_trade_success_prob,
     trades_for_confidence,
 )
+from engine.pvp_rank import PVP_RANK_VERSION, IVSpread, top_spreads
 
 if TYPE_CHECKING:
     from apps.mechanics.models import MechanicRuleSet
@@ -287,3 +288,47 @@ def decode_calc_share(encoded: str) -> tuple[str, dict]:
     calc_type = payload.pop("t")
     payload.pop("v", None)
     return calc_type, payload
+
+
+def _pvp_rank_cache_key(
+    base_atk: int, base_def: int, base_stam: int, max_cp: int, n: int, level_cap: float
+) -> str:
+    raw = json.dumps(
+        {
+            "base_atk": base_atk,
+            "base_def": base_def,
+            "base_stam": base_stam,
+            "max_cp": max_cp,
+            "n": n,
+            "level_cap": level_cap,
+            "algo": PVP_RANK_VERSION,
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return "pvp_rank:" + hashlib.sha256(raw.encode()).hexdigest()
+
+
+def top_spreads_cached(
+    base_atk: int,
+    base_def: int,
+    base_stam: int,
+    max_cp: int,
+    n: int = 10,
+    *,
+    level_cap: float = 50.0,
+) -> list[IVSpread]:
+    """Como engine.pvp_rank.top_spreads, pero con caché por hash.
+
+    Plan 048: rank_for_league recalcula 4096 combinaciones de IV por
+    request; la clave incluye PVP_RANK_VERSION para que un despliegue con
+    una corrección de cálculo (como la de este mismo plan) nunca sirva un
+    ranking obsoleto desde el caché.
+    """
+    key = _pvp_rank_cache_key(base_atk, base_def, base_stam, max_cp, n, level_cap)
+    result = cache.get(key)
+    if result is not None:
+        return result
+    result = top_spreads(base_atk, base_def, base_stam, max_cp, n, level_cap=level_cap)
+    cache.set(key, result, timeout=getattr(settings, "CALC_CACHE_TIMEOUT", 3600))
+    return result

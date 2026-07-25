@@ -49,15 +49,21 @@
 - [x] Commit de cierre de fase 2
 - [x] Revisión de sub-agente: confirmó todo, encontró 1 hueco real (faltaban property tests del paso 3 del plan) → corregido con `TestFindBreakpointsProperties` (hypothesis); suite final 1252 passed
 
-## Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — tiene STOP real
+## Fase 3 — Plan 048: corregir PvP ranking (dep. 046) — tenía STOP real
 
-- [ ] Implementar HP entero real en `IVSpread` (usar `engine.stats.hp`, no `stam_val` continuo truncado al final)
-- [ ] Corregir `stat_product` para no perder precisión antes de tiempo
-- [ ] **STOP — preguntar al usuario** antes de publicar el cambio de ranking visible: ¿hay fuente real para validar al menos un caso (ej. Medicham), o se acepta como corrección determinista sin oráculo externo + nota de migración?
-- [ ] Cachear `rank_for_league` con clave determinista `(species, base stats, max_cp, level_cap)`
-- [ ] Fixtures actualizadas con nota explícita de "antes/después" y causa (no aceptar a ciegas)
-- [ ] Suite + ruff + mypy verdes
-- [ ] Actualizar `plans/README.md` fila 048 → DONE
+- [x] **STOP resuelto por el usuario (2026-07-24):** implementar y publicar con nota de migración
+- [x] Test (TDD-red confirmado, 3 fallos): `IVSpread.hp` ya no placeholder; `stat_product` usa HP entero; golden vector Medicham (1695612 buggy vs 1691183 correcto)
+- [x] `IVSpread.hp` es ahora un campo real (antes `@property` muerta que devolvía 0)
+- [x] `stat_product` usa `engine.stats.hp()` (HP entero) en vez de `stam_eff*cpm` continuo
+- [x] `rank_for_league` popula `hp` real por spread
+- [x] Evidencia concreta antes/después documentada en spec.md §5 (Medicham GL: #1 cambia de 5/15/15 a empate 5/15/14≈5/15/15)
+- [x] `PVP_RANK_VERSION = "pvp-rank-v2"` — mecanismo de migración (invalida caché v1 automáticamente)
+- [x] Caché determinista: `apps/calculators/services.py::top_spreads_cached` (patrón igual a `compute_scenario_cached`)
+- [x] `apps/calculators/views.py::_pvp_result` usa `top_spreads_cached`; expone `hp` en el resultado
+- [x] `_pvp_result.html`: columna HP nueva
+- [x] Suite completa 1254 passed; ruff/format/mypy(164 files)/lint-imports/makemigrations verdes; coverage pvp_rank.py 98%
+- [x] Actualizar `plans/README.md` fila 048 → DONE
+- [x] Commit de cierre de fase 3
 
 ## Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046)
 

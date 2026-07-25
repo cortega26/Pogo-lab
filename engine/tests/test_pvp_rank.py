@@ -18,6 +18,7 @@ from engine.pvp_rank import (
     top_spreads,
 )
 from engine.stats import cpm_for_level
+from engine.stats import hp as compute_hp
 
 
 class TestGenerateAllIVs:
@@ -49,6 +50,22 @@ class TestStatProduct:
         cpm = cpm_for_level(20.0)
         sp = stat_product(121, 152, 155, 5, 15, 15, cpm)
         assert sp > 0
+
+    def test_uses_integer_hp_not_continuous_stam(self):
+        """Plan 048: el HP debe truncarse a entero (engine.stats.hp) antes de
+        multiplicarlo, no usarse como stam_eff*cpm continuo. Medicham
+        (121,152,155) atk_iv=0/def_iv=15/stam_iv=15 nivel 40: stam_eff=170,
+        cpm=0.79030001 -> continuo=134.3510017, entero real=134 (difieren).
+        Valor esperado calculado con las mismas funciones ya verificadas de
+        engine.stats (cpm_for_level, hp), no una fuente externa nueva."""
+        cpm = cpm_for_level(40.0)
+        sp = stat_product(121, 152, 155, 0, 15, 15, cpm)
+        atk_val = 121 * cpm
+        def_val = 167 * cpm
+        expected_with_integer_hp = int(atk_val * def_val * 134)
+        buggy_with_continuous_stam = int(atk_val * def_val * (170 * cpm))
+        assert expected_with_integer_hp != buggy_with_continuous_stam
+        assert sp == expected_with_integer_hp
 
 
 class TestRankForLeague:
@@ -119,6 +136,21 @@ class TestTopSpreads:
 
 class TestIVSpreadImmutability:
     def test_iv_spread_is_frozen(self):
-        sp = IVSpread(atk_iv=5, def_iv=15, stam_iv=15, level=50.0, cp_value=1495, stat_product=1000)
+        sp = IVSpread(
+            atk_iv=5, def_iv=15, stam_iv=15, level=50.0, cp_value=1495, stat_product=1000, hp=140
+        )
         with pytest.raises(FrozenInstanceError):
             sp.atk_iv = 10  # type: ignore[misc]
+
+
+class TestIVSpreadHp:
+    def test_hp_is_the_real_integer_not_a_placeholder(self):
+        """Plan 048: IVSpread.hp era una property que siempre devolvía 0
+        (código muerto). Ahora debe ser el HP entero real de engine.stats.hp
+        para esa combinación de IVs y nivel."""
+        ranking = rank_for_league(121, 152, 155, max_cp=1500, level_cap=50.0)
+        best = ranking[0]
+        assert best.hp > 0
+        cpm = cpm_for_level(best.level)
+        expected_hp = compute_hp(155, best.stam_iv, cpm)
+        assert best.hp == expected_hp
