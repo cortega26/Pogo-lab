@@ -12,7 +12,6 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from apps.audit.models import AuditEvent
 from apps.core.models import TimestampedModel
 
 
@@ -49,6 +48,10 @@ class DataContributionConsent(TimestampedModel):
 
     @classmethod
     def grant_consent(cls, user, scope: str, text_version: str):
+        """Otorga (o reactiva) el consentimiento. Mutación pura de datos —
+        no emite AuditEvent (plan 060: los modelos no generan side effects
+        cross-app). Para el flujo de producción con auditoría, usar
+        apps.contributions.services.grant_consent."""
         now = timezone.now()
         consent, created = cls.objects.get_or_create(
             user=user,
@@ -65,18 +68,12 @@ class DataContributionConsent(TimestampedModel):
             consent.revoked_at = None
             consent.is_active = True
             consent.save()
-
-        AuditEvent.log(
-            verb="consent_granted",
-            actor=user,
-            target_type="DataContributionConsent",
-            target_id=consent.pk,
-            metadata={"scope": scope, "text_version": text_version},
-        )
         return consent
 
     @classmethod
     def revoke_consent(cls, user, scope: str):
+        """Revoca el consentimiento. Mutación pura de datos — no emite
+        AuditEvent (ver nota de grant_consent)."""
         try:
             consent = cls.objects.get(user=user, scope=scope)
         except cls.DoesNotExist:
@@ -85,14 +82,6 @@ class DataContributionConsent(TimestampedModel):
             consent.is_active = False
             consent.revoked_at = timezone.now()
             consent.save()
-
-            AuditEvent.log(
-                verb="consent_revoked",
-                actor=user,
-                target_type="DataContributionConsent",
-                target_id=consent.pk,
-                metadata={"scope": scope},
-            )
         return consent
 
     def clean(self):

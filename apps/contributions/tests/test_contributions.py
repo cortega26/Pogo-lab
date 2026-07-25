@@ -17,6 +17,7 @@ from apps.contributions.models import DataContributionConsent, DatasetVersion
 from apps.contributions.services import (
     aggregate_community_distribution,
     build_dataset_version,
+    mark_dataset_suspicious,
 )
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
 from apps.trades.models import TradeObservation
@@ -162,9 +163,14 @@ class TestDataContributionConsent:
 
     @pytest.mark.django_db
     def test_grant_creates_audit_event(self, user):
+        """Plan 060: el modelo ya no emite AuditEvent (evita el ciclo
+        contributions.models -> audit.models). El logging vive en la capa
+        de servicio (apps.contributions.services.grant_consent), que el
+        view de producción usa."""
         from apps.audit.models import AuditEvent
+        from apps.contributions.services import grant_consent
 
-        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        grant_consent(user, SCOPE, CONSENT_VERSION)
         events = AuditEvent.objects.filter(verb="consent_granted", actor=user)
         assert events.count() == 1
         assert events[0].metadata == {"scope": "community_dataset", "text_version": "1.0.0"}
@@ -172,21 +178,47 @@ class TestDataContributionConsent:
     @pytest.mark.django_db
     def test_revoke_creates_audit_event(self, user):
         from apps.audit.models import AuditEvent
+        from apps.contributions.services import grant_consent, revoke_consent
 
-        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
-        DataContributionConsent.revoke_consent(user, SCOPE)
+        grant_consent(user, SCOPE, CONSENT_VERSION)
+        revoke_consent(user, SCOPE)
+        events = AuditEvent.objects.filter(verb="consent_revoked", actor=user)
+        assert events.count() == 1
+
+    @pytest.mark.django_db
+    def test_double_revoke_does_not_double_log(self, user):
+        """Un segundo revoke sobre un consentimiento ya inactivo no debe
+        auditar de nuevo (replica el comportamiento original del modelo,
+        que solo auditaba dentro de la rama `if consent.is_active`)."""
+        from apps.audit.models import AuditEvent
+        from apps.contributions.services import grant_consent, revoke_consent
+
+        grant_consent(user, SCOPE, CONSENT_VERSION)
+        revoke_consent(user, SCOPE)
+        revoke_consent(user, SCOPE)
         events = AuditEvent.objects.filter(verb="consent_revoked", actor=user)
         assert events.count() == 1
 
     @pytest.mark.django_db
     def test_audit_metadata_has_no_pii_from_consent(self, user):
         from apps.audit.models import AuditEvent
+        from apps.contributions.services import grant_consent
 
-        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        grant_consent(user, SCOPE, CONSENT_VERSION)
         event = AuditEvent.objects.filter(verb="consent_granted").first()
         assert event is not None
         metadata_str = str(event.metadata)
         assert user.email not in metadata_str
+
+    @pytest.mark.django_db
+    def test_model_classmethod_no_longer_emits_audit_event(self, user):
+        """Plan 060: llamar al classmethod del modelo directamente (como
+        hacen los demás tests de este archivo, por conveniencia de setup)
+        ya NO crea un AuditEvent — eso requiere pasar por el servicio."""
+        from apps.audit.models import AuditEvent
+
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        assert not AuditEvent.objects.filter(verb="consent_granted", actor=user).exists()
 
 
 def _serialize_version(version):
@@ -623,6 +655,17 @@ class TestConsentViews:
         assert consent.is_active is True
 
     @pytest.mark.django_db
+    def test_grant_view_creates_audit_event(self, client, user):
+        """Plan 060: la vista de producción debe seguir auditando el
+        consentimiento — usa apps.contributions.services.grant_consent,
+        no el classmethod del modelo directamente (que ya no audita)."""
+        from apps.audit.models import AuditEvent
+
+        client.force_login(user)
+        client.post("/es/contribuciones/consentir/")
+        assert AuditEvent.objects.filter(verb="consent_granted", actor=user).exists()
+
+    @pytest.mark.django_db
     def test_revoke_view_redirects(self, client, user):
         DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
         client.force_login(user)
@@ -631,6 +674,15 @@ class TestConsentViews:
 
         consent = DataContributionConsent.objects.get(user=user, scope=SCOPE)
         assert consent.is_active is False
+
+    @pytest.mark.django_db
+    def test_revoke_view_creates_audit_event(self, client, user):
+        from apps.audit.models import AuditEvent
+
+        DataContributionConsent.grant_consent(user, SCOPE, CONSENT_VERSION)
+        client.force_login(user)
+        client.post("/es/contribuciones/revocar/")
+        assert AuditEvent.objects.filter(verb="consent_revoked", actor=user).exists()
 
     @pytest.mark.django_db
     def test_consent_views_require_login(self, client):
@@ -663,3 +715,34 @@ class TestConsentViews:
         )
         assert response.status_code == 302
         assert response.url == "/"
+
+
+class TestMarkDatasetSuspicious:
+    """Moderación de datasets (plan 060: movido desde apps.audit.services
+    — apps.contributions es el dueño del agregado DatasetVersion)."""
+
+    @pytest.mark.django_db
+    def test_mark_dataset_suspicious(self, user):
+        from apps.audit.models import AuditEvent
+
+        version = DatasetVersion.objects.create(
+            number=1,
+            criteria={"min_sample": 30},
+            row_count=100,
+            checksum="abc123",
+            is_public=True,
+            publication_status="public",
+        )
+
+        mark_dataset_suspicious(version.pk, reason="Sospecha de datos manipulados", actor=user)
+
+        version.refresh_from_db()
+        assert version.publication_status == "quarantined"
+        assert version.is_public is False
+        assert version.moderation_reason == "Sospecha de datos manipulados"
+        assert version.moderated_at is not None
+
+        events = AuditEvent.objects.filter(verb="dataset_marked_suspicious")
+        assert events.count() == 1
+        assert events[0].actor == user
+        assert events[0].metadata.get("reason") == "Sospecha de datos manipulados"

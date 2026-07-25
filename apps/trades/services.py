@@ -14,6 +14,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.db.utils import IntegrityError
 
+from apps.audit.models import AuditEvent
 from apps.mechanics.services import RulesetUnavailableError, resolve_trade_floor
 from engine.observations import ivs_consistent_with_floor
 
@@ -434,6 +435,33 @@ def export_csv(owner_id: int) -> str:
         )
 
     return output.getvalue()
+
+
+def mark_observation(
+    observation_id: int,
+    state: str,
+    reason: str = "",
+    actor=None,
+) -> TradeObservation:
+    """Marca una observación con un nuevo estado (moderación) y audita.
+
+    Plan 060: movido desde apps.audit.services — apps.trades es el dueño
+    del agregado TradeObservation; apps.audit queda como sink puro."""
+    obs = TradeObservation.objects.get(pk=observation_id)
+    previous_state = obs.state
+    obs.state = state
+    obs.exclusion_reason = reason
+    obs.save(update_fields=["state", "exclusion_reason", "updated_at"])
+
+    AuditEvent.log(
+        verb=f"observation_marked_{state}",
+        actor=actor,
+        target_type="TradeObservation",
+        target_id=obs.pk,
+        metadata={"reason": reason, "previous_state": previous_state},
+    )
+
+    return obs
 
 
 def dashboard_stats(owner_id: int) -> dict[str, Any]:

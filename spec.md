@@ -436,11 +436,54 @@ directo. Se añadieron tests que fallaban primero (confirmado) para los
 tres casos, y se sumaron valores no numéricos (`"abc"`, inyección SQL de
 juguete) a `_SUSPICIOUS_VALUES` del fuzz test. Suite final: 1270 passed.
 
-## 7. Fase 5 — Plan 060: límites entre apps (independiente)
+## 7. Fase 5 — Plan 060: límites entre apps (independiente) — **DONE**
 
-Detallar al llegar: releer `plans/060-enforce-application-boundaries.md`,
-generar mapa de imports actual (`lint-imports` + inspección), definir DAG
-permitido en un ADR nuevo, mecanizar con contratos de `import-linter`.
+### 7.1 Ciclo real confirmado (evidencia del plan, verificada)
+
+`apps.contributions.models.DataContributionConsent.grant_consent/revoke_consent`
+llamaban `AuditEvent.log(...)` directamente. `apps.audit.services` (solo
+`mark_observation` + `mark_dataset_suspicious`) importaba
+`apps.contributions.models.DatasetVersion` y
+`apps.trades.models.TradeObservation`. Ciclo: `contributions` → `audit`,
+`audit` → `contributions`/`trades`. `import-linter` no lo veía porque
+`root_packages` solo tenía `"engine"` — las apps de Django no estaban bajo
+ningún contrato.
+
+### 7.2 Fix
+
+- `apps.contributions.models`: ya no importa `apps.audit.models`. Los
+  classmethods `grant_consent`/`revoke_consent` quedan como mutación pura
+  de datos (se mantuvieron con la misma firma — son la base de ~40 tests
+  de setup en `test_contributions.py`, no se podían eliminar).
+- Nuevos `apps.contributions.services.grant_consent`/`revoke_consent`:
+  orquestan mutación + `AuditEvent.log`. La vista de producción
+  (`apps/contributions/views.py`) ahora llama a estos, no al modelo.
+  Se replicó con cuidado la semántica original de `revoke_consent`
+  (auditar solo si había un consentimiento *activo* antes de revocar, no
+  en un doble-revoke) — un chequeo de pre-estado, no de post-estado.
+- `mark_observation` → movido a `apps.trades.services` (dueño de
+  `TradeObservation`). `mark_dataset_suspicious` → movido a
+  `apps.contributions.services` (dueño de `DatasetVersion`).
+- `apps/audit/services.py` eliminado (quedó vacío tras la extracción).
+  `apps.audit` es ahora un sink puro: solo `AuditEvent` + admin.
+- Tests movidos a las apps dueñas del agregado (`tests/test_trades.py`,
+  `apps/contributions/tests/test_contributions.py`); `apps/audit/tests/
+  test_audit.py` conserva solo `TestAuditEvent` (el modelo en sí).
+- `pyproject.toml`: `root_packages` ahora incluye `"apps"`; 2 contratos
+  `forbidden` nuevos (`audit-is-a-sink-not-a-source`,
+  `domain-models-do-not-import-audit`). Verificado que detectan la
+  regresión real (reintroduje el import viejo en `contributions/models.py`
+  y `lint-imports` lo cachó, incluso transitivamente vía
+  `experiments.models`).
+- ADR nuevo: `docs/adr/0011-limites-entre-apps.md` (documenta el DAG, las
+  alternativas descartadas — capa de eventos genérica, mover AuditEvent,
+  `layers` contract exhaustivo — y la asimetría aceptada entre el
+  classmethod del modelo y el servicio).
+
+### 7.3 Verificación
+
+Suite completa 1274 passed; ruff/format/mypy(163 files)/lint-imports (3
+contratos, 0 rotos)/makemigrations limpios.
 
 ## 8. Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
 

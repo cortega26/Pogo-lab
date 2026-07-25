@@ -1,11 +1,17 @@
-"""Tests para apps/audit — AuditEvent y moderación."""
+"""Tests para apps/audit — AuditEvent (modelo/sink).
+
+Plan 060: apps.audit ya no tiene services.py — mark_observation vive en
+apps.trades.services (ver tests/test_trades.py::TestMarkObservation) y
+mark_dataset_suspicious en apps.contributions.services (ver
+apps/contributions/tests/test_contributions.py::TestMarkDatasetSuspicious).
+apps.audit queda como sink puro: solo el modelo AuditEvent, consultable
+por cualquier app, sin lógica de moderación propia ni dependencias hacia
+apps de dominio."""
 
 import pytest
 from django.contrib.auth import get_user_model
 
 from apps.audit.models import AuditEvent
-from apps.audit.services import mark_dataset_suspicious, mark_observation
-from apps.trades.models import TradeObservation
 
 User = get_user_model()
 
@@ -63,82 +69,3 @@ class TestAuditEvent:
 
         events = list(AuditEvent.objects.all())
         assert events[0].pk == e2.pk
-
-
-class TestModeration:
-    """Marcado de observaciones como sospechosas/duplicate usando servicios de moderación."""
-
-    @pytest.mark.django_db
-    def test_mark_observation_suspicious(self):
-        user = User.objects.create_user(email="mod@test.com", password="pass123")
-        obs = TradeObservation.objects.create(
-            owner=user,
-            observed_at="2026-07-15T00:00:00Z",
-            friendship_level="best",
-            trade_type="lucky",
-            is_lucky=True,
-            atk=15,
-            iv_def=15,
-            hp=15,
-            state="valid",
-        )
-
-        mark_observation(obs.pk, "suspicious", reason="Estadísticamente atípico", actor=user)
-
-        obs.refresh_from_db()
-        assert obs.state == "suspicious"
-        assert obs.exclusion_reason == "Estadísticamente atípico"
-
-        events = AuditEvent.objects.filter(verb="observation_marked_suspicious")
-        assert events.count() == 1
-        assert events[0].actor == user
-
-    @pytest.mark.django_db
-    def test_mark_observation_duplicate(self):
-        user = User.objects.create_user(email="dup@test.com", password="pass123")
-        obs = TradeObservation.objects.create(
-            owner=user,
-            observed_at="2026-07-15T00:00:00Z",
-            friendship_level="good",
-            trade_type="normal",
-            is_lucky=False,
-            atk=10,
-            iv_def=10,
-            hp=10,
-            state="valid",
-        )
-
-        mark_observation(obs.pk, "duplicate", reason="Hash duplicado", actor=user)
-
-        obs.refresh_from_db()
-        assert obs.state == "duplicate"
-
-        events = AuditEvent.objects.filter(verb="observation_marked_duplicate")
-        assert events.count() == 1
-
-    @pytest.mark.django_db
-    def test_mark_dataset_suspicious(self):
-        from apps.contributions.models import DatasetVersion
-
-        version = DatasetVersion.objects.create(
-            number=1,
-            criteria={"min_sample": 30},
-            row_count=100,
-            checksum="abc123",
-            is_public=True,
-            publication_status="public",
-        )
-
-        user = User.objects.create_user(email="auditor@test.com", password="pass123")
-        mark_dataset_suspicious(version.pk, reason="Sospecha de datos manipulados", actor=user)
-
-        version.refresh_from_db()
-        assert version.publication_status == "quarantined"
-        assert version.is_public is False
-        assert version.moderation_reason == "Sospecha de datos manipulados"
-        assert version.moderated_at is not None
-
-        events = AuditEvent.objects.filter(verb="dataset_marked_suspicious")
-        assert events.count() == 1
-        assert events[0].actor == user
-        assert events[0].metadata.get("reason") == "Sospecha de datos manipulados"
