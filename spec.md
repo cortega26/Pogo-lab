@@ -485,6 +485,24 @@ ningún contrato.
 Suite completa 1274 passed; ruff/format/mypy(163 files)/lint-imports (3
 contratos, 0 rotos)/makemigrations limpios.
 
+**Revisión de sub-agente fresco (checkpoint §10):** verificó de forma
+independiente (test pytest propio, no confiar en los del repo) que la
+vista de producción real sigue creando `AuditEvent` en grant y revoke;
+replicó el caso de doble-revoke vía HTTP real y confirmó que no duplica
+el audit log; corrió su propio chequeo de ciclos con `grimp` sobre las 13
+apps (ninguno encontrado) y reprodujo la detección de regresión de
+`lint-imports`. **1 hallazgo real:** `apps/core/metrics.py` (código
+preexistente del M7, no tocado por esta fase) importaba
+`apps.contributions.models`/`apps.trades.models`, contradiciendo la
+afirmación del ADR de que `core` es la base sin dependencias hacia
+arriba. **Corregido:** confirmado que `product_metrics()` no tenía
+ningún consumidor en todo el repo (ni vista, ni comando, ni test) —
+código muerto del hardening de M7 que nunca se conectó. Se eliminó el
+archivo completo en vez de documentar la excepción; `apps.core` ahora
+tiene cero imports hacia otras apps, verificado con grep. ADR-0011
+actualizado para reflejarlo. Suite tras el fix: 1274 passed (sin cambio,
+confirma que estaba muerto), lint-imports 3/3 contratos verdes.
+
 ## 8. Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
 
 Detallar al llegar: releer `plans/061-enforce-audit-event-integrity.md`.

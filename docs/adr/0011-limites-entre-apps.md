@@ -47,9 +47,11 @@ otra app; eso es trabajo de la capa de servicio/orquestación.
   base de datos innecesaria para resolver un problema que es de *dirección de import*, no de
   *ubicación del modelo*.
 - **Contrato `layers` estricto para todas las apps** (en vez de `forbidden` puntual) — descartada por
-  ahora: el grafo real de imports (`core` en la base; `content`/`mechanics`/`sources`/`trades`/`audit`
-  como apps de dominio; `analysis`/`experiments`/`decisions`/`contributions` construyendo sobre esas)
-  ya es acíclico fuera del caso `audit`↔`contributions`/`trades` corregido aquí. Definir un `layers`
+  ahora: el grafo real de imports (`core` en la base — verificado sin ninguna importación hacia otra
+  app tras eliminar `apps/core/metrics.py`, código muerto sin ningún consumidor que rompía esta
+  invariante; `content`/`mechanics`/`sources`/`trades`/`audit` como apps de dominio;
+  `analysis`/`experiments`/`decisions`/`contributions` construyendo sobre esas) ya es acíclico fuera
+  del caso `audit`↔`contributions`/`trades` corregido aquí. Definir un `layers`
   contract exhaustivo es más arriesgado (puede revelar/romper relaciones legítimas no inventariadas)
   y no lo pedía la evidencia concreta de este plan. Se puede añadir después si aparece un nuevo ciclo.
 
