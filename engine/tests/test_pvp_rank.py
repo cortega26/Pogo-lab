@@ -8,6 +8,8 @@ Fixtures verificadas:
 from dataclasses import FrozenInstanceError
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from engine.pvp_rank import (
     IVSpread,
@@ -17,8 +19,10 @@ from engine.pvp_rank import (
     stat_product,
     top_spreads,
 )
-from engine.stats import cpm_for_level
+from engine.stats import CPM_TABLE, cpm_for_level
 from engine.stats import hp as compute_hp
+
+_CPM_LEVELS = sorted(CPM_TABLE.keys())
 
 
 class TestGenerateAllIVs:
@@ -66,6 +70,28 @@ class TestStatProduct:
         buggy_with_continuous_stam = int(atk_val * def_val * (170 * cpm))
         assert expected_with_integer_hp != buggy_with_continuous_stam
         assert sp == expected_with_integer_hp
+
+    @given(
+        base_atk=st.integers(min_value=50, max_value=300),
+        base_def=st.integers(min_value=50, max_value=300),
+        base_stam=st.integers(min_value=50, max_value=300),
+        iv_atk=st.integers(min_value=0, max_value=15),
+        iv_def=st.integers(min_value=0, max_value=15),
+        iv_stam=st.integers(min_value=0, max_value=15),
+        level=st.sampled_from(_CPM_LEVELS),
+    )
+    def test_always_matches_integer_hp_formula(
+        self, base_atk, base_def, base_stam, iv_atk, iv_def, iv_stam, level
+    ):
+        """Generaliza el golden vector de Medicham: para cualquier stats base
+        e IVs, stat_product debe coincidir con la composición de las
+        funciones ya verificadas de engine.stats (no solo para un caso)."""
+        cpm = cpm_for_level(level)
+        sp = stat_product(base_atk, base_def, base_stam, iv_atk, iv_def, iv_stam, cpm)
+        atk_val = (base_atk + iv_atk) * cpm
+        def_val = (base_def + iv_def) * cpm
+        expected_hp = compute_hp(base_stam, iv_stam, cpm)
+        assert sp == int(atk_val * def_val * expected_hp)
 
 
 class TestRankForLeague:
@@ -118,6 +144,17 @@ class TestRankForLeague:
         best = ranking[0]
         pct = iv_rank_percent(121, 152, 155, best.atk_iv, best.def_iv, best.stam_iv, max_cp=1500)
         assert pct == pytest.approx(0.0, abs=0.5)
+
+    def test_azumarill_ultra_league_top_hp_matches_integer_formula(self):
+        """Plan 048 (revisión de Fase 3): el plan pedía verificar el fix en
+        más de una especie/liga, no solo Medicham en Great League. Azumarill
+        (112,152,225) en Ultra League (max_cp=2500)."""
+        ranking = rank_for_league(112, 152, 225, max_cp=2500, level_cap=51.0)
+        best = ranking[0]
+        cpm = cpm_for_level(best.level)
+        expected_hp = compute_hp(225, best.stam_iv, cpm)
+        assert best.hp == expected_hp
+        assert best.hp > 0
 
 
 class TestTopSpreads:

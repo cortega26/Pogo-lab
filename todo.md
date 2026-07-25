@@ -64,6 +64,7 @@
 - [x] Suite completa 1254 passed; ruff/format/mypy(164 files)/lint-imports/makemigrations verdes; coverage pvp_rank.py 98%
 - [x] Actualizar `plans/README.md` fila 048 → DONE
 - [x] Commit de cierre de fase 3
+- [x] Revisión de sub-agente: confirmó golden vectors y mecanismo de caché; encontró 2 huecos reales (nota de migración no visible al usuario final; fix solo probado en Medicham GL) → ambos corregidos: aviso visible en `_pvp_result.html` + test, y `test_always_matches_integer_hp_formula` (hypothesis) + caso Azumarill/Ultra League; suite final 1257 passed
 
 ## Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046)
 

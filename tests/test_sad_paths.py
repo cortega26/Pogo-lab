@@ -101,6 +101,15 @@ class TestSadPathPvP:
     def test_empty(self):
         assert Client().post("/es/calculadora/pvp/", {}).status_code == 200
 
+    def test_ranking_shows_migration_note_and_hp_column(self):
+        """Plan 048: el ranking corregido debe avisar al usuario final que el
+        orden puede diferir de cálculos anteriores (no solo documentación
+        interna en spec.md), y exponer el HP entero real por spread."""
+        r = Client().post("/es/calculadora/pvp/", {"species": "medicham", "league": "1500"})
+        content = r.content.decode()
+        assert "2026-07-24" in content
+        assert "HP" in content
+
 
 class TestSadPathCatch:
     def test_get(self):

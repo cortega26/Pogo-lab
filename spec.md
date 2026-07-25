@@ -320,6 +320,24 @@ módulo y aquí. También se agregó caché determinista (antes recalculaba
 inalcanzable preexistente, fuera de alcance de este plan); ruff/format/mypy
 (164 files)/lint-imports/makemigrations limpios.
 
+**Revisión de sub-agente fresco (checkpoint §10):** recalculó de forma
+independiente ambos golden vectors (Medicham GL antes/después y el caso de
+nivel 40) y coincidieron dígito a dígito; confirmó que `PVP_RANK_VERSION`
+sí participa en la clave de caché (mecanismo de invalidación real, no
+cosmético). Encontró **2 huecos reales**: (1) la nota de migración solo
+existía en documentación interna (spec.md/todo.md/docstring), no en ningún
+lugar que el usuario final viera — el propio plan 048 (paso 5) pedía
+"nota de cambio si rankings visibles varían" en la superficie del
+producto. **Corregido:** aviso visible en `_pvp_result.html` (texto
+específico con fecha, mismo estilo muted que otras notas de la app) + test
+que confirma que aparece en el HTML renderizado. (2) El plan pedía
+verificar el fix en más de una especie/liga; solo se había probado
+Medicham en Great League. **Corregido:** se agregó `test_always_matches_
+integer_hp_formula` (property test con `hypothesis` sobre stats/IVs/nivel
+arbitrarios) y un caso concreto adicional (Azumarill, Ultra League,
+max_cp=2500) verificado por cálculo independiente antes de escribirlo
+(HP esperado 202, confirmado). Suite final: 1257 passed.
+
 ## 5.1 Fase 3 — texto original del plan (referencia)
 
 El propio plan dice: *"los tests actuales se derivan del mismo algoritmo y no
