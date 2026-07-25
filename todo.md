@@ -82,6 +82,7 @@
 - [x] Suite completa 1268 passed; ruff/format/mypy(164 files)/lint-imports/makemigrations verdes
 - [x] Actualizar `plans/README.md` fila 053 → DONE
 - [x] Commit de cierre de fase 4
+- [x] Revisión de sub-agente: confirmó los 5 bugs reales (reproducidos contra el commit padre) y el fuzz test sustantivo; encontró 1 hueco real (cp/shiny/shadow revalidaban el default ya sustituido, no el input crudo — "abc" nunca se rechazaba) → corregido en los 3 lugares + valores no numéricos agregados al fuzz test; suite final 1270 passed
 
 ## Fase 5 — Plan 060: límites entre apps
 

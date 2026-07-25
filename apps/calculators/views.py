@@ -220,9 +220,15 @@ def _cp_result(params):
 
     if params:
         try:
-            iv_atk = _parse_int_in_range(str(iv_atk), default=10, lo=0, hi=15, label="IV Ataque")
-            iv_def = _parse_int_in_range(str(iv_def), default=10, lo=0, hi=15, label="IV Defensa")
-            iv_stam = _parse_int_in_range(str(iv_stam), default=10, lo=0, hi=15, label="IV Stamina")
+            iv_atk = _parse_int_in_range(
+                params.get("iv_atk"), default=10, lo=0, hi=15, label="IV Ataque"
+            )
+            iv_def = _parse_int_in_range(
+                params.get("iv_def"), default=10, lo=0, hi=15, label="IV Defensa"
+            )
+            iv_stam = _parse_int_in_range(
+                params.get("iv_stam"), default=10, lo=0, hi=15, label="IV Stamina"
+            )
 
             species = SPECIES_DB.get(species_id, SPECIES_DB["pikachu"])
             cp_val, hp_val = compute_cp_hp(
@@ -608,7 +614,7 @@ def _shiny_result(params):
                 params.get("rate"), default=0.002, label="rate", lo=0.0, hi=1.0
             )
             n_encounters = _parse_int_in_range(
-                str(n_encounters), default=100, lo=0, hi=100_000_000, label="n"
+                params.get("n"), default=100, lo=0, hi=100_000_000, label="n"
             )
             confidence = _parse_finite_float(
                 params.get("confidence"), default=0.95, label="confidence", lo=0.0, hi=1.0
@@ -681,9 +687,15 @@ def _shadow_result(params):
             level = _parse_finite_float(
                 params.get("level"), default=40.0, label="level", lo=1.0, hi=55.0
             )
-            iv_atk = _parse_int_in_range(str(iv_atk), default=15, lo=0, hi=15, label="IV Ataque")
-            iv_def = _parse_int_in_range(str(iv_def), default=15, lo=0, hi=15, label="IV Defensa")
-            iv_stam = _parse_int_in_range(str(iv_stam), default=15, lo=0, hi=15, label="IV Stamina")
+            iv_atk = _parse_int_in_range(
+                params.get("iv_atk"), default=15, lo=0, hi=15, label="IV Ataque"
+            )
+            iv_def = _parse_int_in_range(
+                params.get("iv_def"), default=15, lo=0, hi=15, label="IV Defensa"
+            )
+            iv_stam = _parse_int_in_range(
+                params.get("iv_stam"), default=15, lo=0, hi=15, label="IV Stamina"
+            )
 
             species = SPECIES_DB.get(species_id, SPECIES_DB["machamp"])
             r = compare_shadow_purified(
