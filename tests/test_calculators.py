@@ -12,7 +12,9 @@ from apps.calculators.services import (
     _round,
     compute_scenario,
     compute_scenario_cached,
+    decode_calc_share,
     decode_share_url,
+    encode_calc_share,
     encode_share_url,
 )
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
@@ -366,6 +368,43 @@ class TestShareURLRoundTrip:
         e1 = encode_share_url(inputs)
         e2 = encode_share_url(inputs)
         assert e1 == e2
+
+
+class TestGenericCalcShareCodec:
+    """Plan 053: decode_calc_share nunca debe dejar escapar AttributeError/
+    KeyError — todo input inválido es un ValueError controlado."""
+
+    def test_roundtrip(self):
+        encoded = encode_calc_share("pvp", {"species": "medicham", "league": 1500})
+        calc_type, params = decode_calc_share(encoded)
+        assert calc_type == "pvp"
+        assert params == {"species": "medicham", "league": 1500}
+
+    def test_json_list_instead_of_object_raises_value_error(self):
+        """Antes: json.loads de una lista producía un payload sin .get,
+        y payload.get("v") lanzaba AttributeError sin capturar."""
+        from base64 import b64encode
+
+        raw = b64encode(b"[1,2,3]").decode().rstrip("=")
+        with pytest.raises(ValueError):
+            decode_calc_share(raw)
+
+    def test_missing_type_key_raises_value_error(self):
+        """Antes: payload.pop("t") sin la clave lanzaba KeyError sin capturar."""
+        import json
+        from base64 import b64encode
+
+        raw = b64encode(json.dumps({"v": "gv1", "species": "mewtwo"}).encode()).decode().rstrip("=")
+        with pytest.raises(ValueError):
+            decode_calc_share(raw)
+
+    def test_oversized_payload_raises_value_error(self):
+        with pytest.raises(ValueError):
+            decode_calc_share("A" * 100_000)
+
+    def test_malformed_base64_raises_value_error(self):
+        with pytest.raises(ValueError):
+            decode_calc_share("###not-base64###")
 
 
 @pytest.mark.django_db

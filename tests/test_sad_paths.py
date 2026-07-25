@@ -6,6 +6,8 @@ Cada calculadora debe devolver 200 con mensaje de error, nunca 500.
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 pytestmark = pytest.mark.django_db
 
@@ -89,6 +91,18 @@ class TestSadPathCost:
     def test_empty(self):
         assert Client().post("/es/calculadora/costos/", {}).status_code == 200
 
+    def test_infinite_to_level_does_not_500(self):
+        """Plan 053: to_level=inf crasheaba con OverflowError sin capturar
+        (round((inf-1)*2) no puede convertirse a entero)."""
+        r = Client().post("/es/calculadora/costos/", {"from_level": "20", "to_level": "inf"})
+        assert r.status_code == 200
+        assert "Error" in r.content.decode()
+
+    def test_nan_from_level_does_not_500(self):
+        r = Client().post("/es/calculadora/costos/", {"from_level": "nan", "to_level": "40"})
+        assert r.status_code == 200
+        assert "Error" in r.content.decode()
+
 
 class TestSadPathPvP:
     def test_get(self):
@@ -122,6 +136,16 @@ class TestSadPathCatch:
     def test_empty(self):
         assert Client().post("/es/calculadora/captura/", {}).status_code == 200
 
+    def test_nan_ball_multiplier_is_rejected_not_silently_computed(self):
+        """Plan 053: ball/berry/throw/medal sin validar podían producir un
+        multiplicador NaN sin crashear, mostrando "nan%" de probabilidad de
+        captura al usuario en vez de rechazar la entrada."""
+        r = Client().post(
+            "/es/calculadora/captura/", {"species": "charmander", "level": "15", "ball": "nan"}
+        )
+        assert r.status_code == 200
+        assert "Error" in r.content.decode()
+
 
 class TestSadPathTypes:
     def test_get(self):
@@ -147,6 +171,13 @@ class TestSadPathShiny:
     def test_empty(self):
         assert Client().post("/es/calculadora/shiny/", {}).status_code == 200
 
+    def test_rate_one_with_negative_n_does_not_500(self):
+        """Plan 053: p_at_least_one(1.0, n<0) = 0.0**(negativo) -> ZeroDivisionError
+        sin capturar. rate=1.0 y n negativo no deben llegar al engine."""
+        r = Client().post("/es/calculadora/shiny/", {"rate": "1.0", "n": "-1"})
+        assert r.status_code == 200
+        assert "Error" in r.content.decode()
+
 
 class TestSadPathShadow:
     def test_get(self):
@@ -160,6 +191,9 @@ class TestSadPathShadow:
         assert r.status_code < 500
 
     def test_iv_out_of_range(self):
+        """Plan 053: antes se aceptaba en silencio un IV fuera de [0,15] y se
+        mostraba un CP/HP calculado con ese valor inválido como si fuera
+        real. Ahora debe rechazarse con un error, no solo evitar el 500."""
         r = Client().post(
             "/es/calculadora/shadow/",
             {
@@ -170,7 +204,8 @@ class TestSadPathShadow:
                 "iv_stam": "15",
             },
         )
-        assert r.status_code < 500
+        assert r.status_code == 200
+        assert "Error" in r.content.decode()
 
     def test_empty(self):
         assert Client().post("/es/calculadora/shadow/", {}).status_code == 200
@@ -203,6 +238,76 @@ class TestSadPathBreakpoints:
 
     def test_empty(self):
         assert Client().post("/es/calculadora/breakpoints/", {}).status_code == 200
+
+
+class TestCrossCalculatorShareURL:
+    """Plan 053: _get_params descartaba el calc_type devuelto por
+    decode_calc_share, así que una share URL de una calculadora se
+    aceptaba en cualquier otra (cálculo cruzado)."""
+
+    def test_pvp_share_url_is_ignored_by_cp_calculator(self):
+        """El selector de especie de la calculadora CP siempre lista todas
+        las especies (incluida Medicham) como <option>, así que se verifica
+        el contexto real (qué especie quedó seleccionada), no un substring
+        en el HTML completo."""
+        from apps.calculators.services import encode_calc_share
+
+        pvp_share = encode_calc_share("pvp", {"species": "medicham", "league": "1500"})
+        r = Client().get(f"/es/calculadora/cp/?share={pvp_share}")
+        assert r.status_code == 200
+        assert r.context["species_id"] != "medicham"
+        assert r.context["result"] is None
+
+
+_SUSPICIOUS_VALUES = st.one_of(
+    st.just("nan"),
+    st.just("inf"),
+    st.just("-inf"),
+    st.just("Infinity"),
+    st.just(""),
+    st.just("0"),
+    st.just("-1"),
+    st.integers(min_value=-(10**9), max_value=10**9).map(str),
+)
+
+# (url, campo) para cada calculadora; cubre los campos numéricos de entrada
+# de las 8 calculadoras (plan 053, paso 5: fuzzing genérico).
+_CALCULATOR_NUMERIC_FIELDS = [
+    ("/es/calculadora/costos/", "from_level"),
+    ("/es/calculadora/costos/", "to_level"),
+    ("/es/calculadora/captura/", "ball"),
+    ("/es/calculadora/captura/", "berry"),
+    ("/es/calculadora/captura/", "throw"),
+    ("/es/calculadora/captura/", "medal"),
+    ("/es/calculadora/captura/", "level"),
+    ("/es/calculadora/shiny/", "rate"),
+    ("/es/calculadora/shiny/", "n"),
+    ("/es/calculadora/shiny/", "confidence"),
+    ("/es/calculadora/shadow/", "level"),
+    ("/es/calculadora/shadow/", "iv_atk"),
+    ("/es/calculadora/shadow/", "iv_def"),
+    ("/es/calculadora/shadow/", "iv_stam"),
+    ("/es/calculadora/breakpoints/", "iv_atk"),
+    ("/es/calculadora/breakpoints/", "defender_def"),
+    ("/es/calculadora/cp/", "level"),
+    ("/es/calculadora/cp/", "iv_atk"),
+    ("/es/calculadora/pvp/", "league"),
+]
+
+
+class TestCalculatorFuzzing:
+    """Plan 053, paso 5: fuzzing genérico sobre todas las calculadoras.
+
+    Ninguna combinación de (endpoint, campo numérico, valor sospechoso)
+    debe producir un 500 — nan/inf/enteros extremos deben rechazarse con
+    un error controlado, nunca llegar sin validar al engine."""
+
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
+    @given(value=_SUSPICIOUS_VALUES, endpoint=st.sampled_from(_CALCULATOR_NUMERIC_FIELDS))
+    def test_no_500_for_any_suspicious_value_in_any_calculator(self, value, endpoint):
+        url, field = endpoint
+        r = Client().post(url, {field: value})
+        assert r.status_code < 500, f"{url} con {field}={value!r} devolvió {r.status_code}"
 
 
 class TestBulkAddSadPath:

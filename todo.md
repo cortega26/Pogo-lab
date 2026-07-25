@@ -66,15 +66,22 @@
 - [x] Commit de cierre de fase 3
 - [x] Revisión de sub-agente: confirmó golden vectors y mecanismo de caché; encontró 2 huecos reales (nota de migración no visible al usuario final; fix solo probado en Medicham GL) → ambos corregidos: aviso visible en `_pvp_result.html` + test, y `test_always_matches_integer_hp_formula` (hypothesis) + caso Azumarill/Ultra League; suite final 1257 passed
 
-## Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046)
+## Fase 4 — Plan 053: validar contratos de calculadoras (dep. 046) — DONE
 
-- [ ] Releer `plans/053-validate-calculator-contracts.md` completo (post-046/047/048)
-- [ ] Inventariar las 8 calculadoras y sus parámetros de entrada + share-URL
-- [ ] Diseñar contrato de validación reutilizable (`apps/calculators/`)
-- [ ] Aplicar a cada calculadora; ningún input inválido produce 500
-- [ ] Tests de contrato por calculadora (happy path + bordes)
-- [ ] Suite + ruff + mypy verdes
-- [ ] Actualizar `plans/README.md` fila 053 → DONE
+- [x] Releer `plans/053-validate-calculator-contracts.md` completo
+- [x] Inventariar las 8 calculadoras (`views.py`: cp, cost, pvp, catch, types, shiny, shadow, breakpoints)
+- [x] Reproducir con pytest (no solo leer del plan) 5 bugs reales: codec AttributeError/KeyError, cost OverflowError (500 real confirmado), shiny ZeroDivisionError (500 real confirmado), shadow IV sin validar, cross-calculator share URL
+- [x] `decode_calc_share`: límite de longitud, valida dict, valida `t`, nunca deja escapar AttributeError/KeyError
+- [x] `_get_params`: rechaza share URL de otra calculadora (cae a defaults)
+- [x] Nuevo helper `_parse_finite_float` (mismo estilo que los ya existentes); aplicado a cost/catch/shiny/shadow
+- [x] `_parse_int_in_range` reutilizado para IVs de shadow y `n` de shiny
+- [x] Tests TDD por bug (fallan primero, confirmado) + `TestGenericCalcShareCodec` (codec) + `TestCrossCalculatorShareURL`
+- [x] Fuzz test genérico con hypothesis (`TestCalculatorFuzzing`, 19 combinaciones endpoint×campo × valores sospechosos) — cierra el paso 5 del plan
+- [x] No se creó framework nuevo (helpers existentes + 1 nuevo bastaban, según pide el plan)
+- [x] `tests/test_calculator_views.py` no se creó como archivo nuevo — se extendió `tests/test_sad_paths.py` (ya cubría exactamente ese propósito)
+- [x] Suite completa 1268 passed; ruff/format/mypy(164 files)/lint-imports/makemigrations verdes
+- [x] Actualizar `plans/README.md` fila 053 → DONE
+- [x] Commit de cierre de fase 4
 
 ## Fase 5 — Plan 060: límites entre apps
 

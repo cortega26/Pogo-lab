@@ -3,6 +3,7 @@
 Obtiene el piso `f` del ruleset vigente (M2) y delega en engine/probability.
 """
 
+import binascii
 import hashlib
 import json
 from base64 import b64decode, b64encode
@@ -266,12 +267,24 @@ def encode_calc_share(calc_type: str, params: dict) -> str:
     return encoded
 
 
+MAX_SHARE_URL_LENGTH = 2048
+
+
 def decode_calc_share(encoded: str) -> tuple[str, dict]:
     """Decodifica un fragmento de URL genérico.
+
+    Plan 053: rechaza con ValueError controlado (nunca deja escapar
+    AttributeError/KeyError) los casos: payload más largo que
+    MAX_SHARE_URL_LENGTH, base64/UTF-8/JSON malformado, JSON que no sea un
+    objeto (ej. una lista), versión desconocida, o payload sin `t`
+    (tipo de calculadora).
 
     Returns:
         Tupla (calc_type, params_dict).
     """
+    if len(encoded) > MAX_SHARE_URL_LENGTH:
+        raise ValueError("URL de calculadora inválida (demasiado larga)")
+
     try:
         padded = encoded.replace("-", "+").replace("_", "/")
         pad = 4 - len(padded) % 4
@@ -279,11 +292,15 @@ def decode_calc_share(encoded: str) -> tuple[str, dict]:
             padded += "=" * pad
         raw = b64decode(padded.encode()).decode()
         payload = json.loads(raw)
-    except (json.JSONDecodeError, Exception) as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError, binascii.Error, ValueError) as exc:
         raise ValueError("URL de calculadora inválida") from exc
 
+    if not isinstance(payload, dict):
+        raise ValueError("URL de calculadora inválida")
     if payload.get("v") != GENERIC_SHARE_VERSION:
         raise ValueError("Versión de URL no soportada")
+    if "t" not in payload:
+        raise ValueError("URL de calculadora inválida (falta tipo)")
 
     calc_type = payload.pop("t")
     payload.pop("v", None)
