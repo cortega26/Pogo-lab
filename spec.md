@@ -566,6 +566,37 @@ lint-imports (3 contratos)/makemigrations limpios. Confirmado con grep
 que ningún código de producción muta/borra `AuditEvent` directamente
 (nada que romper con el nuevo bloqueo).
 
+### 8.4 Protección a nivel de base de datos — evaluada y diferida (paso 2 del plan)
+
+El plan pedía explícitamente **"evaluar"** (no implementar obligatoriamente)
+protección a nivel de DB, además del bloqueo ORM. Evaluación: un trigger/regla
+de PostgreSQL que rechace UPDATE/DELETE sobre `audit_auditevent`, o un
+`REVOKE UPDATE, DELETE` sobre el rol de la app, daría defensa en profundidad
+contra un servidor de aplicación comprometido con acceso directo a la BD, o
+una "corrección manual" vía `psql`. Se **difiere** por tres razones:
+
+1. **Costo de mantenimiento cross-DB.** El proyecto corre contra SQLite en
+   parte del desarrollo/tests y PostgreSQL en producción (plan 056); un
+   trigger de integridad tendría sintaxis distinta en cada motor, o exigiría
+   forzar Postgres también en dev — un cambio de infraestructura mayor, no
+   parte de este plan.
+2. **Es una migración de esquema, no un cambio de código de aplicación.**
+   Encaja mejor con el espíritu del STOP del propio plan 061 ("no agregar una
+   puerta trasera genérica" sin definir política primero) — invertido: no
+   agregar una restricción de infraestructura invasiva sin una decisión y
+   revisión dedicadas, aunque en este caso sea una restricción, no una puerta
+   trasera.
+3. **El control de acceso a la base de datos en producción es una
+   responsabilidad operativa** (quién tiene credenciales de DB, rotación,
+   principio de mínimo privilegio) ya cubierta por la separación de roles del
+   hosting (ver `docs/hosting-micro.md`/`oci-prod-native-deployment` en
+   memoria), no algo que este plan de código deba resolver.
+
+Si en el futuro se identifica un vector de amenaza concreto (ej. un
+incidente de acceso no autorizado a la BD), esta evaluación debe
+reabrirse con una migración dedicada — no se cierra la puerta a hacerlo,
+solo se documenta por qué no se hizo ahora.
+
 ## 9. Convenciones (de AGENTS.md, sin cambios)
 
 - Español neutral (sin voseo).
