@@ -503,14 +503,68 @@ tiene cero imports hacia otras apps, verificado con grep. ADR-0011
 actualizado para reflejarlo. Suite tras el fix: 1274 passed (sin cambio,
 confirma que estaba muerto), lint-imports 3/3 contratos verdes.
 
-## 8. Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
+## 8. Fase 6 — Plan 061: AuditEvent inmutable (dep. 060) — **DONE**
 
-Detallar al llegar: releer `plans/061-enforce-audit-event-integrity.md`.
-Ya sabido de antemano (confirmado en el propio plan): admin no es
-completamente readonly (`has_add/change/delete_permission` no están
-bloqueados), `AuditEvent.log` defaultea `correlation_id=""` y la mayoría de
-llamadas no propaga el ID real que el middleware ya coloca en
-request/thread-local.
+### 8.1 Estado real al llegar (distinto de lo que el plan original decía)
+
+El texto del plan (escrito 2026-07-21) decía que el admin no bloqueaba
+add/change/delete. **Verificado como ya FALSO al llegar a esta fase**:
+`apps/audit/admin.py` ya tenía `has_add_permission`/`has_change_permission`/
+`has_delete_permission` devolviendo `False` y los 7 campos en
+`readonly_fields` — confirmado por `tests/test_audit_immutable.py`
+(`TestAuditEventAdminReadonly`, ya existente, ya verde) y por
+`plans/README.md` (fila 061 decía "PARTIAL: admin readonly done"). El plan
+se escribió contra un commit anterior a ese trabajo parcial. Lo que
+realmente faltaba: (1) bloqueo a nivel de modelo/queryset (el admin
+readonly no impide `AuditEvent.objects.filter(...).update(...)` desde
+código, shell o un servicio nuevo); (2) propagación real de
+`correlation_id`; (3) scanner recursivo de PII.
+
+### 8.2 Fix
+
+- **Inmutabilidad a nivel de modelo** (`apps/audit/models.py`):
+  `AuditEvent.save()` lanza `ValueError` si `self.pk` ya existe (permite
+  el INSERT inicial, bloquea cualquier UPDATE); `AuditEvent.delete()`
+  siempre lanza. Un `AuditEventQuerySet`/`AuditEventManager` propios
+  bloquean también `.update()`/`.delete()` a nivel de queryset (el admin
+  readonly no cubre esta vía — alguien podría llamar
+  `AuditEvent.objects.filter(...).update(...)` directamente).
+- **`correlation_id` real, no `""` por defecto**: `AuditEvent.log()` ahora
+  hereda `apps.core.logging_filters.get_correlation_id()` (el thread-local
+  que el middleware ya poblaba) cuando no se pasa explícito; fuera de un
+  request (management commands, shell) genera un UUID propio en vez de
+  dejarlo en blanco.
+- **El middleware confiaba ciegamente en el header del cliente**
+  (`HTTP_X_CORRELATION_ID`) — hallazgo propio, no estaba en la evidencia
+  original del plan pero es exactamente lo que el plan advierte ("no
+  confiar en header arbitrario como autoridad sin normalización"): un
+  valor con saltos de línea crasheaba la respuesta con
+  `django.http.BadHeaderError` (confirmado reproduciendo el caso antes del
+  fix), y no había límite de longitud. Nuevo `sanitize_correlation_id()`
+  (`apps/core/logging_filters.py`): valida charset seguro
+  (`[A-Za-z0-9_-]+`) y longitud ≤64; si no cumple, genera un UUID nuevo en
+  vez de rechazar la request. Aplicado en el middleware y de nuevo dentro
+  de `AuditEvent.log` (defensa en profundidad).
+- **Scanner recursivo de PII** (`tests/test_audit_immutable.py`): un
+  centinela único inyectado en `user.email` y en `notes` de una
+  observación se busca recursivamente (dicts/listas anidadas) en TODOS los
+  `AuditEvent` generados por un flujo real completo (consentir, registrar
+  observación, marcar sospechosa, construir dataset, marcar dataset
+  sospechoso, revocar). Se detectó y corrigió un error propio durante la
+  escritura del test: usé el mismo string como "centinela PII" y como
+  texto de `reason=` de moderación (que SÍ se espera en metadata, es texto
+  administrativo, no PII) — el test fallaba por diseño propio, no por un
+  bug real; se separaron los dos conceptos.
+
+### 8.3 Verificación
+
+```
+uv run pytest apps/audit/tests tests/test_security.py tests/test_account.py tests/test_audit_immutable.py -q
+```
+→ 49 passed. Suite completa: 1286 passed; ruff/format/mypy(162 files)/
+lint-imports (3 contratos)/makemigrations limpios. Confirmado con grep
+que ningún código de producción muta/borra `AuditEvent` directamente
+(nada que romper con el nuevo bloqueo).
 
 ## 9. Convenciones (de AGENTS.md, sin cambios)
 
