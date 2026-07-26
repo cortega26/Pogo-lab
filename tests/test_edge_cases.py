@@ -6,6 +6,7 @@ Cada test verifica un edge case específico que podría romper en producción.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from typing import ClassVar
 
@@ -257,7 +258,7 @@ class TestPlan054EdgeCases:
         long_error = "x" * 1000
         with (
             patch.object(AnalysisResult.objects, "bulk_create", side_effect=Exception(long_error)),
-            pytest.raises(Exception, match="x{1000}"),
+            pytest.raises(Exception, match=re.escape(long_error)),
         ):
             run_personal_analysis(user.pk)
 
