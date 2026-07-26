@@ -9,7 +9,9 @@ para decidir mejor.
 
 ## Estado
 
-🟨 **MVP implementado; hardening de beta en cierre.** Falta dominio/TLS y apertura de beta cerrada. Documentación:
+🟨 **MVP implementado; hardening de beta en cierre.** Dominio y TLS ya fueron
+verificados; falta el smoke autorizado del flujo de invitación y la decisión
+operativa de apertura de beta cerrada. Documentación:
 
 - Plan maestro: [`docs/plan.md`](docs/plan.md)
 - Seguimiento por milestone: [`docs/milestones/`](docs/milestones/) (tablero en su `README.md`)

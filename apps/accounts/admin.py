@@ -79,17 +79,17 @@ class InvitationAdmin(admin.ModelAdmin):
         logger = logging.getLogger(__name__)
         sent = 0
         skipped = 0
-        errors = []
+        failed_ids = []
         for invitation in queryset:
             if not invitation.is_valid:
                 skipped += 1
                 continue
             try:
                 self._send_invitation_email(invitation)
-            except Exception as exc:
+            except Exception:
                 skipped += 1
-                errors.append(f"{invitation.email}: {exc!s}")
-                logger.exception("Error enviando invitación a %s", invitation.email)
+                failed_ids.append(invitation.pk)
+                logger.error("Error enviando invitación id=%s", invitation.pk)
                 continue
             invitation.sent_at = timezone.now()
             invitation.save(update_fields=["sent_at"])
@@ -98,16 +98,17 @@ class InvitationAdmin(admin.ModelAdmin):
                 actor=request.user,
                 target_type="Invitation",
                 target_id=invitation.pk,
-                metadata={"email": invitation.email},
+                metadata={},
             )
             sent += 1
         msg = _("{sent} invitaciones enviadas, {skipped} omitidas.").format(
             sent=sent, skipped=skipped
         )
-        if errors:
-            msg += " " + _("Errores: ") + "; ".join(errors[:5])
-            if len(errors) > 5:
-                msg += f" (+{len(errors) - 5} más)"
+        if failed_ids:
+            visible_ids = ", ".join(str(invitation_id) for invitation_id in failed_ids[:5])
+            msg += " " + _("Errores en invitaciones ID: ") + visible_ids
+            if len(failed_ids) > 5:
+                msg += f" (+{len(failed_ids) - 5} más)"
         self.message_user(
             request,
             msg,
