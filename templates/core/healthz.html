@@ -11,99 +11,71 @@
 {% endblock %}
 
 {% block content %}
-<section class="relative overflow-hidden border-2 border-slate-900 bg-slate-950 px-6 py-14 sm:px-12 sm:py-20 dark:border-slate-100">
-  <div class="pointer-events-none absolute inset-0 opacity-[0.07]"
-       style="background-image: linear-gradient(to right, #FBF8F1 1px, transparent 1px), linear-gradient(to bottom, #FBF8F1 1px, transparent 1px); background-size: 28px 28px;"></div>
-  <div class="pointer-events-none absolute -right-16 -top-16 h-72 w-72 text-slate-800 sm:h-96 sm:w-96 dark:text-slate-900" aria-hidden="true">
-    {% include "includes/_logo_icon.html" %}
-  </div>
-
-  <div class="relative z-10 grid grid-cols-1 gap-10 lg:grid-cols-[3fr_2fr] lg:items-end">
-    <div>
-      <p class="mb-4 inline-flex items-center gap-2 border border-accent-500 px-2.5 py-1 font-mono text-[11px] uppercase tracking-widest text-accent-400">
-        {% trans "Ficha 01 · Matemática verificada" %}
-      </p>
-      <h1 class="max-w-2xl text-5xl font-black uppercase leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl">
-        {% trans "Pogo-lab" %}
-      </h1>
-      <p class="mt-5 max-w-lg text-lg leading-relaxed text-slate-300">
-        {% trans "Matemática honesta para entender las mecánicas de Pokémon GO." %}
-      </p>
-      <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-        <a href="{% url 'calculator' %}" class="btn-bracket bg-accent-500 text-white hover:bg-accent-600">
-          {% trans "Calcular probabilidades" %} →
-        </a>
-        <a href="{% url 'mechanic_list' %}" class="btn-bracket border-slate-100 bg-transparent text-slate-100 hover:bg-slate-100 hover:text-slate-900">
-          {% trans "Explorar mecánicas" %}
-        </a>
-      </div>
+<section class="border-b border-slate-200 py-12 dark:border-slate-800 sm:py-16">
+  <div class="max-w-2xl">
+    <h1 class="text-5xl font-semibold leading-none text-slate-900 dark:text-slate-50 sm:text-6xl">Pogo-lab</h1>
+    <p class="mt-5 text-xl leading-relaxed text-slate-600 dark:text-slate-400">
+      {% trans "Matemática honesta para entender las mecánicas de Pokémon GO." %}
+    </p>
+    <div class="mt-7 flex flex-wrap gap-3">
+      <a href="{% url 'calculator' %}" class="btn-bracket border-brand-600 bg-brand-600 text-white hover:bg-brand-700">
+        {% trans "Calcular probabilidades" %}
+      </a>
+      <a href="{% url 'mechanic_list' %}" class="btn-bracket bg-white text-slate-800 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+        {% trans "Explorar mecánicas" %}
+      </a>
     </div>
-
-    <dl class="grid grid-cols-3 gap-px border-2 border-slate-700 bg-slate-700 text-center lg:gap-0">
-      <div class="bg-slate-950 px-2 py-5">
-        <dt class="font-mono text-[10px] uppercase tracking-wide text-slate-400">{% trans "Mecánicas" %}</dt>
-        <dd class="mt-1 font-display text-4xl font-black text-white">3</dd>
-      </div>
-      <div class="bg-slate-950 px-2 py-5">
-        <dt class="font-mono text-[10px] uppercase tracking-wide text-slate-400">{% trans "Trazable" %}</dt>
-        <dd class="mt-1 font-display text-4xl font-black text-accent-400">100%</dd>
-      </div>
-      <div class="bg-slate-950 px-2 py-5">
-        <dt class="font-mono text-[10px] uppercase tracking-wide text-slate-400">{% trans "Sesgo" %}</dt>
-        <dd class="mt-1 font-display text-4xl font-black text-hundo-500">0</dd>
-      </div>
-    </dl>
   </div>
 </section>
 
-<section class="mt-16">
+<section class="mt-12">
   <h2 class="section-title">{% trans "Ciclo del producto" %}</h2>
-  <ol class="grid grid-cols-1 gap-px border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-5 dark:border-slate-800 dark:bg-slate-800">
-    <li class="bg-white p-5 dark:bg-slate-900">
-      <span class="flex h-7 w-7 items-center justify-center border-2 border-slate-900 font-mono text-xs font-bold text-slate-900 dark:border-slate-100 dark:text-slate-100">01</span>
-      <h3 class="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{% trans "Entender" %}</h3>
-      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{% trans "Mecánicas versionadas con fuentes trazables" %}</p>
+  <ol class="grid grid-cols-1 divide-y divide-slate-200 border-y border-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-5 dark:divide-slate-800 dark:border-slate-800">
+    <li class="p-5">
+      <span class="text-sm font-medium text-slate-500 dark:text-slate-400">01</span>
+      <h3 class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Entender" %}</h3>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{% trans "Mecánicas versionadas con fuentes trazables" %}</p>
     </li>
-    <li class="bg-white p-5 dark:bg-slate-900">
-      <span class="flex h-7 w-7 items-center justify-center border-2 border-slate-900 font-mono text-xs font-bold text-slate-900 dark:border-slate-100 dark:text-slate-100">02</span>
-      <h3 class="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{% trans "Calcular" %}</h3>
-      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{% trans "Probabilidades exactas con matemática verificada" %}</p>
+    <li class="p-5">
+      <span class="text-sm font-medium text-slate-500 dark:text-slate-400">02</span>
+      <h3 class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Calcular" %}</h3>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{% trans "Probabilidades exactas con matemática verificada" %}</p>
     </li>
-    <li class="bg-white p-5 dark:bg-slate-900">
-      <span class="flex h-7 w-7 items-center justify-center border-2 border-slate-900 font-mono text-xs font-bold text-slate-900 dark:border-slate-100 dark:text-slate-100">03</span>
-      <h3 class="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{% trans "Registrar" %}</h3>
-      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{% trans "Intercambios con CSV o manualmente" %}</p>
+    <li class="p-5">
+      <span class="text-sm font-medium text-slate-500 dark:text-slate-400">03</span>
+      <h3 class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Registrar" %}</h3>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{% trans "Intercambios con CSV o manualmente" %}</p>
     </li>
-    <li class="bg-white p-5 dark:bg-slate-900">
-      <span class="flex h-7 w-7 items-center justify-center border-2 border-slate-900 font-mono text-xs font-bold text-slate-900 dark:border-slate-100 dark:text-slate-100">04</span>
-      <h3 class="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{% trans "Analizar" %}</h3>
-      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{% trans "Inferencia estadística honesta" %}</p>
+    <li class="p-5">
+      <span class="text-sm font-medium text-slate-500 dark:text-slate-400">04</span>
+      <h3 class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Analizar" %}</h3>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{% trans "Inferencia estadística honesta" %}</p>
     </li>
-    <li class="bg-accent-50 p-5 dark:bg-accent-500/10">
-      <span class="flex h-7 w-7 items-center justify-center border-2 border-accent-600 font-mono text-xs font-bold text-accent-600 dark:border-accent-400 dark:text-accent-400">05</span>
-      <h3 class="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{% trans "Decidir" %}</h3>
-      <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{% trans "Recomendaciones deterministas y trazables" %}</p>
+    <li class="p-5">
+      <span class="text-sm font-medium text-slate-500 dark:text-slate-400">05</span>
+      <h3 class="mt-2 text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Decidir" %}</h3>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{% trans "Recomendaciones deterministas y trazables" %}</p>
     </li>
   </ol>
 </section>
 
-<section class="mt-16">
+<section class="mt-12">
   <h2 class="section-title">{% trans "¿Por qué Pogo-lab?" %}</h2>
-  <div class="specimen-card grid grid-cols-1 sm:grid-cols-2">
-    <div class="border-b-2 border-slate-900 p-6 sm:border-r-2 dark:border-slate-100">
-      <h3 class="font-mono text-xs font-bold uppercase tracking-wide text-accent-600 dark:text-accent-500">{% trans "01 · Sin magia negra" %}</h3>
+  <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+    <div class="border-l-2 border-brand-500 pl-4">
+      <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Sin magia negra" %}</h3>
       <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{% trans "Cada resultado muestra su regla, versión y fuente. No confíes en nuestra palabra: verifícalo." %}</p>
     </div>
-    <div class="border-b-2 border-slate-900 p-6 dark:border-slate-100">
-      <h3 class="font-mono text-xs font-bold uppercase tracking-wide text-accent-600 dark:text-accent-500">{% trans "02 · Modelo correcto" %}</h3>
+    <div class="border-l-2 border-brand-500 pl-4">
+      <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Modelo correcto" %}</h3>
       <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{% trans "Re-roll uniforme en [f,15], no clamping. Probado con hypothesis testing y simulación." %}</p>
     </div>
-    <div class="p-6 sm:border-r-2 sm:border-slate-900 dark:sm:border-slate-100">
-      <h3 class="font-mono text-xs font-bold uppercase tracking-wide text-accent-600 dark:text-accent-500">{% trans "03 · Procedencia separada" %}</h3>
+    <div class="border-l-2 border-brand-500 pl-4">
+      <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Procedencia separada" %}</h3>
       <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{% trans "Oficial / comunidad / datamining / inferido — cada afirmación con su etiqueta de confianza." %}</p>
     </div>
-    <div class="border-t-2 border-slate-900 p-6 sm:border-t-0 dark:border-slate-100">
-      <h3 class="font-mono text-xs font-bold uppercase tracking-wide text-accent-600 dark:text-accent-500">{% trans "04 · Decisiones, no números" %}</h3>
+    <div class="border-l-2 border-brand-500 pl-4">
+      <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100">{% trans "Decisiones, no números" %}</h3>
       <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{% trans "Convertimos probabilidades en acciones: ¿cuántos intercambios necesitas para estar 95% seguro?" %}</p>
     </div>
   </div>

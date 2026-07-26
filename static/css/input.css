@@ -97,24 +97,23 @@
   --color-danger-600: #9C4517;
   --color-danger-700: #7A3711;
 
-  --font-sans: 'Newsreader', ui-serif, Georgia, serif;
-  --font-display: 'Big Shoulders', ui-sans-serif, system-ui, sans-serif;
+  /* Una sola voz tipográfica para la interfaz: clara y compacta, sin el
+     contraste decorativo serif/sans que hacía que cada vista pareciera una
+     pieza editorial distinta. */
+  --font-sans: 'Big Shoulders', ui-sans-serif, sans-serif;
+  --font-display: 'Big Shoulders', ui-sans-serif, sans-serif;
   --font-mono: 'Fira Code', ui-monospace, monospace;
 
-  /* Radios casi cuadrados: una sola forma redonda (rounded-full, sin token)
-     queda reservada al motivo circular de la marca; el resto del sistema es
-     anguloso a propósito. */
-  --radius-md: 0.0625rem;
-  --radius-lg: 0.125rem;
-  --radius-xl: 0.1875rem;
-  --radius-2xl: 0.25rem;
-  --radius-3xl: 0.375rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+  --radius-3xl: 0.625rem;
 
-  /* Sombras duras "de ficha estampada": desplazamiento sólido, sin difuminado. */
-  --shadow-card: 2px 2px 0 0 var(--color-slate-900);
-  --shadow-glass: 2px 2px 0 0 var(--color-slate-300);
-  --shadow-glow: 3px 3px 0 0 var(--color-accent-600);
-  --shadow-glow-accent: 3px 3px 0 0 var(--color-accent-800, #6f2417);
+  --shadow-card: 0 1px 2px rgb(32 26 21 / 0.06);
+  --shadow-glass: 0 1px 2px rgb(32 26 21 / 0.06);
+  --shadow-glow: 0 1px 2px rgb(32 26 21 / 0.06);
+  --shadow-glow-accent: 0 1px 2px rgb(32 26 21 / 0.06);
 }
 
 @layer base {
@@ -128,7 +127,7 @@
 
   h1, h2, h3, .section-title, .display {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
   }
 
   ::selection {
@@ -137,12 +136,7 @@
 }
 
 .section-title {
-  @apply mb-4 flex items-baseline gap-3 text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50;
-}
-
-.section-title::before {
-  content: "";
-  @apply h-0.75 w-8 bg-accent-500;
+  @apply mb-5 text-3xl font-semibold leading-none text-slate-900 dark:text-slate-50;
 }
 
 /* Ficha de espécimen: la unidad de tarjeta base del sistema. Borde firme +
@@ -151,55 +145,45 @@
    estáticas (resultados, formularios, tarjetas de stat) no imitan una
    affordance de clic que no tienen. */
 .specimen-card {
-  @apply relative border-2 border-slate-900 bg-white shadow-card transition-colors duration-150 dark:border-slate-100 dark:bg-slate-900;
+  @apply relative rounded-lg border border-slate-200 bg-white shadow-card transition-colors duration-150 dark:border-slate-800 dark:bg-slate-900;
 }
 
 a.specimen-card:hover {
-  @apply border-accent-500 dark:border-accent-400;
+  @apply border-slate-300 dark:border-slate-700;
 }
 
 /* Botón "de corchete": sin scale, sin blur, sin desplazamiento — la
    respuesta al cursor es de color; al presionar, la sombra se hunde. */
 .btn-bracket {
-  @apply inline-flex items-center justify-center gap-2 border-2 border-slate-900 px-5 py-2.5 font-mono text-sm font-semibold uppercase tracking-wide shadow-card transition-[box-shadow,background-color,color] duration-100 dark:border-slate-100;
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-slate-900 px-4 py-2 font-sans text-base font-semibold tracking-normal shadow-none transition-colors duration-150 dark:border-slate-100;
 }
 
 .btn-bracket:active {
-  @apply translate-x-0 translate-y-0 shadow-none;
+  @apply shadow-none;
 }
 
 /* Enlace de navegación: subrayado que se despliega desde la izquierda,
    sin fondo tipo píldora. */
 .nav-link {
-  @apply relative inline-flex items-center justify-center gap-2 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-slate-600 transition-colors duration-150 dark:text-slate-400;
-}
-
-.nav-link::after {
-  content: "";
-  @apply absolute inset-x-3 bottom-1 h-0.5 origin-left scale-x-0 bg-accent-500 transition-transform duration-200;
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 font-sans text-base font-medium tracking-normal text-slate-600 transition-colors duration-150 dark:text-slate-400;
 }
 
 .nav-link:hover {
   @apply text-slate-900 dark:text-slate-100;
 }
 
-.nav-link:hover::after,
-.nav-link--active::after {
-  @apply scale-x-100;
-}
-
 .nav-link--active {
-  @apply text-accent-600 dark:text-accent-500;
+  @apply bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100;
 }
 
 /* Campo de formulario "de ficha": borde firme, foco por color sólido en vez
    de anillo difuminado. */
 .input-field {
-  @apply block w-full border-2 border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors duration-150 focus:border-accent-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-accent-400;
+  @apply block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 placeholder-slate-400 transition-colors duration-150 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-brand-400;
 }
 
 .field-label {
-  @apply mb-1.5 block font-mono text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400;
+  @apply mb-1.5 block font-sans text-base font-medium normal-case tracking-normal text-slate-700 dark:text-slate-300;
 }
 
 /* Prosa larga (legal, guías): espaciado + viñetas cuadradas en vez de las
@@ -229,41 +213,9 @@ a.specimen-card:hover {
   @apply text-accent-600 underline decoration-2 underline-offset-2 hover:text-accent-500 dark:text-accent-400;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
 .htmx-request .skeleton,
 .skeleton.htmx-request {
-  position: relative;
-  overflow: hidden;
-}
-
-.htmx-request .skeleton::after,
-.skeleton.htmx-request::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(255 255 255 / 0.4) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.2s ease-in-out infinite;
-}
-
-.dark .htmx-request .skeleton::after,
-.dark .skeleton.htmx-request::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(255 255 255 / 0.08) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
+  @apply opacity-60;
 }
 
 .htmx-request .skeleton-block {
