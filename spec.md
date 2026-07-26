@@ -52,7 +52,7 @@ tentación de citar "la mecánica conocida de Pokémon" es alta. **Prohibido**:
 
 ## 2. Inventario verificado (commit base `f12a9dc`, 2026-07-24)
 
-```
+```text
 uv run pytest -q            → 883 passed, 0 skipped
 uv run ruff check .         → All checks passed
 uv run ruff format --check . → 190 files already formatted
@@ -106,7 +106,7 @@ Script comparativo real (no memoria): construye las 324 celdas de
 `engine.dps_data.TYPE_EFFECTIVENESS` (con default 1.0 para pares ausentes) y
 las compara con tolerancia `1e-9`. Resultado exacto:
 
-```
+```text
 Total diffs: 11
 ('dragon', 'fairy'):   types.py=0.390625  dps_data=0.39
 ('electric', 'ground'):types.py=0.390625  dps_data=0.39
@@ -294,7 +294,7 @@ pasaba). Ahora `hp` es un campo real poblado en `rank_for_league`, y
 **Evidencia concreta del cambio visible (antes/después), Medicham Great
 League (121/152/155, max_cp=1500, level_cap=50):**
 
-```
+```text
 ANTES (bug)  #1: IVs 5/15/15, nivel 50.0, CP 1499, stat_product 2122457
 DESPUÉS (fix) #1: empate IVs 5/15/14 (CP 1494) y 5/15/15 (CP 1499),
                ambos stat_product 2109813 (gana 5/15/14 por orden de
@@ -558,9 +558,10 @@ código, shell o un servicio nuevo); (2) propagación real de
 
 ### 8.3 Verificación
 
-```
+```text
 uv run pytest apps/audit/tests tests/test_security.py tests/test_account.py tests/test_audit_immutable.py -q
 ```
+
 → 49 passed. Suite completa: 1286 passed; ruff/format/mypy(162 files)/
 lint-imports (3 contratos)/makemigrations limpios. Confirmado con grep
 que ningún código de producción muta/borra `AuditEvent` directamente
