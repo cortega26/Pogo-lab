@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Estado** | 🟨 Gate 0 iniciado — 5 deudas verificadas; Ola A pendiente de definición de fixtures en engine/ |
+| **Estado** | 🟨 Gate 0 iniciado — contrato de snapshots documentado; fuente/licencia bloqueadas |
 | **Tipo** | Epic (se descompone en milestones M8+) |
 | **Depende de** | M7 mergeado · PR-21 (legal/hosting) resuelto |
 | **Entrada (no confiable)** | [../research/](../research/) — mapa de investigación **sin verificar** |
@@ -65,6 +65,11 @@ Simulador PvE por ticks (CALC008) · Simulador de turnos PvP (CALC010) · Team b
 
 Toda fuente nueva pasa por el checklist §6 de [../research/data_policy.md](../research/data_policy.md). Procedencia versionada (`SourceClaim`); nada comunitario presentado como oficial.
 
+El contrato propuesto de snapshots vive en [ADR-0012](../adr/0012-snapshots-datos-referencia.md).
+El registro de candidatos sigue [bloqueado](../research/reference-data-source-register.md): no hay
+autorización para adquirir, almacenar o redistribuir datos de referencia, por lo que ningún ingestor
+ni consumidor nuevo puede implementarse todavía.
+
 ## Modelo de datos
 
 Entidades nuevas propuestas (`Species`, `Move`, `MoveStat` inmutable, `RaidBoss` — ver `research_report.md` §9) **a validar en diseño**, no a adoptar tal cual.
@@ -101,3 +106,4 @@ Regla fija para la Ola A y siguientes: **poseer la data de referencia en local**
 | Fecha | Estado | Nota |
 |---|---|---|
 | 2026-07-19 | 🟨 | Verificación de las 5 deudas conocidas completada. Valores corregidos en tabla. Precondición legal de M7 (bloqueantes B1-B3) resuelta. Gate 0 checklist creado. Ola A y M8 pendientes de planificación. |
+| 2026-07-26 | 🟨 | ADR-0012 y registro de fuentes creados. El contrato exige snapshots locales e inmutables; la fuente/licencia y aprobación del owner siguen BLOCKED, sin cambios de runtime. |

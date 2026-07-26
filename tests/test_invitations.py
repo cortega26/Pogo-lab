@@ -216,7 +216,9 @@ def test_admin_send_invitations_creates_audit_event(admin_client, invitation, ad
     event = AuditEvent.objects.filter(verb="invitation_sent").first()
     assert event is not None
     assert event.actor_id == admin_user.pk
-    assert event.metadata["email"] == invitation.email
+    assert event.target_type == "Invitation"
+    assert event.target_id == invitation.pk
+    assert event.metadata == {}
 
 
 @pytest.mark.django_db
