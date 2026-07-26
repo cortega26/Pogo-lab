@@ -11,6 +11,7 @@ env:
   DJANGO_SETTINGS_MODULE: config.settings.test
   SECRET_KEY: ci-test-key-not-for-production
   DATABASE_URL: sqlite:///db.sqlite3
+  EMAIL_URL: smtp://test:test@localhost:25
 
 jobs:
   test:
