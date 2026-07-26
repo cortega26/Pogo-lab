@@ -36,7 +36,7 @@ dig +short www.pogo-lab.tooltician.com    # igual
 ```
 
 > Con proxy naranja, el registro resuelve a IPs de Cloudflare, **no** a `146.181.47.12`.
-# Es esperado y deseado: la IP del origin queda oculta.
+> Es esperado y deseado: la IP del origin queda oculta.
 
 ---
 
@@ -67,8 +67,8 @@ Cloudflare → **SSL/TLS → Origin Server → Create Certificate**.
 Guarda los dos bloques PEM y súbelos a la VM (ver §3).
 
 > Alternativa: `certbot --nginx` con challenge HTTP-01. **No recomendado** en modo
-# proxied naranja: Let's Encrypt no siempre puede alcanzar el origin por HTTP-01 con el
-# proxy de por medio, y los origin certs de CF no caducan cada 90 días.
+> proxied naranja: Let's Encrypt no siempre puede alcanzar el origin por HTTP-01 con el
+> proxy de por medio, y los origin certs de CF no caducan cada 90 días.
 
 ---
 
@@ -132,6 +132,7 @@ curl -sSI https://pogo-lab.tooltician.com/ | grep -iE "strict-transport|x-conten
 ```
 
 **Resultado esperado:**
+
 - `dig` devuelve IPs `104.x` o `172.x` (Cloudflare).
 - `curl https` devuelve `302` (redirect de Django a login/locale) o `200`.
 - `curl http` devuelve `301` a `https://`.
@@ -149,10 +150,10 @@ resultado en el registro de avance de `docs/milestones/M7-hardening-beta.md`.
 - [ ] `https://pogo-lab.tooltician.com/healthz.json` responde `{"status": "ok"}`.
 - [ ] `/accounts/login/` renderiza el formulario (sin errores 500).
 - [ ] Un POST de login inválido devuelve 200 con error de formulario (no 403 CSRF).
-- [ ] `/privacy/` y `/tos/` cargan con el correo `carlos@tooltician.com`.
+- [ ] `/privacy/` y `/tos/` cargan con el correo <carlos@tooltician.com>.
 - [ ] Cabeceras: HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy`.
 - [ ] CSP en la respuesta (sin violaciones en la consola del navegador).
-- [ ] TLS: nota A+ en https://www.ssllabs.com/ssltest/ (opcional pero recomendado).
+- [ ] TLS: nota A+ en <https://www.ssllabs.com/ssltest/> (opcional pero recomendado).
 - [ ] Backup automático ejecutado al menos una vez tras el despliegue (ver
       `bin/backup-oci.sh`).
 
@@ -185,7 +186,7 @@ completar M7".
    `.env-oci` (`EMAIL_URL=smtp+tls://b31878001%40smtp-brevo.com:...@smtp-relay.brevo.com:587`,
    `DEFAULT_FROM_EMAIL=noreply@tooltician.com`). Plan 050 fail-closed validation
    re-activado en `prod.py`. Test de envío real pasado (correo entregado a
-   carlos@tooltician.com). Pendiente humano: agregar IP del host OCI al allowlist
+   <carlos@tooltician.com>). Pendiente humano: agregar IP del host OCI al allowlist
    de Brevo (Settings → SMTP & API) y verificar `noreply@tooltician.com` como
    sender o dominio verificado en Brevo.
 
