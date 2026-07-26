@@ -58,7 +58,7 @@ jobs:
       # de abajo sí lo hace y corre esos tests por separado.
       - name: Tests + coverage
         run: |
-          uv run coverage run -m pytest --no-header -q --tb=short --ignore=tests/test_e2e.py
+          uv run coverage run -m pytest --no-header -q --tb=short --ignore=tests/test_e2e.py -m "not postgres"
           uv run coverage report
 
       - name: Security audit
