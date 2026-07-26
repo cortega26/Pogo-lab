@@ -104,17 +104,20 @@
 - [x] Commit de cierre de fase 5
 - [x] Revisión de sub-agente: confirmó producción (AuditEvent vía vista real) y doble-revoke correctos; encontró 1 hallazgo real (`apps/core/metrics.py` código muerto rompía la invariante "core sin imports hacia arriba" que afirma la ADR) → eliminado (sin consumidores en todo el repo); ADR-0011 actualizado; suite sin cambio (1274 passed)
 
-## Fase 6 — Plan 061: AuditEvent inmutable (dep. 060)
+## Fase 6 — Plan 061: AuditEvent inmutable (dep. 060) — DONE
 
-- [ ] Releer `plans/061-enforce-audit-event-integrity.md` completo
-- [ ] Admin de `AuditEvent` completamente readonly (bloquear add/change/delete)
-- [ ] Bloquear `save()`/`delete()` de instancias ya persistidas a nivel de modelo
-- [ ] Propagar `correlation_id` real (middleware → thread-local → todos los `AuditEvent.log`)
-- [ ] Test: admin POST/delete bloqueados
-- [ ] Test: `.save()` de instancia existente bloqueado
-- [ ] Test: centinela de PII ausente en metadata
-- [ ] Suite + ruff + mypy verdes
-- [ ] Actualizar `plans/README.md` fila 061 → DONE
+- [x] Releer `plans/061-enforce-audit-event-integrity.md` completo
+- [x] Admin de `AuditEvent` completamente readonly — **ya estaba hecho** (verificado, no era cierto lo que decía el texto del plan original de 2026-07-21; `plans/README.md` ya lo marcaba PARTIAL con esto hecho)
+- [x] Bloquear `save()`/`delete()` de instancias ya persistidas a nivel de modelo (`AuditEvent.save()`/`.delete()`) + `AuditEventQuerySet`/`Manager` propios bloqueando `.update()`/`.delete()` en bloque (el admin readonly no cubre esta vía)
+- [x] Propagar `correlation_id` real: `AuditEvent.log()` hereda `get_correlation_id()` del thread-local cuando no se pasa explícito; fuera de request genera un UUID propio (nunca en blanco)
+- [x] Hallazgo propio no listado en el plan original: el middleware confiaba ciegamente en el header `HTTP_X_CORRELATION_ID` del cliente — un valor con `\r\n` crasheaba con `BadHeaderError` (reproducido antes del fix). Nuevo `sanitize_correlation_id()` (charset seguro + longitud ≤64, si no cumple genera UUID nuevo), aplicado en middleware y en `AuditEvent.log` (defensa en profundidad)
+- [x] Test: admin POST/delete bloqueados (ya existían, verdes)
+- [x] Test: `.save()`/`.delete()` de instancia existente bloqueado + `.update()`/`.delete()` de queryset bloqueado (4 tests nuevos)
+- [x] Test: propagación real de correlation_id (thread-local, fuera de request, HTTP end-to-end, header malicioso sanitizado, header válido preservado — 6 tests nuevos)
+- [x] Test: scanner recursivo de centinela PII sobre un flujo completo (consentir → registrar → moderar → build dataset → moderar dataset → revocar); se detectó y corrigió un error propio en el diseño del test (centinela mezclado con texto de `reason` administrativo)
+- [x] Suite completa 1286 passed; ruff/format/mypy(162 files)/lint-imports(3 contratos)/makemigrations verdes; confirmado por grep que ningún código de producción muta/borra AuditEvent directamente
+- [x] Actualizar `plans/README.md` fila 061 → DONE
+- [x] Commit de cierre de fase 6
 
 ## Revisiones periódicas (sub-agente fresco)
 
