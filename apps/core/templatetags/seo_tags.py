@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 
 from django import template
 from django.urls import translate_url
+from django.utils.safestring import mark_safe
 
 from engine.dps_data import TYPE_COLORS, PokemonType
 
@@ -161,7 +162,7 @@ def safe_html(html_content: str) -> str:
     """Sanitiza HTML permitiendo solo etiquetas y atributos seguros."""
     parser = _Sanitizer()
     parser.feed(html_content)
-    return parser.get_safe_html()
+    return mark_safe(parser.get_safe_html())
 
 
 @register.simple_tag(takes_context=True)

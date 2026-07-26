@@ -112,7 +112,6 @@
 
   /* Sombras duras "de ficha estampada": desplazamiento sólido, sin difuminado. */
   --shadow-card: 2px 2px 0 0 var(--color-slate-900);
-  --shadow-card-hover: 4px 4px 0 0 var(--color-slate-900);
   --shadow-glass: 2px 2px 0 0 var(--color-slate-300);
   --shadow-glow: 3px 3px 0 0 var(--color-accent-600);
   --shadow-glow-accent: 3px 3px 0 0 var(--color-accent-800, #6f2417);
@@ -147,22 +146,22 @@
 }
 
 /* Ficha de espécimen: la unidad de tarjeta base del sistema. Borde firme +
-   sombra dura desplazada en vez de blur/soft-shadow. */
+   sombra dura desplazada en vez de blur/soft-shadow. El realce de color al
+   pasar el cursor solo aplica cuando la ficha es un enlace (<a>): las fichas
+   estáticas (resultados, formularios, tarjetas de stat) no imitan una
+   affordance de clic que no tienen. */
 .specimen-card {
-  @apply relative border-2 border-slate-900 bg-white shadow-card transition-[box-shadow,transform] duration-150 dark:border-slate-100 dark:bg-slate-900;
+  @apply relative border-2 border-slate-900 bg-white shadow-card transition-colors duration-150 dark:border-slate-100 dark:bg-slate-900;
 }
 
-.specimen-card:hover {
-  @apply shadow-card-hover -translate-x-0.5 -translate-y-0.5;
+a.specimen-card:hover {
+  @apply border-accent-500 dark:border-accent-400;
 }
 
-/* Botón "de corchete": sin scale, sin blur — se hunde al presionar. */
+/* Botón "de corchete": sin scale, sin blur, sin desplazamiento — la
+   respuesta al cursor es de color; al presionar, la sombra se hunde. */
 .btn-bracket {
-  @apply inline-flex items-center justify-center gap-2 border-2 border-slate-900 px-5 py-2.5 font-mono text-sm font-semibold uppercase tracking-wide shadow-card transition-[box-shadow,transform] duration-100 dark:border-slate-100;
-}
-
-.btn-bracket:hover {
-  @apply shadow-card-hover -translate-x-0.5 -translate-y-0.5;
+  @apply inline-flex items-center justify-center gap-2 border-2 border-slate-900 px-5 py-2.5 font-mono text-sm font-semibold uppercase tracking-wide shadow-card transition-[box-shadow,background-color,color] duration-100 dark:border-slate-100;
 }
 
 .btn-bracket:active {
