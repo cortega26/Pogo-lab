@@ -118,6 +118,8 @@
 - [x] Suite completa 1286 passed; ruff/format/mypy(162 files)/lint-imports(3 contratos)/makemigrations verdes; confirmado por grep que ningún código de producción muta/borra AuditEvent directamente
 - [x] Actualizar `plans/README.md` fila 061 → DONE
 - [x] Commit de cierre de fase 6
+- [x] Revisión final de sub-agente: confirmó las 4 formas de inmutabilidad en shell propio, el `BadHeaderError` real (reproducido independientemente antes del fix), que ningún código de producción se rompe, y el sanity-check del conjunto (1286 passed, 3/3 contratos, sin residuos). 1 gap documental (no de código): el plan pedía "evaluar" protección a nivel DB, no quedó registrado por qué se difirió → agregado en spec.md §8.4
+- [x] **BACKLOG COMPLETO: 6/6 fases cerradas (046, 047, 048, 053, 060, 061), cada una con su propia revisión independiente y correcciones aplicadas. Rama lista para que el usuario decida push/merge a main.**
 
 ## Revisiones periódicas (sub-agente fresco)
 
