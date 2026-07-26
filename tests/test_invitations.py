@@ -442,9 +442,11 @@ def test_admin_send_invitations_logs_error_on_failure(admin_client, invitation, 
 def test_admin_build_signup_url_fails_in_prod_when_no_base_url(invitation):
     """En producción (DEBUG=False), falta INVITATION_BASE_URL lanza RuntimeError."""
 
+    from django.contrib import admin as django_admin
+
     from apps.accounts.admin import InvitationAdmin
 
-    admin_instance = InvitationAdmin(Invitation, None)
+    admin_instance = InvitationAdmin(Invitation, django_admin.site)
     with pytest.raises(RuntimeError, match="INVITATION_BASE_URL"):
         admin_instance._build_signup_url(invitation)
 
@@ -453,9 +455,11 @@ def test_admin_build_signup_url_fails_in_prod_when_no_base_url(invitation):
 @override_settings(INVITATION_BASE_URL="https://example.com")
 def test_admin_build_signup_url_with_base_url(invitation):
     """Con INVITATION_BASE_URL configurado, el enlace es absoluto y válido."""
+    from django.contrib import admin as django_admin
+
     from apps.accounts.admin import InvitationAdmin
 
-    admin_instance = InvitationAdmin(Invitation, None)
+    admin_instance = InvitationAdmin(Invitation, django_admin.site)
     url = admin_instance._build_signup_url(invitation)
     assert url.startswith("https://example.com/")
     assert f"invite={invitation.token}" in url
