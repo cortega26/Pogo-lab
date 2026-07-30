@@ -1,13 +1,71 @@
-# Hosting — plan A1 (ideal) y fallback en micro (1 GB)
+# Hosting OCI — A1 en producción y micro de rollback
 
 Complementa **[ADR-0009](adr/0009-hosting-oracle-cloud.md)**. La asignación Always Free vigente para
 **Ampere A1 Flex** es **2 OCPU / 12 GB RAM**; una configuración de **4 OCPU / 24 GB** requiere PAYG
-y puede generar cargos. Este documento cubre (A) cómo conseguir capacidad A1 pese al
-*"Out of host capacity"* y (B) cómo dejar la beta viva **hoy** en la micro diminuta mientras tanto.
+y puede generar cargos.
+
+## Estado actual
+
+Desde el **2026-07-30**, producción corre en una A1 ARM64 de **2 OCPU / 12 GB RAM** con
+un boot volume de 100 GB en `sa-santiago-1`. La topología activa es un monolito simple:
+
+| Componente | Implementación actual |
+|---|---|
+| Aplicación | Django/Gunicorn como servicio systemd |
+| Base de datos | PostgreSQL 14 local |
+| Edge del host | nginx con certificado Cloudflare Origin CA |
+| DNS/TLS público | Cloudflare proxied; ver [deploy-tooltician.md](deploy-tooltician.md) |
+| Backups | `pogo-lab-backup.timer` diario, retención local de 14 días |
+| Despliegue | GitHub Actions por SSH al host A1 |
+| Rollback | micro OCI de 1 GB detenida, conservada temporalmente |
+
+Docker Compose sigue disponible como artefacto portable, pero **no es el orquestador del entorno
+productivo activo**. Esta precisión evita operar con una topología distinta de la real.
+
+## Qué habilita la A1
+
+El salto principal es de memoria: **1 GB → 12 GB**. La CPU solo aumenta de 1 a 2 OCPU, por lo que
+la mejora es capacidad operativa y estabilidad bajo concurrencia, no cómputo ilimitado.
+
+- Ejecutar Django, PostgreSQL y nginx juntos sin depender continuamente de swap.
+- Construir dependencias, aplicar migraciones y recolectar estáticos en el host con menor riesgo de OOM.
+- Ejecutar análisis estadísticos, agregaciones comunitarias e importaciones CSV sin asfixiar al proceso web.
+- Hacer backups, restores de verificación y mantenimiento mientras el servicio conserva margen de memoria.
+- Mantener temporalmente una base restaurada o un entorno de smoke aislado durante una operación.
+- Aumentar trabajadores de Gunicorn después de medir latencia, memoria y saturación de CPU.
+- Dar a PostgreSQL más caché y memoria de mantenimiento después de obtener una línea base.
+- Incorporar monitoreo local liviano sin añadir Redis, colas ni microservicios.
+
+Estas capacidades son **margen disponible**, no garantías de tráfico. Cualquier cambio de concurrencia o
+memoria se valida con métricas y carga representativa antes de aplicarlo en producción.
+
+## Mejoras priorizadas
+
+| Prioridad | Mejora | Criterio |
+|---|---|---|
+| P0 · aplicada | Backup diario local + restore probado | Mantener timer activo y revisar fallos |
+| P0 · aplicada | Health, TLS, firewall y servicios systemd | Verificar después de cada despliegue |
+| P0 · siguiente | Copia de backups fuera de la VM | Evita que una pérdida de disco destruya original y backup |
+| P1 · siguiente | Alertas de salud, disco, memoria y unidades systemd | Alertar antes de saturación o falta de espacio |
+| P1 · medir | Gunicorn: evaluar 3 trabajadores | Comparar latencia y CPU con los 2 actuales; revertir si empeora |
+| P1 · medir | Afinar PostgreSQL para 12 GB | Basarse en métricas; no copiar valores genéricos a ciegas |
+| P2 · opcional | Restore aislado programado | Probar que el backup no solo existe, sino que restaura |
+| P2 · opcional | Staging efímero | Solo durante verificación; sin secretos ni datos personales de producción |
+
+## Límites que permanecen
+
+- Es un **único host**: no hay alta disponibilidad ni failover automático.
+- Dos OCPU pueden saturarse con simulaciones o análisis sostenidos; los trabajos pesados deben acotarse.
+- No hay GPU.
+- El boot volume sigue siendo finito; logs, media y backups necesitan límites y monitoreo.
+- Un backup en el mismo disco no protege frente a pérdida total de la VM.
+- Más RAM no justifica introducir Redis, colas, microservicios u otros componentes sin necesidad demostrada.
 
 ---
 
-## A · Conseguir la A1 en OCI (lo ideal)
+## Histórico y recuperación de capacidad
+
+## A · Conseguir o recrear una A1 en OCI
 
 ### A.0 — Corrige el destino de región (bug en setup-oci.sh)
 
@@ -72,7 +130,7 @@ aceptar PAYG. Verificado con un simulacro del launch bajo `set -euo pipefail`:
   quedar en bucle.
 
 Como `OCI_REGION` y `OCI_HOME_REGION` ya valen `sa-santiago-1`, todas las llamadas de creación
-(VCN, subnet, launch) usan la misma región. Uso, cuando PAYG apruebe:
+(VCN, subnet, launch) usan la misma región. Uso si hay que recrear la A1:
 
 ```bash
 ./bin/setup-oci.sh                 # reintenta cada 60 s hasta conseguir la A1
@@ -84,10 +142,11 @@ tuviera varios, habría que iterar `AD` en cada intento (no implementado; no nec
 
 ---
 
-## B · Fallback: micro de 1 GB usable hoy
+## B · Fallback y rollback: micro de 1 GB
 
-Independiente de la A1. Sirve una beta cerrada sin problemas si sacas Postgres de la caja y añades
-swap. Ficheros ya provistos: `compose.micro.yaml` + `bin/setup-swap.sh`.
+La micro anterior permanece detenida como rollback temporal. Si hay que reconstruir un fallback de 1 GB,
+conviene sacar Postgres de la caja y añadir swap. Ficheros provistos:
+`compose.micro.yaml` + `bin/setup-swap.sh`.
 
 ### B.1 — Postgres gestionado gratuito (Neon o Supabase)
 
@@ -126,7 +185,8 @@ construir la imagen fuera (GitHub Actions → registro) y hacer `pull` en la VM.
 
 ## C · Escape a otro proveedor gratuito
 
-El stack es portable (Docker + `DATABASE_URL`), migrar cuesta minutos:
+El stack es portable (Docker + `DATABASE_URL`). Las opciones siguientes son referencias históricas;
+antes de usarlas hay que verificar disponibilidad, límites y precios vigentes:
 
 - **Google Cloud "Always Free" e2-micro** (`us-west1`/`us-central1`/`us-east1`): 1 GB RAM
   compartida pero **disponible de forma fiable** (sin lotería de capacidad) + 30 GB de disco.
@@ -140,8 +200,10 @@ El stack es portable (Docker + `DATABASE_URL`), migrar cuesta minutos:
 
 ## Resumen de decisión
 
-1. **Always Free** — usa 2 OCPU / 12 GB para coste de cómputo cero; alerta a 0,01 USD como red de
-   seguridad. PAYG permite configurar más recursos, pero 4/24 puede facturarse.
-2. **En paralelo**, deja la beta viva con la micro afinada (§B): Neon + swap + `compose.micro.yaml`.
-3. Verifica A1 en Santiago (§A.2); si existe, aplica el patch de reintento (§A.3).
-4. Si Santiago nunca da A1: cuenta nueva con otra home region, o GCP e2-micro (§C).
+1. **Producción:** A1 de 2 OCPU / 12 GB dentro de la asignación prevista; no ampliar a 4/24 sin
+   aceptación explícita de PAYG.
+2. **Operación:** mantener el monolito systemd simple y medir antes de aumentar workers o memoria de PostgreSQL.
+3. **Durabilidad:** priorizar backup fuera de la VM y alertas antes de añadir nuevas piezas de infraestructura.
+4. **Rollback:** conservar la micro detenida durante la ventana operativa acordada; después, retirarla
+   explícitamente para evitar drift y superficie de mantenimiento.
+5. **Escape:** si OCI deja de ser adecuado, usar la portabilidad de `Dockerfile`/`DATABASE_URL` (§C).

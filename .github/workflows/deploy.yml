@@ -29,7 +29,9 @@ jobs:
             uv run python manage.py collectstatic --noinput
             sudo systemctl restart pogo-lab.service
             curl --fail --silent --show-error --retry 5 \
-              --retry-connrefused --header "Host: ${{ secrets.OCI_HOST }}" \
+              --retry-connrefused \
+              --header "Host: pogo-lab.tooltician.com" \
+              --header "X-Forwarded-Proto: https" \
               http://127.0.0.1:8000/healthcheck.json
             echo "Despliegue completado en $(date -Iseconds)"
 

@@ -6,7 +6,7 @@
 | **Tamaño** | M |
 | **Depende de** | M1 … M6 |
 | **PRs** | PR-20, PR-21 |
-| **Actualizado** | 2026-07-24 |
+| **Actualizado** | 2026-07-30 |
 
 ## Objetivo
 
@@ -60,12 +60,16 @@ de producto y revisión legal.
 **Entorno desplegado con dominio y TLS verificados. PENDIENTE-HUMANO: smoke
 autorizado del flujo de invitación y decisión operativa de apertura.**
 
-**ENTORNO DESPLEGADO Y VERIFICADO (2026-07-23): <https://pogo-lab.tooltician.com>** — DNS Cloudflare proxied (registro A → 146.181.47.12), TLS vía cert wildcard `*.tooltician.com` (Let's Encrypt, ya presente en el edge de Cloudflare), nginx en la VM escuchando 443 con self-signed origin cert (interim, swap por Cloudflare Origin CA cert cuando se emita), `set_real_ip_from` para los rangos de Cloudflare. Smoke completo verde: `/healthz.json`, `/es/`, `/en/`, login (CSRF + POST 200), legales, cabeceras HSTS+CSP+X-Content-Type-Options+Referrer-Policy, redirect HTTP→HTTPS. `cache_ratelimit` table creada en prod (faltaba). Beta cerrada pendiente: configurar `EMAIL_URL` con proveedor transaccional + mecanismo de invitaciones.
+**ENTORNO DESPLEGADO Y VERIFICADO: <https://pogo-lab.tooltician.com>** — DNS Cloudflare proxied
+(registro A → A1 `159.112.147.154` desde 2026-07-30), certificado Cloudflare Origin CA,
+nginx y Django/Gunicorn sobre OCI A1 ARM64 (2 OCPU / 12 GB). Smoke completo verde:
+`/healthz.json`, `/es/`, `/en/`, login (CSRF + POST 200), legales, calculadora, cabeceras
+HSTS+CSP+X-Content-Type-Options+Referrer-Policy y redirect HTTP→HTTPS.
 
 ## Pendiente humano — pasos para completar M7
 
 1. **Dominio y TLS:** ✅ **HECHO (2026-07-23).**
-   - Registro A `pogo-lab.tooltician.com` → `146.181.47.12` creado en Cloudflare (proxied/naranja).
+   - Registro A `pogo-lab.tooltician.com` → `159.112.147.154` en Cloudflare (proxied/naranja).
    - nginx reconfigurado en la VM: `listen 443 ssl`, `server_name pogo-lab.tooltician.com`, `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP`.
    - **Cloudflare Origin CA cert** (15 años, válido hasta 2041) instalado en `/etc/nginx/certs/{fullchain,privkey}.pem`.
    - **SSL mode = Full** (no strict). El modo Full (strict) no es usable a nivel de zona porque `tooltician.com` sirve también a GitHub Pages (sin cert SSL válido en el origin), y el SSL mode es una configuración por-zona, no por-hostname. Con el cert origin CA válido, Full ofrece cifrado end-to-end; la única diferencia con strict es que Cloudflare no valida el cert del origin (en la práctica no hay riesgo: controlamos el origin y el cert).
@@ -92,9 +96,11 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 ## Registro de avance
 
 | Fecha | Estado | Nota |
+|---|---|---|
+| 2026-07-30 | ✅ | Documentación operativa post-migración consolidada: `hosting-oci.md` pasa a ser SSOT de la topología A1 real, capacidades habilitadas, límites, mejoras priorizadas y rollback micro. ADR-0009 recibe una enmienda que registra systemd como orquestación productiva activa y mantiene Docker Compose como artefacto de portabilidad. |
+| 2026-07-30 | ✅ | **Migración blue-green de OCI micro a Ampere A1 completada.** A1 `VM.Standard.A1.Flex` ARM64 (2 OCPU / 12 GB, boot 100 GB) aprovisionada en `FAULT-DOMAIN-1`. Se replicó el stack nativo systemd (PostgreSQL 14, Django/Gunicorn, nginx), el certificado Origin CA y la configuración productiva; firewall OCI + host verificados. Backup final comprimido validado por SHA-256, restore transaccional y paridad exacta de contenido en 32 tablas persistentes (cache de rate limit excluida por ser descartable). DNS Cloudflare cambió a `159.112.147.154`; marcadores de access log confirman tráfico exclusivo al nuevo origin. Smoke público verde: health+DB, ES/EN, login GET + POST inválido con CSRF, legales, calculadora, robots, sitemap y cinco cabeceras de seguridad. Timer diario de backup activo; `OCI_HOST` de GitHub Actions actualizado; micro `146.181.47.12` detenida y conservada como rollback. Brevo autorizó la nueva IP; autenticación SMTP y entrega real de un correo de smoke confirmadas. |
 | 2026-07-26 | 🟨 | Interfaz revisada bajo Uncodixfy: sistema visual simplificado (bordes y sombras sutiles, tipografía única, controles normales y sin animación decorativa), portada reorganizada y dashboard de intercambios convertido de tarjetas KPI a resumen por filas. CSS compilado; `uv run pytest` verde (1294 pruebas). |
 | 2026-07-26 | 🟨 | Plan 062: acción de administración de invitaciones sanitizada; el email ya no llega a `AuditEvent.metadata`, logs ni mensajes de error, cubierto por centinelas locales. Protocolo de cohorte creado en `docs/beta-cohort.md`. Smoke y decisión go/no-go siguen BLOCKED hasta aprobación operativa; no se enviaron invitaciones en este trabajo. |
-|---|---|---|
 | 2026-07-24 | 🟨 | **Brevo SMTP wired + beta cerrada por invitación implementada.** `EMAIL_URL` configurado en `.env` y `.env-oci` (Login `b31878001@smtp-brevo.com` con `@` URL-encoded como `%40`, SMTP key `xsmtpsib-...`, `smtp-relay.brevo.com:587` con TLS). Plan 050 fail-closed validation re-activado en `prod.py` (descomentado + import `ImproperlyConfigured`); 3 tests de `test_settings.py` + 3 de `test_edge_cases.py` des-skippeados; `test_plans_regression.py` aprieta el check de código fuente. Email de prueba enviado a <carlos@tooltician.com>. Sistema de invitaciones: modelo `Invitation` (token `secrets.token_urlsafe`, `expires_at` automático, constraint unique pending por email), `InvitationGateMiddleware` (carga `?invite=<token>` en sesión), `InvitationAdapter` (cierra `is_open_for_signup` salvo sesión con email invitado), admin action `send_invitations` (envía correo por Brevo + registra `AuditEvent`). 20 tests nuevos en `tests/test_invitations.py`. 861 tests verdes. Pendiente humano: agregar IP del host OCI al allowlist de Brevo, verificar `noreply@tooltician.com` como sender en Brevo, smoke de extremo a extremo del flujo signup→email→verify→login en prod. |
 | 2026-07-23 | ✅ | **Entorno desplegado y verificado en <https://pogo-lab.tooltician.com>.** DNS Cloudflare proxied (A → 146.181.47.12), **Cloudflare Origin CA cert** (15 años, hasta 2041) instalado en nginx, **SSL mode = Full (strict)**, Always Use HTTPS + HSTS at edge + TLS 1.3 + min TLS 1.2, `set_real_ip_from` Cloudflare, `.env` VM actualizado (ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS/DEFAULT_FROM_EMAIL/ALLAUTH_TRUSTED_CLIENT_IP_HEADER), `cache_ratelimit` table creada. Rate limiting con IP real del cliente (IPv4+IPv6). Smoke verde: healthz, locales es/en, login (POST 200), legales, calculadora, cabeceras HSTS+CSP+XCTO+Referrer, redirect HTTP→HTTPS, TLS 1.1 rechazado. Pendiente: `EMAIL_URL` + invitaciones para beta cerrada. |
 | 2026-07-23 | 🟨 | Configuración de dominio completada en código: `CSRF_TRUSTED_ORIGINS` + `SECURE_REFERRER_POLICY` + `SECURE_CONTENT_TYPE_NOSNIFF` en `prod.py`; `set_real_ip_from` (rangos Cloudflare) + `real_ip_header CF-Connecting-IP` en `infra/nginx/default.conf` (rate limiting ve la IP real del cliente tras el proxy). Guía operativa nueva en `docs/deploy-tooltician.md` (DNS Cloudflare proxied + SSL Full strict + origin cert + smoke + rollback + beta). Tests: 817 passed, ruff/mypy limpios. Pendiente humano: crear registro A `pogo-lab`→`146.181.47.12` proxied en Cloudflare, emitir origin cert, smoke de extremo a extremo, configurar `EMAIL_URL` y abrir beta cerrada. |

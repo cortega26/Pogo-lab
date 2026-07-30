@@ -1,6 +1,6 @@
 # ADR-0009 — Hosting en Oracle Cloud Infrastructure (OCI)
 
-- **Estado:** Aceptada
+- **Estado:** Aceptada · enmienda operativa 2026-07-30
 - **Fecha:** 2026-07-17
 - **Relacionadas:** `plan.md` §P, §S8 · ADR-0001 · M7 PR-21
 
@@ -53,3 +53,14 @@ Alta. El `Dockerfile` y `compose.prod.yaml` son estándar; la aplicación no usa
 OCI. Migrar a Fly.io, Railway, Render o cualquier VPS requiere solo: (1) cambiar el target en `deploy.yml`,
 (2) apuntar `DATABASE_URL` a la nueva instancia de Postgres, (3) restaurar el backup más reciente. Coste
 estimado de migración: < 2 horas.
+
+## Enmienda operativa — 2026-07-30
+
+La decisión de proveedor, shape y monolito se mantiene. La implementación productiva observada y validada
+durante la migración a A1 usa **servicios systemd nativos** para Django/Gunicorn, PostgreSQL y nginx, en vez
+de Docker Compose. Se adopta esta topología como estado operativo porque coincide con el workflow de
+despliegue activo y reduce capas en un único VPS.
+
+`Dockerfile` y los archivos Compose se conservan como artefactos de portabilidad y desarrollo; no describen
+el proceso productivo actual. Si se vuelve a Compose en el futuro, debe ser una migración explícita con
+backup, restore, smoke y actualización de esta ADR.
