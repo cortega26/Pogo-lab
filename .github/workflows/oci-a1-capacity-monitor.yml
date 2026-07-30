@@ -51,7 +51,7 @@ jobs:
 
       - name: Crear o cerrar alerta de GitHub
         id: alert
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CAPACITY_STATUS: ${{ steps.capacity.outputs.status }}
           AVAILABLE_FAULT_DOMAINS: ${{ steps.capacity.outputs.available_fault_domains }}
