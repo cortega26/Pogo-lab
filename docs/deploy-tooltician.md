@@ -3,14 +3,14 @@
 Guía operativa para poner la beta en producción bajo el subdominio
 `pogo-lab.tooltician.com` (dominio `tooltician.com` gestionado en Cloudflare).
 
-**Topología:** Cloudflare (proxy naranja) → VM OCI `146.181.47.12` (nginx + Django).
+**Topología:** Cloudflare (proxy naranja) → VM OCI A1 `159.112.147.154` (nginx + Django).
 SSL termina en Cloudflare (modo **Full (strict)**) con un **origin certificate** de
 Cloudflare instalado en nginx. La IP de la VM queda oculta; los rangos de Cloudflare
 están listados en `infra/nginx/default.conf` (`set_real_ip_from` + `real_ip_header
 CF-Connecting-IP`) para que Django vea la IP real del cliente (requerido por el rate
 limiting).
 
-Complementa [hosting-micro.md](hosting-micro.md) y [ADR-0009](adr/0009-hosting-oracle-cloud.md).
+Complementa [hosting-oci.md](hosting-oci.md) y [ADR-0009](adr/0009-hosting-oracle-cloud.md).
 
 ---
 
@@ -20,11 +20,11 @@ Panel de Cloudflare → **tooltician.com** → **DNS** → **Records** → **Add
 
 | Tipo | Nombre | Contenido | Proxy | TTL |
 |---|---|---|---|---|
-| `A` | `pogo-lab` | `146.181.47.12` | **Proxied** (naranja) | Auto |
-| `A` | `www.pogo-lab` | `146.181.47.12` | **Proxied** (naranja) | Auto |
+| `A` | `pogo-lab` | `159.112.147.154` | **Proxied** (naranja) | Auto |
+| `A` | `www.pogo-lab` | `159.112.147.154` | **Proxied** (naranja) | Auto |
 | `AAAA` | `pogo-lab` | *(IPv6 de la VM, si la hay)* | **Proxied** | Auto |
 
-> La VM OCI micro actual es IPv4. Si más adelante se habilita IPv6 en la VCN de OCI,
+> La VM OCI A1 actual es IPv4. Si más adelante se habilita IPv6 en la VCN de OCI,
 > añade el registro `AAAA` correspondiente. Sin él, Cloudflare entrega el sitio por IPv4
 > y por IPv6 con su propio stack (suficiente para la beta).
 
@@ -35,7 +35,7 @@ dig +short pogo-lab.tooltician.com        # debe devolver IPs de Cloudflare (104
 dig +short www.pogo-lab.tooltician.com    # igual
 ```
 
-> Con proxy naranja, el registro resuelve a IPs de Cloudflare, **no** a `146.181.47.12`.
+> Con proxy naranja, el registro resuelve a IPs de Cloudflare, **no** a `159.112.147.154`.
 > Es esperado y deseado: la IP del origin queda oculta.
 
 ---
@@ -74,11 +74,11 @@ Guarda los dos bloques PEM y súbelos a la VM (ver §3).
 
 ## 3. Instalar el certificado origin en la VM
 
-En la VM OCI (`146.181.47.12`), como root:
+En la VM OCI (`159.112.147.154`), como root:
 
 ```bash
 # 1. Copiar los PEM (desde tu máquina o pegarlos en la VM)
-ssh ubuntu@146.181.47.12
+ssh ubuntu@159.112.147.154
 
 # 2. Crear el directorio de certs si no existe
 sudo mkdir -p /etc/nginx/certs
@@ -208,14 +208,15 @@ completar M7".
 
 Si el despliegue con el nuevo dominio falla y hay que volver atrás rápido:
 
-1. **DNS:** en Cloudflare, poner el registro `A pogo-lab` en modo **DNS only** (gris)
-   o pausar el proxy de Cloudflare para aislar el problema del origin.
+1. **DNS:** cambiar temporalmente el registro `A pogo-lab` de `159.112.147.154`
+   a la micro de rollback `146.181.47.12`, mantenerlo proxied y ejecutar
+   `sudo systemctl start pogo-lab.service` en la micro.
 2. **Certificado:** si el origin cert está mal, reemplazar
    `/etc/nginx/certs/{fullchain,privkey}.pem` y `sudo systemctl reload nginx`.
 3. **Código:** `git revert <commit>` del commit de dominio si el problema es de
    configuración de Django/nginx.
-4. **Acceso de emergencia:** la VM sigue siendo alcanzable por IP
-   (`http://146.181.47.12`) mientras `ALLOWED_HOSTS` lo permita; útil para debug.
+4. **Acceso de emergencia:** la A1 sigue siendo alcanzable por IP
+   (`http://159.112.147.154`) mientras `ALLOWED_HOSTS` lo permita; útil para debug.
 
 ---
 
@@ -226,6 +227,6 @@ Si el despliegue con el nuevo dominio falla y hay que volver atrás rápido:
   `curl -sL https://www.cloudflare.com/ips/ | xargs`. Si se endurece más, montar un
   cron que regenere la lista `set_real_ip_from` en nginx. Por ahora, los rangos en
   `default.conf` son los vigentes a 2026-07.
-- **Monitor de capacidad A1:** ver `.github/workflows/` (requiere secrets de Actions).
-  Si consigue una A1, migrar de la micro (1 GB) a la A1 (12 GB) — ver
-  `hosting-micro.md`.
+- **Monitor de capacidad A1:** la migración a la A1 (2 OCPU / 12 GB) se completó
+  el 2026-07-30. El workflow puede conservarse como diagnóstico de capacidad o
+  deshabilitarse para evitar alertas innecesarias.
