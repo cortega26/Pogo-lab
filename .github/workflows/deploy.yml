@@ -2,9 +2,19 @@ name: Deploy
 
 on:
   workflow_dispatch:
+  # Se dispara automáticamente cuando el workflow CI termina en main — no en
+  # push directo, para no desplegar un commit cuyo CI todavía está corriendo
+  # o falló. El `if` del job filtra por `conclusion == 'success'`.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
 
 jobs:
   deploy-oci:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to OCI
