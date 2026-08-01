@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% load i18n %}
+{% extends "base.html" %}{% load i18n calculators_extras %}
 {% block title %}{% trans "Breakpoints PvE — Pogo-lab" %}{% endblock %}
 {% block description %}{% trans "Encuentra los niveles donde tu ataque rápido hace 1 punto más de daño contra un Boss de incursión en Pokémon GO." %}{% endblock %}
 {% block og_title %}{% trans "Breakpoints PvE — Pogo-lab" %}{% endblock %}
@@ -9,15 +9,18 @@
   <form hx-post="{% url 'breakpoints_view' %}" hx-target="#bp-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
     {% csrf_token %}
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      <div><label class="field-label" for="bp-species">{% trans "Atacante" %}</label>
-        <select name="species" id="bp-species" class="input-field">
-          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select></div>
+      <div><label class="field-label" for="bp-species-search">{% trans "Atacante" %}</label>
+        <input type="text" id="bp-species-search" class="input-field" list="species-datalist" autocomplete="off"
+               value="{{ species_choices|choice_label:species_id }}"
+               data-species-search data-target="bp-species"
+               placeholder="{% trans "Buscar especie…" %}">
+        <input type="hidden" name="species" id="bp-species" value="{{ species_id }}">
+        {% include "calculators/_species_datalist.html" %}</div>
       <div><label class="field-label" for="bp-move">{% trans "Fast Move" %}</label>
         <select name="move" id="bp-move" class="input-field">
           {% for val, label in move_choices %}<option value="{{ val }}" {% if val == move_key %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
-        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">{% trans "Se muestran todos los fast moves del motor: aún no verificamos cuáles aprende cada especie en el juego real." %}</p>
+        <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">{% trans "Se muestran todos los fast moves del motor: aún no verificamos cuáles aprende cada especie en el juego real." %}</p>
       </div>
       <div><label class="field-label" for="bp-iv">{% trans "IV Ataque (0–15)" %}</label>
         <input type="number" name="iv_atk" id="bp-iv" value="{{ iv_atk }}" min="0" max="15" class="input-field font-mono"></div>
@@ -33,7 +36,7 @@
   <div id="bp-results">
     {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
     {% elif result %}{% include "calculators/_breakpoints_result.html" %}
-    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona atacante, fast move e IV para ver los breakpoints." %}</p>{% endif %}
+    {% else %}<p class="text-center text-sm text-slate-600 dark:text-slate-400">{% trans "Selecciona atacante, fast move e IV para ver los breakpoints." %}</p>{% endif %}
   </div>
 </div>
 {% endblock %}

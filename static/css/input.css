@@ -11,18 +11,14 @@
 }
 
 @font-face {
-  font-family: 'Newsreader';
-  src: url('/static/fonts/Newsreader-variable.woff2') format('woff2');
-  font-weight: 200 800;
+  /* Mismo carácter que 'Big Shoulders' pero en el corte óptico "Text": menos
+     condensado, pensado para párrafos y UI en vez de titulares. Reemplaza a
+     'Big Shoulders' como --font-sans para que labels/párrafos/tablas sean
+     legibles sin perder la voz tipográfica de la marca (ver --font-display). */
+  font-family: 'Big Shoulders Text';
+  src: url('/static/fonts/BigShouldersText-variable.woff2') format('woff2');
+  font-weight: 100 900;
   font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Newsreader';
-  src: url('/static/fonts/Newsreader-italic-variable.woff2') format('woff2');
-  font-weight: 200 800;
-  font-style: italic;
   font-display: swap;
 }
 
@@ -42,7 +38,7 @@
   --color-slate-200: #E1D9C8;
   --color-slate-300: #CBBFA6;
   --color-slate-400: #A69579;
-  --color-slate-500: #83725B;
+  --color-slate-500: #7D6D57;
   --color-slate-600: #635546;
   --color-slate-700: #493E33;
   --color-slate-800: #322A22;
@@ -97,10 +93,13 @@
   --color-danger-600: #9C4517;
   --color-danger-700: #7A3711;
 
-  /* Una sola voz tipográfica para la interfaz: clara y compacta, sin el
-     contraste decorativo serif/sans que hacía que cada vista pareciera una
-     pieza editorial distinta. */
-  --font-sans: 'Big Shoulders', ui-sans-serif, sans-serif;
+  /* Una sola voz tipográfica para la interfaz, en dos cortes ópticos de la
+     misma familia: 'Big Shoulders' (condensado) para titulares de impacto,
+     'Big Shoulders Text' (menos condensado) para párrafos, labels y UI —
+     evita el contraste decorativo serif/sans que hacía que cada vista
+     pareciera una pieza editorial distinta, sin sacrificar legibilidad en
+     texto corrido. */
+  --font-sans: 'Big Shoulders Text', ui-sans-serif, sans-serif;
   --font-display: 'Big Shoulders', ui-sans-serif, sans-serif;
   --font-mono: 'Fira Code', ui-monospace, monospace;
 

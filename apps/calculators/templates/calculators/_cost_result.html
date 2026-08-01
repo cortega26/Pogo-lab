@@ -7,14 +7,11 @@
     <div><dt class="field-label">{% trans "Caramelos XL" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.total_candy_xl }}</dd></div>
     <div><dt class="field-label">{% trans "Power-Ups" %}</dt><dd class="font-mono text-2xl font-bold text-slate-900 dark:text-slate-100">{{ result.power_ups }}</dd></div>
   </dl>
-  <p class="mt-4 font-mono text-xs text-slate-400 dark:text-slate-500">
+  <p class="mt-4 font-mono text-xs text-slate-600 dark:text-slate-400">
     {% trans "Nivel" %} {{ result.from_level }} → {{ result.to_level }}
     {% if result.is_lucky %}&middot; {% trans "Lucky" %}{% endif %}
     {% if result.is_shadow %}&middot; {% trans "Shadow" %}{% endif %}
   </p>
-  {% if share_url %}
-  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
-    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
-  {% endif %}
+  {% include "calculators/_share_link.html" %}
 </div>
 {% endif %}

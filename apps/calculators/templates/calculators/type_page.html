@@ -29,7 +29,7 @@
   <div id="type-results">
     {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
     {% elif result %}{% include "calculators/_type_result.html" %}
-    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona el tipo defensivo y presiona Ver efectividad." %}</p>{% endif %}
+    {% else %}<p class="text-center text-sm text-slate-600 dark:text-slate-400">{% trans "Selecciona el tipo defensivo y presiona Ver efectividad." %}</p>{% endif %}
   </div>
 </div>
 {% endblock %}

@@ -62,11 +62,11 @@
         <div>
           <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">{{ left.name }}</h2>
           <div class="flex gap-1 mt-1">
-            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                  style="background-color: {{ left.type1|type_color }}">{{ left.type1|capfirst }}</span>
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style="background-color: {{ left.type1|type_color }}; color: {{ left.type1|type_text_color }};">{{ left.type1|capfirst }}</span>
             {% if left.type2 %}
-            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                  style="background-color: {{ left.type2|type_color }}">{{ left.type2|capfirst }}</span>
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style="background-color: {{ left.type2|type_color }}; color: {{ left.type2|type_text_color }};">{{ left.type2|capfirst }}</span>
             {% endif %}
           </div>
         </div>
@@ -81,11 +81,11 @@
         <div>
           <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">{{ right.name }}</h2>
           <div class="flex gap-1 mt-1">
-            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                  style="background-color: {{ right.type1|type_color }}">{{ right.type1|capfirst }}</span>
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style="background-color: {{ right.type1|type_color }}; color: {{ right.type1|type_text_color }};">{{ right.type1|capfirst }}</span>
             {% if right.type2 %}
-            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                  style="background-color: {{ right.type2|type_color }}">{{ right.type2|capfirst }}</span>
+            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style="background-color: {{ right.type2|type_color }}; color: {{ right.type2|type_text_color }};">{{ right.type2|capfirst }}</span>
             {% endif %}
           </div>
         </div>

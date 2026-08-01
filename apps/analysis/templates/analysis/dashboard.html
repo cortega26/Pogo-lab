@@ -122,7 +122,7 @@
           </span>
           <div class="min-w-0">
             <strong class="text-sm text-slate-800 dark:text-slate-100">{{ rec.message_key }}</strong>
-            <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">({{ rec.rule_key }}@{{ rec.rule_version }})</span>
+            <span class="ml-1 text-xs text-slate-600 dark:text-slate-400">({{ rec.rule_key }}@{{ rec.rule_version }})</span>
             {% if rec.params %}
             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {% for k, v in rec.params.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}

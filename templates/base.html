@@ -48,6 +48,8 @@
     document.addEventListener('htmx:configLoad', () => htmx.config.allowEval = false);
   </script>
   <script src="{% static 'vendor/htmx.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/species-search.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/copy-share-link.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:border-2 focus:border-slate-900 focus:bg-accent-500 focus:px-4 focus:py-2 focus:font-mono focus:text-white">
@@ -155,14 +157,14 @@
             </span>
             Pogo-lab
           </div>
-          <p class="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+          <p class="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             {% trans "Análisis estadístico honesto y trazable para las mecánicas de Pokémon GO." %}
           </p>
         </div>
 
         <div>
           <h3 class="mb-3 font-sans text-base font-semibold text-slate-900 dark:text-slate-100">
-            {% trans "Herramientas" %}
+            {% trans "Calculadoras" %}
           </h3>
           <ul class="space-y-2">
             <li><a href="{% url 'calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Calculadora de IV" %}</a></li>
@@ -174,19 +176,25 @@
             <li><a href="{% url 'shiny_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Calculadora Shiny" %}</a></li>
             <li><a href="{% url 'shadow_calculator' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Shadow vs Purified" %}</a></li>
             <li><a href="{% url 'breakpoints_view' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Breakpoints PvE" %}</a></li>
-            <li><a href="{% url 'mechanic_list' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Mecánicas" %}</a></li>
-            <li><a href="{% url 'content_page' slug='cp-como-funciona' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Guía: CP y HP" %}</a></li>
-            <li><a href="{% url 'content_page' slug='iv-en-intercambios' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Guía: IV en intercambios" %}</a></li>
-            <li><a href="{% url 'dps_browser' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">DPS/TDO</a></li>
-            <li><a href="{% url 'trades:dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Dashboard" %}</a></li>
           </ul>
         </div>
 
         <div>
           <h3 class="mb-3 font-sans text-base font-semibold text-slate-900 dark:text-slate-100">
+            {% trans "Recursos" %}
+          </h3>
+          <ul class="space-y-2">
+            <li><a href="{% url 'mechanic_list' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Mecánicas" %}</a></li>
+            <li><a href="{% url 'content_page' slug='cp-como-funciona' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Guía: CP y HP" %}</a></li>
+            <li><a href="{% url 'content_page' slug='iv-en-intercambios' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Guía: IV en intercambios" %}</a></li>
+            <li><a href="{% url 'dps_browser' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">DPS/TDO</a></li>
+          </ul>
+
+          <h3 class="mb-3 mt-6 font-sans text-base font-semibold text-slate-900 dark:text-slate-100">
             {% trans "Comunidad" %}
           </h3>
           <ul class="space-y-2">
+            <li><a href="{% url 'trades:dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Dashboard" %}</a></li>
             <li><a href="{% url 'analysis_dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Análisis personal" %}</a></li>
             <li><a href="{% url 'experiments:community_dashboard' %}" class="text-sm text-slate-600 decoration-accent-500 decoration-2 underline-offset-4 transition-colors hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">{% trans "Dataset comunitario" %}</a></li>
             {% if user.is_authenticated %}
@@ -207,7 +215,7 @@
         </div>
       </div>
 
-      <div class="mt-10 border-t border-slate-200 pt-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-500">
+      <div class="mt-10 border-t border-slate-200 pt-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
         <p>Pogo-lab &mdash; {% trans "No afiliado a Niantic, The Pokémon Company, Nintendo ni Creatures Inc." %}</p>
         <p class="mt-1">{% trans "Los datos y análisis son proporcionados 'tal cual' con fines educativos." %}</p>
       </div>

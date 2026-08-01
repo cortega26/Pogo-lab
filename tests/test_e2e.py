@@ -500,7 +500,8 @@ def test_cp_calculator_htmx(live_server):
         page.wait_for_load_state("networkidle")
 
         title_before = page.title()
-        page.select_option("#cp-species", "mewtwo")
+        page.fill("#cp-species-search", "Mewtwo")
+        page.keyboard.press("Tab")
         page.select_option("#cp-level", "40.0")
         page.fill("#cp-iv-atk", "15")
         page.fill("#cp-iv-def", "15")
@@ -543,7 +544,8 @@ def test_pvp_ranker_htmx(live_server):
         page.goto(f"{live_server.url}/es/calculadora/pvp/")
         page.wait_for_load_state("networkidle")
 
-        page.select_option("#pvp-species", "medicham")
+        page.fill("#pvp-species-search", "Medicham")
+        page.keyboard.press("Tab")
         page.select_option("#pvp-league", "1500")
         page.click("button[type=submit]")
 
@@ -581,7 +583,8 @@ def test_shadow_calculator_htmx(live_server):
         page.goto(f"{live_server.url}/es/calculadora/shadow/")
         page.wait_for_load_state("networkidle")
 
-        page.select_option("#shadow-species", "machamp")
+        page.fill("#shadow-species-search", "Machamp")
+        page.keyboard.press("Tab")
         page.select_option("#shadow-level", "40.0")
         page.click("button[type=submit]")
 
@@ -600,7 +603,8 @@ def test_catch_calculator_htmx(live_server):
         page.goto(f"{live_server.url}/es/calculadora/captura/")
         page.wait_for_load_state("networkidle")
 
-        page.select_option("#catch-species", "charmander")
+        page.fill("#catch-species-search", "Charmander")
+        page.keyboard.press("Tab")
         page.select_option("#catch-level", "15.0")
         page.check("input[name=curveball]")
         page.click("button[type=submit]")
@@ -639,7 +643,8 @@ def test_breakpoints_calculator_htmx(live_server):
         page.goto(f"{live_server.url}/es/calculadora/breakpoints/")
         page.wait_for_load_state("networkidle")
 
-        page.select_option("#bp-species", "mewtwo")
+        page.fill("#bp-species-search", "Mewtwo")
+        page.keyboard.press("Tab")
         page.select_option("#bp-move", "psycho_cut")
         page.fill("#bp-iv", "15")
         page.fill("#bp-def", "200")

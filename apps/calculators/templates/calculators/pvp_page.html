@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% load i18n %}
+{% extends "base.html" %}{% load i18n calculators_extras %}
 {% block title %}{% trans "PvP IV Ranker — Pogo-lab" %}{% endblock %}
 {% block description %}{% trans "Descubre la mejor combinación de IVs para tu Pokémon en Great, Ultra o Master League. Ranking por Stat Product de las 4096 combinaciones." %}{% endblock %}
 {% block og_title %}{% trans "PvP IV Ranker — Pogo-lab" %}{% endblock %}
@@ -14,10 +14,13 @@
   <form hx-post="{% url 'pvp_ranker' %}" hx-target="#pvp-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
     {% csrf_token %}
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-      <div><label class="field-label" for="pvp-species">{% trans "Especie" %}</label>
-        <select name="species" id="pvp-species" class="input-field">
-          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select></div>
+      <div><label class="field-label" for="pvp-species-search">{% trans "Especie" %}</label>
+        <input type="text" id="pvp-species-search" class="input-field" list="species-datalist" autocomplete="off"
+               value="{{ species_choices|choice_label:species_id }}"
+               data-species-search data-target="pvp-species"
+               placeholder="{% trans "Buscar especie…" %}">
+        <input type="hidden" name="species" id="pvp-species" value="{{ species_id }}">
+        {% include "calculators/_species_datalist.html" %}</div>
       <div><label class="field-label" for="pvp-league">{% trans "Liga" %}</label>
         <select name="league" id="pvp-league" class="input-field">
           {% for val, label in league_choices %}<option value="{{ val }}" {% if val|stringformat:"s" == league_cap|stringformat:"s" %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -28,7 +31,7 @@
   <div id="pvp-results">
     {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
     {% elif result %}{% include "calculators/_pvp_result.html" %}
-    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Selecciona especie y liga, luego presiona Rankear." %}</p>{% endif %}
+    {% else %}<p class="text-center text-sm text-slate-600 dark:text-slate-400">{% trans "Selecciona especie y liga, luego presiona Rankear." %}</p>{% endif %}
   </div>
 </div>
 {% endblock %}
