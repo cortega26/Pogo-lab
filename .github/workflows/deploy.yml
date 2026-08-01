@@ -10,6 +10,15 @@ on:
     types: [completed]
     branches: [main]
 
+# Serializa despliegues: si dos runs de CI en main terminan cerca uno del
+# otro, esto encola el segundo en vez de dejar dos SSH concurrentes mutando
+# /opt/pogo-lab (git reset, migraciones, collectstatic, restart) a la vez.
+# cancel-in-progress=false porque cancelar un deploy a mitad de una
+# migración deja el servidor en peor estado que esperar.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy-oci:
     if: >-
@@ -19,10 +28,16 @@ jobs:
     steps:
       - name: Deploy to OCI
         uses: appleboy/ssh-action@v1
+        env:
+          # SHA validado por el run de CI que disparó este deploy. En
+          # workflow_dispatch (manual) no hay workflow_run — se usa
+          # 'origin/main' para desplegar la punta actual.
+          DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'origin/main' }}
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          envs: DEPLOY_REF
           script: |
             set -euo pipefail
             export PATH="/home/ubuntu/.local/bin:$PATH"
@@ -30,7 +45,11 @@ jobs:
             git fetch origin main
             git stash --include-untracked || true
             git checkout main
-            git reset --hard origin/main
+            # Se resetea al SHA que realmente pasó CI (DEPLOY_REF), no a
+            # origin/main a secas: si un segundo push llegó a main mientras
+            # este run de CI corría, origin/main ya no sería el commit que
+            # este workflow validó.
+            git reset --hard "$DEPLOY_REF"
             git stash drop 2>/dev/null || true
             uv sync --frozen --no-dev
             uv run python manage.py check --deploy
