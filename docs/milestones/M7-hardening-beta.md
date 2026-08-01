@@ -6,7 +6,7 @@
 | **Tamaño** | M |
 | **Depende de** | M1 … M6 |
 | **PRs** | PR-20, PR-21 |
-| **Actualizado** | 2026-07-30 |
+| **Actualizado** | 2026-08-01 |
 
 ## Objetivo
 
@@ -97,6 +97,7 @@ Profundidad de la analítica de producto (empezar con métricas mínimas).
 
 | Fecha | Estado | Nota |
 |---|---|---|
+| 2026-08-01 | ✅ | Retirado el workflow programado de monitorización de capacidad OCI A1, ya innecesario tras aprovisionar la instancia A1 de producción. También se eliminaron su comprobador, pruebas y documentación operativa asociada. Validación: la suite tuvo 1289 pruebas correctas y falló una prueba de concurrencia de deduplicación no relacionada; al repetir esa prueba con el `HEAD` limpio pasó, por lo que no se atribuye al retiro del monitor. |
 | 2026-07-30 | ✅ | Documentación operativa post-migración consolidada: `hosting-oci.md` pasa a ser SSOT de la topología A1 real, capacidades habilitadas, límites, mejoras priorizadas y rollback micro. ADR-0009 recibe una enmienda que registra systemd como orquestación productiva activa y mantiene Docker Compose como artefacto de portabilidad. |
 | 2026-07-30 | ✅ | **Migración blue-green de OCI micro a Ampere A1 completada.** A1 `VM.Standard.A1.Flex` ARM64 (2 OCPU / 12 GB, boot 100 GB) aprovisionada en `FAULT-DOMAIN-1`. Se replicó el stack nativo systemd (PostgreSQL 14, Django/Gunicorn, nginx), el certificado Origin CA y la configuración productiva; firewall OCI + host verificados. Backup final comprimido validado por SHA-256, restore transaccional y paridad exacta de contenido en 32 tablas persistentes (cache de rate limit excluida por ser descartable). DNS Cloudflare cambió a `159.112.147.154`; marcadores de access log confirman tráfico exclusivo al nuevo origin. Smoke público verde: health+DB, ES/EN, login GET + POST inválido con CSRF, legales, calculadora, robots, sitemap y cinco cabeceras de seguridad. Timer diario de backup activo; `OCI_HOST` de GitHub Actions actualizado; micro `146.181.47.12` detenida y conservada como rollback. Brevo autorizó la nueva IP; autenticación SMTP y entrega real de un correo de smoke confirmadas. |
 | 2026-07-26 | 🟨 | Interfaz revisada bajo Uncodixfy: sistema visual simplificado (bordes y sombras sutiles, tipografía única, controles normales y sin animación decorativa), portada reorganizada y dashboard de intercambios convertido de tarjetas KPI a resumen por filas. CSS compilado; `uv run pytest` verde (1294 pruebas). |
