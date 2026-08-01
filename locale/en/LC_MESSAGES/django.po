@@ -3,218 +3,258 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Pogo-lab\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-23 21:43+0000\n"
+"POT-Creation-Date: 2026-08-01 04:13+0000\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-msgid "Información personal"
+#, python-format
+msgid ""
+"Este enlace de invitación es para %(invited)s. Usa el email que recibió la "
+"invitación."
 msgstr ""
+"This invitation link is for %(invited)s. Use the email address that received"
+" the invitation."
+
+msgid "Información personal"
+msgstr "Personal information"
 
 msgid "Permisos"
-msgstr ""
+msgstr "Permissions"
 
 msgid "Fechas"
-msgstr ""
+msgstr "Dates"
+
+msgid "estado"
+msgstr "status"
+
+msgid "Enviar invitaciones por correo"
+msgstr "Send invitations by email"
+
+#, python-brace-format
+msgid "{sent} invitaciones enviadas, {skipped} omitidas."
+msgstr "{sent} invitations sent, {skipped} skipped."
+
+msgid "Errores en invitaciones ID: "
+msgstr "Errors in invitations ID: "
+
+msgid "Tu invitación a Pogo-lab"
+msgstr "Your invitation to Pogo-lab"
 
 msgid "dirección de email"
-msgstr ""
+msgstr "email address"
 
-msgid "Iniciar sesión"
-msgstr "Log in"
+msgid "email invitado"
+msgstr "invited email"
 
-msgid "¿No tienes cuenta?"
-msgstr "Don't have an account?"
+msgid "token"
+msgstr "token"
 
-msgid "Regístrate"
-msgstr "Sign up"
+msgid "creada por"
+msgstr "created by"
 
-#, fuzzy
-#| msgid "Regístrate"
-msgid "Registrarse"
-msgstr "Sign up"
+msgid "canjeada por"
+msgstr "redeemed by"
 
-msgid "¿Ya tienes cuenta?"
-msgstr "Already have an account?"
+msgid "enviada el"
+msgstr "sent on"
+
+msgid "canjeada el"
+msgstr "redeemed on"
+
+msgid "expira el"
+msgstr "expires on"
+
+msgid "creada el"
+msgstr "created on"
+
+msgid "invitación"
+msgstr "invitation"
+
+msgid "invitaciones"
+msgstr "invitations"
 
 msgid "Pendiente"
-msgstr ""
+msgstr "Pending"
 
 msgid "Completado"
-msgstr ""
+msgstr "Completed"
 
 msgid "Fallido"
-msgstr ""
+msgstr "Failed"
 
 msgid "ejecución de análisis"
-msgstr ""
+msgstr "analysis run"
 
 msgid "ejecuciones de análisis"
-msgstr ""
+msgstr "analysis runs"
 
 msgid "resultado de análisis"
-msgstr ""
+msgstr "analysis result"
 
 msgid "resultados de análisis"
-msgstr ""
+msgstr "analysis results"
 
 msgid "Análisis personal"
-msgstr ""
+msgstr "Personal analysis"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Análisis de intercambios"
-msgstr "trades/"
+msgstr "Trade analysis"
 
 msgid "Observaciones"
-msgstr ""
+msgstr "Observations"
 
 msgid "Éxitos"
-msgstr ""
+msgstr "Successes"
 
 msgid "p-valor"
-msgstr ""
+msgstr "p-value"
 
 msgid "Tamaño de efecto"
-msgstr ""
+msgstr "Effect size"
 
 msgid "IC (Wilson)"
-msgstr ""
+msgstr "CI (Wilson)"
 
 msgid "Método"
-msgstr ""
+msgstr "Method"
 
 msgid "Advertencia"
-msgstr ""
+msgstr "Warning"
 
 msgid "Muestra insuficiente para inferencia"
-msgstr ""
+msgstr "Insufficient sample for inference"
 
 msgid "Valor"
-msgstr ""
+msgstr "Value"
 
 msgid "Conteo"
-msgstr ""
+msgstr "Count"
 
-#, fuzzy
-#| msgid "contribuciones/"
 msgid "Recomendaciones"
-msgstr "contributions/"
+msgstr "Recommendations"
 
 msgid "Sin datos para analizar"
-msgstr ""
+msgstr "No data to analyze"
 
 msgid "Registra intercambios para ver tu análisis estadístico."
-msgstr ""
+msgstr "Log trades to see your statistical analysis."
 
 msgid "Ir a sesiones"
-msgstr ""
+msgstr "Go to sessions"
 
 msgid "evento de auditoría"
-msgstr ""
+msgstr "audit event"
 
 msgid "eventos de auditoría"
-msgstr ""
+msgstr "audit events"
 
 msgid "IV ATK"
-msgstr ""
+msgstr "ATK IV"
 
 msgid "Defensa Boss"
-msgstr ""
+msgstr "Boss Defense"
 
 msgid "Clima"
-msgstr ""
+msgstr "Weather"
 
 msgid "Nivel"
-msgstr ""
+msgstr "Level"
 
 msgid "Daño por golpe"
-msgstr ""
+msgstr "Damage per hit"
 
 msgid "ATK efectivo"
-msgstr ""
+msgstr "Effective ATK"
 
 msgid "No se encontraron breakpoints en el rango L20–L50."
-msgstr ""
+msgstr "No breakpoints found in the L20–L50 range."
 
 msgid "Enlace compartible"
-msgstr ""
+msgstr "Shareable link"
 
-#, fuzzy
-#| msgid "Estado"
 msgid "Resultados"
-msgstr "Status"
+msgstr "Results"
 
 msgid "probabilidad de captura por lanzamiento"
-msgstr ""
+msgstr "capture probability per throw"
 
 msgid "BCR"
-msgstr ""
+msgstr "BCR"
 
 msgid "Multiplicador"
-msgstr ""
+msgstr "Multiplier"
 
 msgid "Costos"
-msgstr ""
+msgstr "Costs"
 
 msgid "Polvo Estelar"
-msgstr ""
+msgstr "Stardust"
 
 msgid "Caramelos"
-msgstr ""
+msgstr "Candy"
 
 msgid "Caramelos XL"
-msgstr ""
+msgstr "XL Candy"
 
 msgid "Power-Ups"
-msgstr ""
+msgstr "Power-Ups"
 
 msgid "Lucky"
-msgstr ""
+msgstr "Lucky"
 
 msgid "Shadow"
-msgstr ""
+msgstr "Shadow"
 
 msgid "CP"
-msgstr ""
+msgstr "CP"
 
 msgid "HP"
-msgstr ""
+msgstr "HP"
 
 msgid "Stat Product"
-msgstr ""
+msgstr "Stat Product"
 
 msgid "combinaciones rankeadas"
+msgstr "ranked combinations"
+
+msgid ""
+"El 2026-07-24 se corrigió el cálculo de HP en el stat product (antes usaba "
+"un valor continuo en vez del HP entero real); el orden del ranking puede "
+"diferir de cálculos anteriores de esta calculadora."
 msgstr ""
+"On 2026-07-24 the HP calculation in the stat product was fixed (it "
+"previously used a continuous value instead of the real integer HP); the "
+"ranking order may differ from earlier results of this calculator."
 
 msgid "Rank"
-msgstr ""
+msgstr "Rank"
 
 msgid "IVs"
-msgstr ""
+msgstr "IVs"
 
 msgid "Piso (f)"
-msgstr ""
+msgstr "Floor (f)"
 
 msgid "Valores posibles por stat (k)"
-msgstr ""
+msgstr "Possible values per stat (k)"
 
 msgid "Probabilidad por intercambio"
-msgstr ""
+msgstr "Probability per trade"
 
 msgid "Probabilidad acumulada (n="
-msgstr ""
+msgstr "Cumulative probability (n="
 
 msgid ")"
-msgstr ""
+msgstr ")"
 
 msgid "Éxitos esperados"
-msgstr ""
+msgstr "Expected successes"
 
 msgid "Probabilidad de cero éxitos"
-msgstr ""
+msgstr "Probability of zero successes"
 
 #, python-format
 msgid ""
@@ -222,484 +262,532 @@ msgid ""
 "        Intercambios para confianza al %(conf)s%%\n"
 "        "
 msgstr ""
+"\n"
+"        Trades for %(conf)s%% confidence\n"
+"        "
 
 msgid "Supuestos"
-msgstr ""
+msgstr "Assumptions"
 
 msgid "Purified"
-msgstr ""
+msgstr "Purified"
 
 msgid "Diferencia"
-msgstr ""
+msgstr "Difference"
 
 msgid "Ataque PvE"
-msgstr ""
+msgstr "PvE Attack"
 
 msgid "Stardust (L1→nivel)"
-msgstr ""
+msgstr "Stardust (L1→level)"
 
 msgid "Caramelos (L1→nivel)"
-msgstr ""
+msgstr "Candy (L1→level)"
 
 msgid "Probabilidad de al menos 1 shiny"
-msgstr ""
+msgstr "Probability of at least 1 shiny"
 
 msgid "Probabilidad de 0 shiny"
-msgstr ""
+msgstr "Probability of 0 shiny"
 
 msgid "Shiny esperados"
-msgstr ""
+msgstr "Expected shinies"
 
 #, python-format
 msgid "En %(n)s encuentros con tasa %(rate)s"
-msgstr ""
+msgstr "In %(n)s encounters at a %(rate)s rate"
 
 #, python-format
 msgid "Para %(conf)s%% de confianza necesitas ~%(enc)s encuentros"
-msgstr ""
+msgstr "For %(conf)s%% confidence you need ~%(enc)s encounters"
 
 msgid "Breakpoints PvE — Pogo-lab"
-msgstr ""
+msgstr "PvE Breakpoints — Pogo-lab"
 
 msgid ""
-"Encuentra los niveles donde tu ataque rápido hace 1 punto más de daño contra "
-"un Boss de incursión en Pokémon GO."
+"Encuentra los niveles donde tu ataque rápido hace 1 punto más de daño contra"
+" un Boss de incursión en Pokémon GO."
 msgstr ""
+"Find the levels where your fast attack deals 1 more point of damage against "
+"a raid Boss in Pokémon GO."
 
 msgid "Calculadora de breakpoints para raids en Pokémon GO."
-msgstr ""
+msgstr "Breakpoint calculator for raids in Pokémon GO."
 
 msgid "Breakpoints PvE"
-msgstr ""
+msgstr "PvE Breakpoints"
 
 msgid "Atacante"
-msgstr ""
+msgstr "Attacker"
 
 msgid "Fast Move"
+msgstr "Fast Move"
+
+msgid ""
+"Se muestran todos los fast moves del motor: aún no verificamos cuáles "
+"aprende cada especie en el juego real."
 msgstr ""
+"All fast moves from the engine are shown: we haven't yet verified which ones"
+" each species actually learns in the real game."
 
 msgid "IV Ataque (0–15)"
-msgstr ""
+msgstr "Attack IV (0–15)"
 
 msgid "Defensa del Boss"
-msgstr ""
+msgstr "Boss Defense"
 
 msgid "Clima potenciado (×1.2)"
-msgstr ""
+msgstr "Boosted weather (×1.2)"
 
 msgid "Calcular breakpoints"
-msgstr ""
+msgstr "Calculate breakpoints"
 
 msgid "Error:"
-msgstr ""
+msgstr "Error:"
 
 msgid "Selecciona atacante, fast move e IV para ver los breakpoints."
-msgstr ""
+msgstr "Select an attacker, fast move, and IV to see the breakpoints."
 
 msgid "Probabilidad de Captura — Pogo-lab"
-msgstr ""
+msgstr "Capture Probability — Pogo-lab"
 
 msgid ""
 "Calcula la probabilidad de capturar un Pokémon salvaje según la especie, "
 "nivel, bola, baya, tipo de tiro y medallas."
 msgstr ""
+"Calculate the probability of catching a wild Pokémon based on species, "
+"level, ball, berry, throw type, and medals."
 
 msgid "Calculadora de Captura — Pogo-lab"
-msgstr ""
+msgstr "Capture Calculator — Pogo-lab"
 
 msgid ""
-"Calcula la probabilidad de captura en Pokémon GO con todos los modificadores."
-msgstr ""
+"Calcula la probabilidad de captura en Pokémon GO con todos los "
+"modificadores."
+msgstr "Calculate the capture probability in Pokémon GO with all modifiers."
 
 msgid "Probabilidad de Captura"
-msgstr ""
+msgstr "Capture Probability"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de Captura"
-msgstr "Calculator"
+msgstr "Capture Calculator"
 
 msgid "Especie"
-msgstr ""
+msgstr "Species"
 
 msgid "Poké Ball"
-msgstr ""
+msgstr "Poké Ball"
 
 msgid "Baya"
-msgstr ""
+msgstr "Berry"
 
 msgid "Tiro"
-msgstr ""
+msgstr "Throw"
 
 msgid "Medalla"
-msgstr ""
+msgstr "Medal"
 
 msgid "Lanzamiento curvo (×1.7)"
-msgstr ""
+msgstr "Curveball throw (×1.7)"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calcular"
-msgstr "Calculator"
+msgstr "Calculate"
 
 msgid "Configura los modificadores y presiona Calcular."
-msgstr ""
+msgstr "Set the modifiers and press Calculate."
 
 msgid "Costo de Power-Up — Pogo-lab"
-msgstr ""
+msgstr "Power-Up Cost — Pogo-lab"
 
 msgid ""
 "Calcula cuánto stardust y caramelos necesitas para subir un Pokémon de "
 "nivel. Incluye descuento Lucky y recargo Shadow."
 msgstr ""
+"Calculate how much stardust and candy you need to level up a Pokémon. "
+"Includes the Lucky discount and Shadow surcharge."
 
 msgid "Calculadora de Costo de Power-Up — Pogo-lab"
-msgstr ""
+msgstr "Power-Up Cost Calculator — Pogo-lab"
 
 msgid ""
 "Calcula cuánto stardust, caramelos y caramelos XL necesitas para subir de "
 "nivel."
 msgstr ""
+"Calculate how much stardust, candy, and XL candy you need to level up."
 
 msgid "Costo Power-Up"
-msgstr ""
+msgstr "Power-Up Cost"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de Costo de Power-Up"
-msgstr "Calculator"
+msgstr "Power-Up Cost Calculator"
 
 msgid "Nivel inicial"
-msgstr ""
+msgstr "Starting level"
 
-#, fuzzy
-#| msgid "Operativo"
 msgid "Nivel objetivo"
-msgstr "Operational"
+msgstr "Target level"
 
 #, python-format
 msgid "Pokémon Lucky (50%% desc.)"
-msgstr ""
+msgstr "Lucky Pokémon (50%% off)"
 
 #, python-format
 msgid "Pokémon Shadow (+20%%)"
-msgstr ""
+msgstr "Shadow Pokémon (+20%%)"
 
 msgid "Selecciona los niveles y opciones y presiona Calcular."
-msgstr ""
+msgstr "Select the levels and options and press Calculate."
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de CP — Pogo-lab"
-msgstr "Calculator"
+msgstr "CP Calculator — Pogo-lab"
 
 msgid ""
 "Calcula el CP y HP de cualquier Pokémon en Pokémon GO a cualquier nivel y "
 "combinación de IVs. Datos verificados del Game Master."
 msgstr ""
+"Calculate the CP and HP of any Pokémon in Pokémon GO at any level and IV "
+"combination. Data verified against the Game Master."
 
 msgid "Calculadora de CP y Nivel — Pogo-lab"
-msgstr ""
+msgstr "CP and Level Calculator — Pogo-lab"
 
 msgid "Calcula el CP y HP de cualquier Pokémon a cualquier nivel e IVs."
-msgstr ""
+msgstr "Calculate the CP and HP of any Pokémon at any level and IVs."
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de CP"
-msgstr "Calculator"
+msgstr "CP Calculator"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de CP y Nivel"
-msgstr "Calculator"
+msgstr "CP and Level Calculator"
 
 msgid "IV Defensa (0–15)"
-msgstr ""
+msgstr "Defense IV (0–15)"
 
 msgid "IV Stamina (0–15)"
-msgstr ""
+msgstr "Stamina IV (0–15)"
 
 msgid "Selecciona una especie, nivel e IVs y presiona Calcular."
-msgstr ""
+msgstr "Select a species, level, and IVs and press Calculate."
 
 msgid "Calculadora de IV — Pogo-lab"
-msgstr ""
+msgstr "IV Calculator — Pogo-lab"
 
 msgid ""
-"Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de "
-"Pokémon GO."
+"Calcula la probabilidad de obtener un hundo o IV deseados en intercambios de"
+" Pokémon GO."
 msgstr ""
+"Calculate the probability of getting a hundo or desired IVs in Pokémon GO "
+"trades."
 
 msgid "Calculadora"
 msgstr "Calculator"
 
 msgid "Calculadora de probabilidad de IV"
-msgstr ""
+msgstr "IV Probability Calculator"
 
 msgid "Nivel de amistad"
-msgstr ""
+msgstr "Friendship level"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Tipo de intercambio"
-msgstr "trades/"
+msgstr "Trade type"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Número de intercambios (n)"
-msgstr "trades/"
+msgstr "Number of trades (n)"
 
-#, fuzzy
-#| msgid "Operativo"
 msgid "Objetivo"
-msgstr "Operational"
+msgstr "Target"
 
 msgid "Umbral"
-msgstr ""
+msgstr "Threshold"
 
 msgid "Nivel de confianza"
-msgstr ""
+msgstr "Confidence level"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculando..."
-msgstr "Calculator"
+msgstr "Calculating..."
 
 msgid "PvP IV Ranker — Pogo-lab"
-msgstr ""
+msgstr "PvP IV Ranker — Pogo-lab"
 
 msgid ""
 "Descubre la mejor combinación de IVs para tu Pokémon en Great, Ultra o "
 "Master League. Ranking por Stat Product de las 4096 combinaciones."
 msgstr ""
+"Discover the best IV combination for your Pokémon in Great, Ultra, or Master"
+" League. Ranked by Stat Product across all 4096 combinations."
 
 msgid "Ranking de IVs por Stat Product para PvP en Pokémon GO."
-msgstr ""
+msgstr "IV ranking by Stat Product for PvP in Pokémon GO."
 
 msgid "PvP IV Ranker"
-msgstr ""
+msgstr "PvP IV Ranker"
 
 msgid "Ranking de IV para PvP"
-msgstr ""
+msgstr "IV Ranking for PvP"
 
 msgid "Liga"
-msgstr ""
+msgstr "League"
 
 msgid "Rankear"
-msgstr ""
+msgstr "Rank"
 
 msgid "Selecciona especie y liga, luego presiona Rankear."
-msgstr ""
+msgstr "Select a species and league, then press Rank."
 
 msgid "Shadow vs Purified — Pogo-lab"
-msgstr ""
+msgstr "Shadow vs Purified — Pogo-lab"
 
 msgid ""
-"Compara el daño, CP y costo en stardust entre un Pokémon Shadow y su versión "
-"Purified en Pokémon GO."
+"Compara el daño, CP y costo en stardust entre un Pokémon Shadow y su versión"
+" Purified en Pokémon GO."
 msgstr ""
+"Compare the damage, CP, and stardust cost between a Shadow Pokémon and its "
+"Purified version in Pokémon GO."
 
 msgid "Comparativa de daño PvE y costos entre Shadow y Purified."
-msgstr ""
+msgstr "PvE damage and cost comparison between Shadow and Purified."
 
 msgid "Shadow vs Purified"
-msgstr ""
+msgstr "Shadow vs Purified"
 
 msgid "IV Ataque"
-msgstr ""
+msgstr "Attack IV"
 
 msgid "IV Defensa"
-msgstr ""
+msgstr "Defense IV"
 
 msgid "IV Stamina"
-msgstr ""
+msgstr "Stamina IV"
 
 msgid "Comparar"
-msgstr ""
+msgstr "Compare"
 
 msgid "Selecciona especie, nivel e IVs para comparar."
-msgstr ""
+msgstr "Select species, level, and IVs to compare."
 
 msgid "Probabilidad de Shiny — Pogo-lab"
-msgstr ""
+msgstr "Shiny Probability — Pogo-lab"
 
 msgid ""
 "Calcula cuántos encuentros necesitas para tener cierta confianza de "
 "encontrar un Pokémon shiny en Pokémon GO."
 msgstr ""
+"Calculate how many encounters you need for a given confidence of finding a "
+"shiny Pokémon in Pokémon GO."
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de Shiny — Pogo-lab"
-msgstr "Calculator"
+msgstr "Shiny Calculator — Pogo-lab"
 
 msgid ""
 "Probabilidad acumulada de encontrar un shiny según la tasa y número de "
 "encuentros."
 msgstr ""
+"Cumulative probability of finding a shiny based on the rate and number of "
+"encounters."
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de Shiny"
-msgstr "Calculator"
+msgstr "Shiny Calculator"
 
 msgid "Tasa shiny"
-msgstr ""
+msgstr "Shiny rate"
 
 msgid "Encuentros (n)"
-msgstr ""
+msgstr "Encounters (n)"
 
 msgid "Confianza objetivo"
-msgstr ""
+msgstr "Target confidence"
 
 msgid "Selecciona la tasa shiny y el número de encuentros."
-msgstr ""
+msgstr "Select the shiny rate and the number of encounters."
 
-#, fuzzy
-#| msgid "Efectividad de %(type)s"
 msgid "Efectividad de Tipos — Pogo-lab"
-msgstr "%(type)s effectiveness"
+msgstr "Type Effectiveness — Pogo-lab"
 
 msgid ""
 "Consulta la matriz de efectividad de tipos en Pokémon GO. Descubre "
 "debilidades, resistencias e inmunidades para los 18 tipos."
 msgstr ""
+"Check the type effectiveness matrix in Pokémon GO. Discover weaknesses, "
+"resistances, and immunities for all 18 types."
 
 msgid "Matriz de Efectividad de Tipos — Pogo-lab"
-msgstr ""
+msgstr "Type Effectiveness Matrix — Pogo-lab"
 
 msgid "Debilidades, resistencias y efectividad de los 18 tipos en Pokémon GO."
 msgstr ""
+"Weaknesses, resistances, and effectiveness of all 18 types in Pokémon GO."
 
-#, fuzzy
-#| msgid "Efectividad de %(type)s"
 msgid "Efectividad de Tipos"
-msgstr "%(type)s effectiveness"
+msgstr "Type Effectiveness"
 
-#, fuzzy
-#| msgid "Efectividad de %(type)s"
 msgid "Matriz de Efectividad de Tipos"
-msgstr "%(type)s effectiveness"
+msgstr "Type Effectiveness Matrix"
 
 msgid "Tipo defensivo 1"
-msgstr ""
+msgstr "Defensive type 1"
 
 msgid "Tipo defensivo 2 (opcional)"
-msgstr ""
+msgstr "Defensive type 2 (optional)"
 
 msgid "— Ninguno —"
-msgstr ""
+msgstr "— None —"
 
 msgid "Ver efectividad"
-msgstr ""
+msgstr "View effectiveness"
 
 msgid "Selecciona el tipo defensivo y presiona Ver efectividad."
-msgstr ""
+msgstr "Select the defensive type and press View effectiveness."
 
-#, fuzzy
-#| msgid "Mecánicas"
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Lucky garantizado (amigos 90 días+)"
+msgstr "Guaranteed Lucky (90+ day friends)"
+
+msgid "Stat individual >= X"
+msgstr "Individual stat >= X"
+
+msgid "Suma de IV >= X"
+msgstr "Sum of IVs >= X"
+
+msgid "Master League (sin límite)"
+msgstr "Master League (no cap)"
+
+msgid "Sin baya"
+msgstr "No berry"
+
+msgid "Baya Frambu"
+msgstr "Razz Berry"
+
+msgid "Baya Frambu Dorada"
+msgstr "Golden Razz Berry"
+
+msgid "Sin medalla"
+msgstr "No medal"
+
+msgid "Bronce"
+msgstr "Bronze"
+
+msgid "Plata"
+msgstr "Silver"
+
+msgid "Oro"
+msgstr "Gold"
+
+msgid "Platino"
+msgstr "Platinum"
+
+msgid "1/500 — Estándar"
+msgstr "1/500 — Standard"
+
+msgid "1/50 — Día de Comunidad"
+msgstr "1/50 — Community Day"
+
+msgid "1/20 — Legendario shiny"
+msgstr "1/20 — Shiny Legendary"
+
+msgid "1/10 — Evento especial"
+msgstr "1/10 — Special event"
+
 msgid "Mecánica"
-msgstr "Mechanics"
+msgstr "Mechanic"
 
 msgid "Guía"
-msgstr ""
+msgstr "Guide"
 
 msgid "Metodología"
-msgstr ""
+msgstr "Methodology"
 
 msgid "Legal"
-msgstr ""
+msgstr "Legal"
 
 msgid "Portada"
-msgstr ""
+msgstr "Homepage"
 
 msgid "Borrador"
-msgstr ""
+msgstr "Draft"
 
 msgid "Publicado"
-msgstr ""
+msgstr "Published"
 
 msgid "Archivado"
-msgstr ""
+msgstr "Archived"
 
 msgid "página de contenido"
-msgstr ""
+msgstr "content page"
 
 msgid "páginas de contenido"
-msgstr ""
+msgstr "content pages"
 
 msgid "Contenido renderizable (HTML)"
-msgstr ""
+msgstr "Renderable content (HTML)"
 
 msgid "traducción de página"
-msgstr ""
+msgstr "page translation"
 
 msgid "traducciones de página"
-msgstr ""
+msgstr "page translations"
 
 msgid "Dataset comunitario"
-msgstr ""
+msgstr "Community dataset"
 
 msgid "consentimiento de contribución"
-msgstr ""
+msgstr "contribution consent"
 
 msgid "consentimientos de contribución"
-msgstr ""
+msgstr "contribution consents"
 
 msgid "La fecha de revocación debe ser posterior a la de otorgamiento."
-msgstr ""
+msgstr "The revocation date must be later than the grant date."
 
 msgid "Un consentimiento activo no puede tener fecha de revocación."
-msgstr ""
+msgstr "An active consent cannot have a revocation date."
 
 msgid "Público"
-msgstr ""
+msgstr "Public"
 
 msgid "Cuarentena"
-msgstr ""
+msgstr "Quarantine"
 
 msgid "Retractado"
-msgstr ""
+msgstr "Retracted"
 
 msgid "versión de dataset"
-msgstr ""
+msgstr "dataset version"
 
 msgid "versiones de dataset"
-msgstr ""
+msgstr "dataset versions"
 
 msgid ""
 "No se puede editar una versión de dataset ya construida. Para actualizar, "
 "crea una nueva versión."
 msgstr ""
+"A dataset version that has already been built cannot be edited. To update "
+"it, create a new version."
 
 msgid "Has dado tu consentimiento para contribuir."
-msgstr ""
+msgstr "You have given your consent to contribute."
 
 msgid "Has revocado tu consentimiento."
-msgstr ""
+msgstr "You have revoked your consent."
 
-#, fuzzy
-#| msgid "Operativo"
 msgid "Informativo"
-msgstr "Operational"
+msgstr "Informational"
 
 msgid "Crítico"
-msgstr ""
+msgstr "Critical"
 
 msgid "regla de decisión"
-msgstr ""
+msgstr "decision rule"
 
 msgid "reglas de decisión"
-msgstr ""
+msgstr "decision rules"
 
 msgid "recomendación"
-msgstr ""
+msgstr "recommendation"
 
-#, fuzzy
-#| msgid "contribuciones/"
 msgid "recomendaciones"
-msgstr "contributions/"
+msgstr "recommendations"
 
 msgid "Rápido"
 msgstr "Fast"
@@ -707,12 +795,19 @@ msgstr "Fast"
 msgid "Cargado"
 msgstr "Charged"
 
+msgid "Nivel no válido:"
+msgstr "Invalid level:"
+
+#, python-format
+msgid "el nivel solicitado no está soportado; se usó el nivel %(lvl)s."
+msgstr "the requested level is not supported; level %(lvl)s was used instead."
+
 #, python-format
 msgid "Top atacantes contra %(type)s"
 msgstr "Top attackers against %(type)s"
 
 msgid "Atacantes"
-msgstr ""
+msgstr "Attackers"
 
 msgid "Orden:"
 msgstr "Sort:"
@@ -727,11 +822,11 @@ msgid "Tipo"
 msgstr "Type"
 
 msgid "Movimientos"
-msgstr ""
+msgstr "Moves"
 
 #, python-format
 msgid "Número %(dex)s en la Pokédex"
-msgstr ""
+msgstr "Pokédex number %(dex)s"
 
 msgid "STAB"
 msgstr "STAB"
@@ -740,7 +835,7 @@ msgid "Sin STAB"
 msgstr "No STAB"
 
 msgid "Selecciona un tipo de ataque para ver el ranking."
-msgstr ""
+msgstr "Select an attack type to see the ranking."
 
 #, python-format
 msgid "Efectividad de %(type)s"
@@ -753,80 +848,69 @@ msgid "esp."
 msgstr "sp."
 
 msgid "Comparar Pokémon — Pogo-lab"
-msgstr ""
+msgstr "Compare Pokémon — Pogo-lab"
 
-#, fuzzy
-#| msgid "Pokémon"
 msgid "Comparar Pokémon"
-msgstr "Pokémon"
+msgstr "Compare Pokémon"
 
 #, python-format
-msgid "Comparación lado a lado de estadísticas y DPS/TDO/eDPS a nivel %(lvl)s."
-msgstr ""
+msgid ""
+"Comparación lado a lado de estadísticas y DPS/TDO/eDPS a nivel %(lvl)s."
+msgstr "Side-by-side comparison of stats and DPS/TDO/eDPS at level %(lvl)s."
 
-#, fuzzy
-#| msgid "Pokémon"
 msgid "Pokémon A"
-msgstr "Pokémon"
+msgstr "Pokémon A"
 
 msgid "ej. rayquaza"
-msgstr ""
+msgstr "e.g. rayquaza"
 
-#, fuzzy
-#| msgid "Pokémon"
 msgid "Pokémon B"
-msgstr "Pokémon"
+msgstr "Pokémon B"
 
 msgid "ej. mewtwo"
-msgstr ""
+msgstr "e.g. mewtwo"
 
 msgid ""
 "Ingresa dos nombres de Pokémon (en inglés y minúscula) para compararlos."
-msgstr ""
+msgstr "Enter two Pokémon names (in English and lowercase) to compare them."
 
 msgid "Volver al ranking DPS/TDO"
-msgstr ""
+msgstr "Back to DPS/TDO ranking"
 
 msgid "Explorador de movimientos — Pogo-lab"
-msgstr ""
+msgstr "Move Explorer — Pogo-lab"
 
 msgid "Explorador de movimientos"
-msgstr ""
+msgstr "Move Explorer"
 
 msgid ""
 "Todos los movimientos rápidos y cargados de Pokémon GO con sus estadísticas "
 "PvE."
-msgstr ""
+msgstr "All fast and charged moves in Pokémon GO with their PvE stats."
 
 msgid "Tipo:"
-msgstr ""
+msgstr "Type:"
 
 msgid "Todos"
 msgstr "All"
 
-#, fuzzy
-#| msgid "Rápido"
 msgid "Rápidos"
 msgstr "Fast"
 
-#, fuzzy
-#| msgid "Cargado"
 msgid "Cargados"
 msgstr "Charged"
 
 msgid "Poder"
-msgstr ""
+msgstr "Power"
 
-#, fuzzy
-#| msgid "Confirmar eliminación"
 msgid "Duración"
-msgstr "Confirm deletion"
+msgstr "Duration"
 
 msgid "Clase"
-msgstr ""
+msgstr "Class"
 
 msgid "Energía"
-msgstr ""
+msgstr "Energy"
 
 msgid "DPS / TDO por tipo — Pogo-lab"
 msgstr "DPS / TDO by type — Pogo-lab"
@@ -835,11 +919,15 @@ msgid ""
 "Explora el ranking de atacantes de Pokémon GO por tipo. Compara DPS, TDO y "
 "mejores combinaciones de movimientos para cada tipo de ataque."
 msgstr ""
+"Explore the Pokémon GO attacker ranking by type. Compare DPS, TDO, and the "
+"best move combinations for each attack type."
 
 msgid ""
-"Compara atacantes de Pokémon GO por tipo. DPS, TDO, mejores combinaciones de "
-"movimientos y cobertura de tipos."
+"Compara atacantes de Pokémon GO por tipo. DPS, TDO, mejores combinaciones de"
+" movimientos y cobertura de tipos."
 msgstr ""
+"Compare Pokémon GO attackers by type. DPS, TDO, best move combinations, and "
+"type coverage."
 
 msgid "DPS/TDO por tipo"
 msgstr "DPS/TDO by type"
@@ -851,430 +939,390 @@ msgid ""
 "Ranking de atacantes de Pokémon GO mejor contra cada tipo. Nivel 40, IVs "
 "15/15/15, sin clima."
 msgstr ""
+"Ranking of the best Pokémon GO attackers against each type. Level 40, "
+"15/15/15 IVs, no weather."
 
 msgid "Nivel:"
-msgstr ""
+msgstr "Level:"
 
-#, fuzzy
-#| msgid "Pokémon"
 msgid "Buscar Pokémon…"
-msgstr "Pokémon"
+msgstr "Search Pokémon…"
 
 msgid "protocolo de experimento"
-msgstr ""
+msgstr "experiment protocol"
 
 msgid "protocolos de experimento"
-msgstr ""
+msgstr "experiment protocols"
 
 msgid "Código interno, ej. trade_iv"
-msgstr ""
+msgstr "Internal code, e.g. trade_iv"
 
 msgid "Activa"
-msgstr ""
+msgstr "Active"
 
 msgid "Deprecada"
-msgstr ""
+msgstr "Deprecated"
 
 msgid "Experimental"
-msgstr ""
+msgstr "Experimental"
 
-#, fuzzy
-#| msgid "Mecánicas"
 msgid "mecánica"
-msgstr "Mechanics"
+msgstr "mechanic"
 
-#, fuzzy
-#| msgid "Mecánicas"
 msgid "mecánicas"
-msgstr "Mechanics"
+msgstr "mechanics"
 
 msgid "Alto"
-msgstr ""
+msgstr "High"
 
 msgid "Medio"
-msgstr ""
+msgstr "Medium"
 
 msgid "Bajo"
-msgstr ""
+msgstr "Low"
 
 msgid "Hipotético"
-msgstr ""
+msgstr "Hypothetical"
 
 msgid "ruleset"
-msgstr ""
+msgstr "ruleset"
 
 msgid "rulesets"
-msgstr ""
+msgstr "rulesets"
 
 msgid "No se puede editar un ruleset ya publicado."
-msgstr ""
+msgstr "A ruleset that has already been published cannot be edited."
 
 msgid "effective_to debe ser posterior a effective_from."
-msgstr ""
+msgstr "effective_to must be later than effective_from."
 
 msgid "Entero"
-msgstr ""
+msgstr "Integer"
 
 msgid "Decimal"
-msgstr ""
+msgstr "Decimal"
 
 msgid "Booleano"
-msgstr ""
+msgstr "Boolean"
 
 msgid "Texto"
-msgstr ""
+msgstr "Text"
 
 msgid "JSON"
-msgstr ""
+msgstr "JSON"
 
 msgid "parámetro de ruleset"
-msgstr ""
+msgstr "ruleset parameter"
 
 msgid "parámetros de ruleset"
-msgstr ""
+msgstr "ruleset parameters"
 
 msgid ""
 "No se pueden modificar los parámetros de un ruleset ya publicado. Crea una "
 "nueva versión del ruleset."
 msgstr ""
+"The parameters of a ruleset that has already been published cannot be "
+"modified. Create a new version of the ruleset."
 
 msgid "No se pueden eliminar los parámetros de un ruleset publicado."
-msgstr ""
+msgstr "The parameters of a published ruleset cannot be deleted."
 
 msgid "Mecánicas"
 msgstr "Mechanics"
 
-#, fuzzy
-#| msgid "calculadora/"
 msgid "Ir a la calculadora"
-msgstr "calculator/"
+msgstr "Go to the calculator"
 
 msgid "Reglas vigentes"
-msgstr ""
+msgstr "Current rules"
 
-#, fuzzy
-#| msgid "Cerrar sesión"
 msgid "Versión"
-msgstr "Log out"
+msgstr "Version"
 
 msgid "Vigente desde"
-msgstr ""
+msgstr "Effective from"
 
 msgid "Vigente hasta"
-msgstr ""
+msgstr "Effective until"
 
 msgid "Parámetros"
-msgstr ""
+msgstr "Parameters"
 
 msgid "Clave"
-msgstr ""
+msgstr "Key"
 
-#, fuzzy
-#| msgid "comunidad/"
 msgid "Unidad"
-msgstr "community/"
+msgstr "Unit"
 
 msgid "Fuentes y evidencia"
-msgstr ""
+msgstr "Sources and evidence"
 
 msgid "Confianza:"
-msgstr ""
+msgstr "Confidence:"
 
 msgid "Sin reglas publicadas"
-msgstr ""
+msgstr "No published rules"
 
 msgid "No hay reglas publicadas para esta mecánica todavía."
-msgstr ""
+msgstr "There are no published rules for this mechanic yet."
 
 msgid "No hay mecánicas disponibles"
-msgstr ""
+msgstr "No mechanics available"
 
 msgid "Las mecánicas del juego se agregarán pronto."
-msgstr ""
+msgstr "Game mechanics will be added soon."
 
 msgid "Oficial"
-msgstr ""
+msgstr "Official"
 
 msgid "Investigación comunitaria"
-msgstr ""
+msgstr "Community research"
 
 msgid "Datamining"
-msgstr ""
+msgstr "Datamining"
 
 msgid "Inferencia"
-msgstr ""
+msgstr "Inference"
 
 msgid "Hipótesis interna"
-msgstr ""
+msgstr "Internal hypothesis"
 
 msgid "Vigente"
-msgstr ""
+msgstr "Current"
 
 msgid "En revisión"
-msgstr ""
+msgstr "Under review"
 
 msgid "Obsoleta"
-msgstr ""
+msgstr "Obsolete"
 
-#, fuzzy
-#| msgid "Contraseña"
 msgid "Contradicha"
-msgstr "Password"
+msgstr "Contradicted"
 
 msgid "referencia de fuente"
-msgstr ""
+msgstr "source reference"
 
 msgid "referencias de fuente"
-msgstr ""
+msgstr "source references"
 
 msgid "afirmación citada"
-msgstr ""
+msgstr "cited claim"
 
 msgid "afirmaciones citadas"
-msgstr ""
+msgstr "cited claims"
 
 msgid "Good Friends"
-msgstr ""
+msgstr "Good Friends"
 
 msgid "Great Friends"
-msgstr ""
+msgstr "Great Friends"
 
 msgid "Ultra Friends"
-msgstr ""
+msgstr "Ultra Friends"
 
 msgid "Best Friends"
-msgstr ""
-
-msgid "Normal"
-msgstr ""
+msgstr "Best Friends"
 
 msgid "Lucky garantizado"
-msgstr ""
+msgstr "Guaranteed Lucky"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "sesión de intercambios"
-msgstr "trades/"
+msgstr "trade session"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "sesiones de intercambios"
-msgstr "trades/"
+msgstr "trade sessions"
 
 msgid "Válido"
-msgstr ""
+msgstr "Valid"
 
 msgid "Excluido"
-msgstr ""
+msgstr "Excluded"
 
 msgid "Sospechoso"
-msgstr ""
+msgstr "Suspicious"
 
 msgid "Duplicado"
-msgstr ""
+msgstr "Duplicate"
 
 msgid "Eliminado"
-msgstr ""
+msgstr "Deleted"
 
 msgid "Manual"
-msgstr ""
+msgstr "Manual"
 
 msgid "Por lotes"
-msgstr ""
+msgstr "Batch"
 
 msgid "CSV"
-msgstr ""
+msgstr "CSV"
 
 msgid "DERIVADO: True si trade_type es lucky o lucky_guaranteed"
-msgstr ""
+msgstr "DERIVED: True if trade_type is lucky or lucky_guaranteed"
 
 msgid "observación de intercambio"
-msgstr ""
+msgstr "trade observation"
 
 msgid "observaciones de intercambios"
-msgstr ""
+msgstr "trade observations"
 
 msgid "Añadir por lotes — Pogo-lab"
-msgstr ""
+msgstr "Add in Batch — Pogo-lab"
 
 msgid "Añadir observaciones por lotes"
-msgstr ""
+msgstr "Add observations in batch"
 
 msgid "JSON de observaciones"
-msgstr ""
+msgstr "Observations JSON"
 
 msgid "Guardar todas"
-msgstr ""
+msgstr "Save all"
 
 #, python-format
 msgid "%(counter)s observación guardada."
 msgid_plural "%(counter)s observaciones guardadas."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%(counter)s observation saved."
+msgstr[1] "%(counter)s observations saved."
 
 msgid "Volver a sesiones"
-msgstr ""
+msgstr "Back to sessions"
 
 msgid "Importar CSV — Pogo-lab"
-msgstr ""
+msgstr "Import CSV — Pogo-lab"
 
 msgid "Importar CSV de observaciones"
-msgstr ""
+msgstr "Import observations CSV"
 
 msgid "Archivo CSV"
-msgstr ""
+msgstr "CSV file"
 
 msgid ""
 "Campos: observed_at, friendship_level, trade_type, atk, def, hp, species"
 msgstr ""
+"Fields: observed_at, friendship_level, trade_type, atk, def, hp, species"
 
 msgid "Usa el archivo docs/csv_template.csv como plantilla."
-msgstr ""
+msgstr "Use the docs/csv_template.csv file as a template."
 
 msgid "Importar"
-msgstr ""
+msgstr "Import"
 
 #, python-format
 msgid "%(valid)s de %(total)s filas importadas correctamente."
-msgstr ""
+msgstr "%(valid)s of %(total)s rows imported successfully."
 
 msgid "Dashboard — Pogo-lab"
-msgstr ""
+msgstr "Dashboard — Pogo-lab"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Dashboard de intercambios"
-msgstr "trades/"
+msgstr "Trade Dashboard"
 
 msgid "Total de observaciones"
-msgstr ""
+msgstr "Total observations"
 
 msgid "Registrar intercambio — Pogo-lab"
-msgstr ""
+msgstr "Log Trade — Pogo-lab"
 
-#, fuzzy
-#| msgid "Iniciar Sesión"
 msgid "Sesión"
-msgstr "Log In"
+msgstr "Session"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Nuevo intercambio"
-msgstr "trades/"
+msgstr "New trade"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Registrar intercambio"
-msgstr "trades/"
+msgstr "Log trade"
 
 msgid "Observación guardada."
-msgstr ""
+msgstr "Observation saved."
 
-#, fuzzy
-#| msgid "Estado"
 msgid "Amistad"
-msgstr "Status"
+msgstr "Friendship"
 
 msgid "Especie (opcional)"
-msgstr ""
+msgstr "Species (optional)"
 
 msgid "Guardar y siguiente"
-msgstr ""
+msgstr "Save and next"
 
-#, fuzzy
-#| msgid "Cerrar sesión"
 msgid "Volver a la sesión"
-msgstr "Log out"
+msgstr "Back to session"
 
 msgid "Nueva sesión — Pogo-lab"
-msgstr ""
+msgstr "New Session — Pogo-lab"
 
 msgid "Sesiones"
-msgstr ""
+msgstr "Sessions"
 
 msgid "Nueva"
-msgstr ""
+msgstr "New"
 
 msgid "Nueva sesión de intercambios"
-msgstr ""
+msgstr "New trade session"
 
 msgid "Etiqueta (opcional)"
-msgstr ""
+msgstr "Label (optional)"
 
 msgid "Ej: Sesión con Juan"
-msgstr ""
+msgstr "E.g.: Session with Juan"
 
 msgid "Amistad por defecto"
-msgstr ""
+msgstr "Default friendship"
 
 msgid "Tipo de intercambio por defecto"
-msgstr ""
+msgstr "Default trade type"
 
-#, fuzzy
-#| msgid "Cerrar sesión"
 msgid "Crear sesión"
-msgstr "Log out"
+msgstr "Create session"
 
 msgid "Cancelar"
-msgstr ""
+msgstr "Cancel"
 
 msgid "Nueva observación"
-msgstr ""
+msgstr "New observation"
 
 msgid "Añadir por lotes"
-msgstr ""
+msgstr "Add in batch"
 
 msgid "Importar CSV"
-msgstr ""
+msgstr "Import CSV"
 
 msgid "Dashboard"
-msgstr ""
+msgstr "Dashboard"
 
 msgid "Fecha"
-msgstr ""
+msgstr "Date"
 
 msgid "Estado"
 msgstr "Status"
 
-#, fuzzy
-#| msgid "Confirmar eliminación"
 msgid "Paginación"
-msgstr "Confirm deletion"
+msgstr "Pagination"
 
 msgid "Sin observaciones"
-msgstr ""
+msgstr "No observations"
 
 msgid "Esta sesión aún no tiene observaciones registradas."
-msgstr ""
+msgstr "This session doesn't have any recorded observations yet."
 
 msgid "Mis sesiones de intercambios — Pogo-lab"
-msgstr ""
+msgstr "My Trade Sessions — Pogo-lab"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Sesiones de intercambios"
-msgstr "trades/"
+msgstr "Trade sessions"
 
-#, fuzzy
-#| msgid "Cerrar sesión"
 msgid "Nueva sesión"
-msgstr "Log out"
+msgstr "New session"
 
 msgid "Sin sesiones todavía"
-msgstr ""
+msgstr "No sessions yet"
 
 msgid "Crea tu primera sesión de intercambios para empezar a registrar."
-msgstr ""
+msgstr "Create your first trade session to start logging."
 
-#, fuzzy
-#| msgid "cuenta/"
 msgid "cuenta/login/"
-msgstr "account/"
+msgstr "account/login/"
 
-#, fuzzy
-#| msgid "cuenta/"
 msgid "cuenta/signup/"
-msgstr "account/"
+msgstr "account/signup/"
 
 msgid "cuenta/"
 msgstr "account/"
@@ -1301,13 +1349,16 @@ msgid "comunidad/"
 msgstr "community/"
 
 msgid "dps/"
-msgstr ""
+msgstr "dps/"
+
+msgid "Iniciar sesión"
+msgstr "Log in"
 
 msgid "Correo electrónico"
 msgstr "Email"
 
 msgid "tu@correo.com"
-msgstr ""
+msgstr "you@email.com"
 
 msgid "Contraseña"
 msgstr "Password"
@@ -1315,17 +1366,37 @@ msgstr "Password"
 msgid "Recordarme"
 msgstr "Remember me"
 
+msgid "¿No tienes cuenta?"
+msgstr "Don't have an account?"
+
+msgid "Regístrate"
+msgstr "Sign up"
+
+msgid "Registrarse"
+msgstr "Sign up"
+
 msgid "Confirmar contraseña"
 msgstr "Confirm password"
 
 msgid "Confirmo que tengo al menos 13 años."
+msgstr "I confirm that I am at least 13 years old."
+
+msgid "¿Ya tienes cuenta?"
+msgstr "Already have an account?"
+
+msgid "Registro cerrado"
+msgstr "Registration closed"
+
+msgid ""
+"Pogo-lab se encuentra en beta cerrada. Para registrarte necesitas una "
+"invitación válida. Pide a quien te invitó que te reenvíe el enlace."
 msgstr ""
+"Pogo-lab is in closed beta. To sign up you need a valid invitation. Ask "
+"whoever invited you to resend the link."
 
 msgid "Eliminar cuenta"
 msgstr "Delete account"
 
-#, fuzzy
-#| msgid "Esta acción es irreversible. Todos tus datos serán eliminados."
 msgid "Esta acción es irreversible. Todos tus datos serán eliminados."
 msgstr "This action is irreversible. All your data will be deleted."
 
@@ -1333,23 +1404,22 @@ msgid "Confirmar eliminación"
 msgstr "Confirm deletion"
 
 msgid "Cuenta eliminada"
-msgstr ""
+msgstr "Account deleted"
 
 msgid "Tu cuenta y todos tus datos han sido eliminados."
-msgstr ""
+msgstr "Your account and all your data have been deleted."
 
 msgid "Volver al inicio"
-msgstr ""
+msgstr "Back to home"
 
 msgid "Exportar datos"
 msgstr "Export data"
 
-#, fuzzy
-#| msgid "Recibirás un enlace de descarga con todos tus datos."
 msgid ""
 "Recibirás un enlace de descarga con todos tus datos personales (GDPR Art. "
 "20)."
-msgstr "You will receive a download link with all your data."
+msgstr ""
+"You will receive a download link with all your personal data (GDPR Art. 20)."
 
 msgid "Solicitar exportación"
 msgstr "Request export"
@@ -1358,218 +1428,208 @@ msgid ""
 "Plataforma de análisis estadístico para mecánicas de Pokémon GO — "
 "probabilidades, IV, Lucky e inferencia honesta."
 msgstr ""
+"Statistical analysis platform for Pokémon GO mechanics — probabilities, IVs,"
+" Lucky, and honest inference."
 
 msgid "Plataforma de análisis estadístico para mecánicas de Pokémon GO."
-msgstr ""
+msgstr "Statistical analysis platform for Pokémon GO mechanics."
 
 msgid "Análisis estadístico para Pokémon GO."
-msgstr ""
+msgstr "Statistical analysis for Pokémon GO."
 
 msgid "Saltar al contenido principal"
-msgstr ""
+msgstr "Skip to main content"
 
 msgid "Abrir menú"
-msgstr ""
+msgstr "Open menu"
 
 msgid "Navegación principal"
-msgstr ""
+msgstr "Main navigation"
 
 msgid "Idioma"
-msgstr ""
+msgstr "Language"
 
 msgid "Alternar modo oscuro"
-msgstr ""
+msgstr "Toggle dark mode"
 
 msgid "Modo oscuro"
-msgstr ""
+msgstr "Dark mode"
 
 msgid "Salir"
-msgstr ""
+msgstr "Log out"
 
 msgid "Entrar"
-msgstr ""
+msgstr "Log in"
 
 msgid ""
 "Análisis estadístico honesto y trazable para las mecánicas de Pokémon GO."
-msgstr ""
+msgstr "Honest, traceable statistical analysis for Pokémon GO mechanics."
 
 msgid "Herramientas"
-msgstr ""
+msgstr "Tools"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora de IV"
-msgstr "Calculator"
+msgstr "IV Calculator"
 
 msgid "CP y Nivel"
-msgstr ""
+msgstr "CP and Level"
 
 msgid "PvP Ranker"
-msgstr ""
+msgstr "PvP Ranker"
 
 msgid "Captura"
-msgstr ""
+msgstr "Capture"
 
-#, fuzzy
-#| msgid "Calculadora"
 msgid "Calculadora Shiny"
-msgstr "Calculator"
+msgstr "Shiny Calculator"
 
 msgid "Guía: CP y HP"
-msgstr ""
+msgstr "Guide: CP and HP"
 
-#, fuzzy
-#| msgid "intercambios/"
 msgid "Guía: IV en intercambios"
-msgstr "trades/"
+msgstr "Guide: IVs in trades"
 
-#, fuzzy
-#| msgid "comunidad/"
 msgid "Comunidad"
-msgstr "community/"
+msgstr "Community"
 
 msgid "Mis sesiones"
-msgstr ""
+msgstr "My sessions"
 
 msgid "Privacidad"
-msgstr ""
+msgstr "Privacy"
 
 msgid "Términos"
-msgstr ""
+msgstr "Terms"
 
 msgid "Descargo"
-msgstr ""
+msgstr "Disclaimer"
 
-#, fuzzy
-#| msgid "No afiliado a Niantic ni The Pokémon Company"
 msgid "No afiliado a Niantic, The Pokémon Company, Nintendo ni Creatures Inc."
-msgstr "Not affiliated with Niantic or The Pokémon Company"
+msgstr ""
+"Not affiliated with Niantic, The Pokémon Company, Nintendo, or Creatures "
+"Inc."
 
 msgid ""
 "Los datos y análisis son proporcionados 'tal cual' con fines educativos."
-msgstr ""
+msgstr "Data and analysis are provided 'as is' for educational purposes."
 
 msgid "Demasiadas solicitudes"
-msgstr ""
+msgstr "Too many requests"
 
 msgid ""
-"Has hecho demasiadas solicitudes. Por favor, espera unos minutos e inténtalo "
-"de nuevo."
+"Has hecho demasiadas solicitudes. Por favor, espera unos minutos e inténtalo"
+" de nuevo."
 msgstr ""
+"You have made too many requests. Please wait a few minutes and try again."
 
 msgid "Análisis estadístico para Pokémon GO"
-msgstr ""
+msgstr "Statistical analysis for Pokémon GO"
 
 msgid ""
 "Plataforma de análisis estadístico para mecánicas de Pokémon GO. Calcula "
 "probabilidades de IV, registra intercambios, y obtén inferencia honesta y "
 "trazable."
 msgstr ""
+"Statistical analysis platform for Pokémon GO mechanics. Calculate IV "
+"probabilities, log trades, and get honest, traceable inference."
 
 msgid ""
 "Calcula probabilidades de IV, registra intercambios, y obtén inferencia "
 "honesta y trazable."
 msgstr ""
-
-msgid "Ficha 01 · Matemática verificada"
-msgstr ""
-
-msgid "Pogo-lab"
-msgstr ""
+"Calculate IV probabilities, log trades, and get honest, traceable inference."
 
 msgid "Matemática honesta para entender las mecánicas de Pokémon GO."
-msgstr ""
+msgstr "Honest math to understand Pokémon GO mechanics."
 
 msgid "Calcular probabilidades"
-msgstr ""
+msgstr "Calculate probabilities"
 
-#, fuzzy
-#| msgid "Mecánicas"
 msgid "Explorar mecánicas"
-msgstr "Mechanics"
-
-msgid "Trazable"
-msgstr ""
-
-msgid "Sesgo"
-msgstr ""
+msgstr "Explore mechanics"
 
 msgid "Ciclo del producto"
-msgstr ""
+msgstr "Product cycle"
 
 msgid "Entender"
-msgstr ""
+msgstr "Understand"
 
 msgid "Mecánicas versionadas con fuentes trazables"
-msgstr ""
+msgstr "Versioned mechanics with traceable sources"
 
 msgid "Probabilidades exactas con matemática verificada"
-msgstr ""
+msgstr "Exact probabilities with verified math"
 
-#, fuzzy
-#| msgid "Regístrate"
 msgid "Registrar"
-msgstr "Sign up"
+msgstr "Log"
 
 msgid "Intercambios con CSV o manualmente"
-msgstr ""
+msgstr "Trades via CSV or manually"
 
 msgid "Analizar"
-msgstr ""
+msgstr "Analyze"
 
 msgid "Inferencia estadística honesta"
-msgstr ""
+msgstr "Honest statistical inference"
 
 msgid "Decidir"
-msgstr ""
+msgstr "Decide"
 
 msgid "Recomendaciones deterministas y trazables"
-msgstr ""
+msgstr "Deterministic, traceable recommendations"
 
 msgid "¿Por qué Pogo-lab?"
-msgstr ""
+msgstr "Why Pogo-lab?"
 
-msgid "01 · Sin magia negra"
-msgstr ""
+msgid "Sin magia negra"
+msgstr "No black magic"
 
 msgid ""
 "Cada resultado muestra su regla, versión y fuente. No confíes en nuestra "
 "palabra: verifícalo."
 msgstr ""
+"Every result shows its rule, version, and source. Don't take our word for "
+"it: verify it yourself."
 
-msgid "02 · Modelo correcto"
-msgstr ""
+msgid "Modelo correcto"
+msgstr "Correct model"
 
 msgid ""
 "Re-roll uniforme en [f,15], no clamping. Probado con hypothesis testing y "
 "simulación."
 msgstr ""
+"Uniform re-roll in [f,15], no clamping. Tested with hypothesis testing and "
+"simulation."
 
-msgid "03 · Procedencia separada"
-msgstr ""
+msgid "Procedencia separada"
+msgstr "Separate provenance"
 
 msgid ""
 "Oficial / comunidad / datamining / inferido — cada afirmación con su "
 "etiqueta de confianza."
 msgstr ""
+"Official / community / datamining / inferred — every claim carries its "
+"confidence label."
 
-msgid "04 · Decisiones, no números"
-msgstr ""
+msgid "Decisiones, no números"
+msgstr "Decisions, not numbers"
 
 #, python-format
 msgid ""
-"Convertimos probabilidades en acciones: ¿cuántos intercambios necesitas para "
-"estar 95%% seguro?"
+"Convertimos probabilidades en acciones: ¿cuántos intercambios necesitas para"
+" estar 95%% seguro?"
 msgstr ""
+"We turn probabilities into actions: how many trades do you need to be 95%% "
+"sure?"
 
 msgid "Dataset Comunitario"
-msgstr ""
+msgstr "Community Dataset"
 
 msgid "Dataset Comunitario de Intercambios"
-msgstr ""
+msgstr "Community Trade Dataset"
 
 msgid "Advertencia sobre los datos"
-msgstr ""
+msgstr "Data warning"
 
 msgid ""
 "Este dataset NO es una muestra aleatoria de la población de jugadores. Los "
@@ -1578,117 +1638,138 @@ msgid ""
 "activos, con más hundos, o con comportamientos atípicos pueden estar "
 "sobrerrepresentados. Interpreta los resultados con cautela."
 msgstr ""
+"This dataset is NOT a random sample of the player population. The data comes"
+" from trainers who voluntarily choose to contribute their observations "
+"(self-selection). This can introduce bias: more active players, players with"
+" more hundos, or players with atypical behavior may be overrepresented. "
+"Interpret the results with caution."
 
 msgid "Afortunados (Lucky)"
-msgstr ""
+msgstr "Lucky"
 
 msgid "Normales"
-msgstr ""
+msgstr "Normal"
 
 msgid "Versión del dataset"
-msgstr ""
+msgstr "Dataset version"
 
 msgid "Fecha de construcción"
-msgstr ""
+msgstr "Build date"
 
 msgid "Muestra mínima alcanzada"
-msgstr ""
+msgstr "Minimum sample reached"
 
 msgid "Muestra mínima no alcanzada"
-msgstr ""
+msgstr "Minimum sample not reached"
 
 msgid "Versiones de ruleset incluidas"
-msgstr ""
+msgstr "Included ruleset versions"
 
 msgid "Distribución agregada"
-msgstr ""
+msgstr "Aggregate distribution"
 
 msgid "Piso:"
-msgstr ""
+msgstr "Floor:"
 
 msgid "Hundos:"
-msgstr ""
+msgstr "Hundos:"
 
 msgid "Metodología y limitaciones"
-msgstr ""
+msgstr "Methodology and limitations"
 
 msgid ""
 "Los datos provienen de intercambios registrados por entrenadores que han "
 "dado su consentimiento explícito para contribuir de forma anonimizada al "
 "dataset comunitario."
 msgstr ""
+"The data comes from trades logged by trainers who have given explicit "
+"consent to contribute anonymized data to the community dataset."
 
 msgid "Solo se incluyen observaciones marcadas como válidas."
-msgstr ""
+msgstr "Only observations marked as valid are included."
 
 msgid ""
 "Cada entrenador otorga consentimiento explícito (revocable en cualquier "
 "momento)."
-msgstr ""
+msgstr "Each trainer grants explicit consent (revocable at any time)."
 
 msgid ""
 "Los datos están anonimizados: sin nombre de entrenador, correo, ubicación "
 "precisa ni marcas de tiempo exactas."
 msgstr ""
+"The data is anonymized: no trainer name, email, precise location, or exact "
+"timestamps."
 
 msgid ""
 "Los IV se agrupan por tipo de intercambio (Lucky/normal) y nivel de amistad "
 "— nunca se mezclan pisos distintos."
 msgstr ""
+"IVs are grouped by trade type (Lucky/normal) and friendship level — "
+"different floors are never mixed."
 
 msgid ""
 "No se incluye país por fila. Cualquier agregado geográfico usa supresión de "
 "celdas pequeñas."
 msgstr ""
+"No country is included per row. Any geographic aggregate uses small-cell "
+"suppression."
 
 msgid ""
 "Sesgo de selección: los contribuyentes no son una muestra aleatoria (ver "
 "advertencia arriba)."
 msgstr ""
+"Selection bias: contributors are not a random sample (see warning above)."
 
 msgid "Descarga"
-msgstr ""
+msgstr "Download"
 
 msgid "La descarga pública del dataset está disponible."
-msgstr ""
+msgstr "Public dataset download is available."
 
 msgid "La descarga pública del dataset no está habilitada en este momento."
-msgstr ""
+msgstr "Public dataset download is not enabled at this time."
 
 msgid ""
 "Habilitar la descarga pública requiere revisión legal de la licencia del "
 "dataset y que se alcance la muestra mínima."
 msgstr ""
+"Enabling public download requires legal review of the dataset license and "
+"reaching the minimum sample."
 
 msgid "Sin dataset disponible"
-msgstr ""
+msgstr "No dataset available"
 
 msgid ""
-"Aún no se ha construido ninguna versión del dataset comunitario. Cuando haya "
-"suficientes contribuciones, aquí aparecerá el dashboard."
+"Aún no se ha construido ninguna versión del dataset comunitario. Cuando haya"
+" suficientes contribuciones, aquí aparecerá el dashboard."
 msgstr ""
+"No version of the community dataset has been built yet. Once there are "
+"enough contributions, the dashboard will appear here."
 
 msgid "Descargo de responsabilidad"
-msgstr ""
+msgstr "Disclaimer"
 
 msgid "Última actualización: 2026-07-19."
-msgstr ""
+msgstr "Last updated: 2026-07-19."
 
-#, fuzzy
-#| msgid "Confirmar eliminación"
 msgid "Afiliación"
-msgstr "Confirm deletion"
+msgstr "Affiliation"
 
 msgid ""
 "Pogo-lab no está afiliado, asociado, autorizado, respaldado por, ni de "
 "ninguna manera vinculado oficialmente a Niantic, Inc., The Pokémon Company, "
 "Nintendo, Creatures Inc., o cualquiera de sus subsidiarias o afiliadas. "
-"Pokémon GO, Pokémon y sus respectivos nombres, marcas, imágenes y personajes "
-"son marcas registradas de sus respectivos propietarios."
+"Pokémon GO, Pokémon y sus respectivos nombres, marcas, imágenes y personajes"
+" son marcas registradas de sus respectivos propietarios."
 msgstr ""
+"Pogo-lab is not affiliated, associated, authorized, endorsed by, or in any "
+"way officially connected to Niantic, Inc., The Pokémon Company, Nintendo, "
+"Creatures Inc., or any of their subsidiaries or affiliates. Pokémon GO, "
+"Pokémon, and their respective names, trademarks, images, and characters are "
+"registered trademarks of their respective owners."
 
 msgid "Precisión de los datos"
-msgstr ""
+msgstr "Data accuracy"
 
 msgid ""
 "Los análisis, cálculos y mecánicas presentados en Pogo-lab se basan en "
@@ -1698,40 +1779,52 @@ msgid ""
 "aviso. No garantizamos la exactitud, integridad o actualidad de ningún "
 "contenido."
 msgstr ""
+"The analyses, calculations, and mechanics presented on Pogo-lab are based on"
+" community research, datamining, and official documentation when available. "
+"While we strive to keep the information current and accurate, game mechanics"
+" may change without notice. We do not guarantee the accuracy, completeness, "
+"or currency of any content."
 
 msgid "Uso del servicio"
-msgstr ""
+msgstr "Use of the service"
 
 msgid ""
 "El uso de Pogo-lab y sus herramientas es bajo tu propio riesgo. Las "
 "decisiones que tomes en el juego basadas en nuestros análisis son tu "
 "responsabilidad. No nos hacemos responsables de pérdidas de recursos en el "
-"juego, intercambios fallidos, o cualquier otro resultado derivado del uso de "
-"la plataforma."
+"juego, intercambios fallidos, o cualquier otro resultado derivado del uso de"
+" la plataforma."
 msgstr ""
+"Use of Pogo-lab and its tools is at your own risk. In-game decisions you "
+"make based on our analyses are your own responsibility. We are not "
+"responsible for in-game resource losses, failed trades, or any other outcome"
+" resulting from use of the platform."
 
 msgid "Contenido generado por usuarios"
-msgstr ""
+msgstr "User-generated content"
 
 msgid ""
 "Pogo-lab puede contener datos de observaciones contribuidos por usuarios. "
-"Estos datos no han sido verificados de forma independiente y pueden contener "
-"errores. El dataset comunitario se proporciona \"tal cual\" con fines de "
+"Estos datos no han sido verificados de forma independiente y pueden contener"
+" errores. El dataset comunitario se proporciona \"tal cual\" con fines de "
 "investigación y entretenimiento."
 msgstr ""
+"Pogo-lab may contain observation data contributed by users. This data has "
+"not been independently verified and may contain errors. The community "
+"dataset is provided \"as is\" for research and entertainment purposes."
 
 msgid "Política de privacidad"
-msgstr ""
+msgstr "Privacy policy"
 
 msgid "Última actualización: 2026-07-18."
-msgstr ""
+msgstr "Last updated: 2026-07-18."
 
 msgid "Responsable del tratamiento"
-msgstr ""
+msgstr "Data controller"
 
 msgid ""
-"El responsable del tratamiento de tus datos personales es Carlos M., persona "
-"natural con domicilio en Chile. Para cualquier asunto de privacidad puedes "
+"El responsable del tratamiento de tus datos personales es Carlos M., persona"
+" natural con domicilio en Chile. Para cualquier asunto de privacidad puedes "
 "escribir a carlos@tooltician.com."
 msgstr ""
 "The data controller of your personal data is Carlos M., a natural person "
@@ -1739,134 +1832,166 @@ msgstr ""
 "carlos@tooltician.com."
 
 msgid "Datos que recopilamos"
-msgstr ""
+msgstr "Data we collect"
 
 msgid ""
-"Recopilamos los siguientes datos cuando creas una cuenta: correo electrónico "
-"(necesario para la autenticación), nombre de usuario (público). Cuando "
+"Recopilamos los siguientes datos cuando creas una cuenta: correo electrónico"
+" (necesario para la autenticación), nombre de usuario (público). Cuando "
 "registras observaciones de intercambios, almacenamos los IVs, tipo de "
 "intercambio, nivel de amistad, especie y marca de tiempo."
 msgstr ""
+"We collect the following data when you create an account: email (required "
+"for authentication), username (public). When you log trade observations, we "
+"store the IVs, trade type, friendship level, species, and timestamp."
 
 msgid "Datos que NO recopilamos"
-msgstr ""
+msgstr "Data we do NOT collect"
 
 msgid "Nombre real del entrenador"
-msgstr ""
+msgstr "Trainer's real name"
 
 msgid "Ubicación precisa (solo país agregado opcional)"
-msgstr ""
+msgstr "Precise location (only optional aggregated country)"
 
 msgid "Identificadores de dispositivo"
-msgstr ""
+msgstr "Device identifiers"
 
 msgid "Contenido de notas privadas"
-msgstr ""
+msgstr "Content of private notes"
 
 msgid "Base legal"
-msgstr ""
+msgstr "Legal basis"
 
 msgid ""
 "Tratamos tus datos conforme a la legislación chilena de protección de datos "
 "(Ley 19.628 y, de forma inminente, la Ley 21.719). Las bases legales son:"
 msgstr ""
+"We process your data in accordance with Chilean data protection law (Law "
+"19.628 and, imminently, Law 21.719). The legal bases are:"
 
 msgid ""
-"Ejecución de un contrato: la creación y gestión de tu cuenta y el uso de las "
-"herramientas del servicio."
+"Ejecución de un contrato: la creación y gestión de tu cuenta y el uso de las"
+" herramientas del servicio."
 msgstr ""
+"Performance of a contract: creating and managing your account and using the "
+"service's tools."
 
 msgid ""
 "Consentimiento explícito: para incluir tus observaciones en el dataset "
 "comunitario anonimizado. Puedes revocarlo en cualquier momento."
 msgstr ""
+"Explicit consent: to include your observations in the anonymized community "
+"dataset. You can revoke it at any time."
 
 msgid ""
 "Interés legítimo: análisis agregados y anonimizados para comprender las "
 "mecánicas del juego — un tratamiento distinto al del dataset comunitario."
 msgstr ""
+"Legitimate interest: aggregated and anonymized analysis to understand game "
+"mechanics — processing distinct from the community dataset."
 
 msgid ""
 "Si resides en la Unión Europea, también se aplica el Reglamento General de "
 "Protección de Datos (GDPR) en lo que corresponda."
 msgstr ""
+"If you reside in the European Union, the General Data Protection Regulation "
+"(GDPR) also applies where relevant."
 
 msgid "Cookies"
-msgstr ""
+msgstr "Cookies"
 
 msgid ""
 "Usamos cookies estrictamente necesarias para la sesión (sessionid, "
-"csrftoken). No usamos cookies de rastreo, publicidad ni análisis de terceros."
+"csrftoken). No usamos cookies de rastreo, publicidad ni análisis de "
+"terceros."
 msgstr ""
+"We use cookies strictly necessary for the session (sessionid, csrftoken). We"
+" do not use third-party tracking, advertising, or analytics cookies."
 
 msgid "Conservación de datos"
-msgstr ""
+msgstr "Data retention"
 
 msgid ""
-"Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta, "
-"todos tus datos personales se eliminan irreversiblemente. Las contribuciones "
-"al dataset comunitario ya agregadas no son reversibles porque los datos han "
-"sido anonimizados de forma irreversible: no contienen nombre de entrenador, "
-"ubicación precisa ni notas privadas, e incluyen solo país agregado. Tu "
-"consentimiento para futuros builds puede revocarse en cualquier momento."
+"Conservamos tus datos mientras tu cuenta esté activa. Al eliminar tu cuenta,"
+" todos tus datos personales se eliminan irreversiblemente. Las "
+"contribuciones al dataset comunitario ya agregadas no son reversibles porque"
+" los datos han sido anonimizados de forma irreversible: no contienen nombre "
+"de entrenador, ubicación precisa ni notas privadas, e incluyen solo país "
+"agregado. Tu consentimiento para futuros builds puede revocarse en cualquier"
+" momento."
 msgstr ""
+"We retain your data while your account is active. When you delete your "
+"account, all your personal data is irreversibly deleted. Contributions "
+"already aggregated into the community dataset are not reversible because the"
+" data has been irreversibly anonymized: it contains no trainer name, precise"
+" location, or private notes, and includes only an aggregated country. Your "
+"consent for future builds can be revoked at any time."
 
 msgid "Tus derechos"
-msgstr ""
+msgstr "Your rights"
 
 msgid ""
 "Acceso: exporta tus datos desde la sección de configuración de tu cuenta."
-msgstr ""
+msgstr "Access: export your data from your account settings section."
 
 msgid "Rectificación: corrige tu información en cualquier momento."
-msgstr ""
+msgstr "Rectification: correct your information at any time."
 
 msgid "Supresión: elimina tu cuenta y todos tus datos asociados."
-msgstr ""
+msgstr "Erasure: delete your account and all associated data."
 
 msgid "Portabilidad: exporta tus observaciones en formato CSV."
-msgstr ""
+msgstr "Portability: export your observations in CSV format."
 
 msgid ""
 "Revocación del consentimiento: desmarca la contribución al dataset en "
 "cualquier momento."
-msgstr ""
+msgstr "Withdrawal of consent: uncheck dataset contribution at any time."
 
 msgid "Seguridad"
-msgstr ""
+msgstr "Security"
 
 msgid ""
 "Implementamos medidas técnicas y organizativas para proteger tus datos: "
 "cifrado en tránsito (HTTPS), hashing seguro de contraseñas (Argon2), "
 "cabeceras de seguridad (CSP, HSTS), y dependencias auditadas regularmente."
 msgstr ""
+"We implement technical and organizational measures to protect your data: "
+"encryption in transit (HTTPS), secure password hashing (Argon2), security "
+"headers (CSP, HSTS), and regularly audited dependencies."
 
 msgid "Menores"
-msgstr ""
+msgstr "Minors"
 
 msgid ""
-"No recopilamos a sabiendas datos de menores de 13 años. Si eres padre, madre "
-"o tutor y tienes conocimiento de que un menor a tu cargo nos ha "
+"No recopilamos a sabiendas datos de menores de 13 años. Si eres padre, madre"
+" o tutor y tienes conocimiento de que un menor a tu cargo nos ha "
 "proporcionado datos personales sin tu consentimiento, contáctanos para "
 "eliminarlos. Al registrarte, confirmas que tienes al menos 13 años."
 msgstr ""
+"We do not knowingly collect data from children under 13. If you are a parent"
+" or guardian and become aware that a minor in your care has provided us with"
+" personal data without your consent, contact us to have it removed. By "
+"signing up, you confirm that you are at least 13 years old."
 
 msgid "Ubicación de los datos"
-msgstr ""
+msgstr "Data location"
 
 msgid "Tus datos se alojan en servidores ubicados en Santiago, Chile."
-msgstr ""
+msgstr "Your data is hosted on servers located in Santiago, Chile."
 
 msgid "Cambios a esta política"
-msgstr ""
+msgstr "Changes to this policy"
 
 msgid ""
 "Actualizaremos esta política cuando sea necesario. Los cambios sustanciales "
 "se notificarán mediante un aviso en el sitio."
 msgstr ""
+"We will update this policy as needed. Substantial changes will be announced "
+"via a notice on the site."
 
 msgid "Contacto"
-msgstr ""
+msgstr "Contact"
 
 msgid ""
 "Para ejercer tus derechos de privacidad (acceso, rectificación, supresión, "
@@ -1879,18 +2004,20 @@ msgstr ""
 "will respond within the timeframes required by applicable law."
 
 msgid "Términos de servicio"
-msgstr ""
+msgstr "Terms of Service"
 
 msgid "Aceptación de los términos"
-msgstr ""
+msgstr "Acceptance of terms"
 
 msgid ""
 "Al acceder y usar Pogo-lab, aceptas estos términos de servicio en su "
 "totalidad. Si no estás de acuerdo, por favor no uses el servicio."
 msgstr ""
+"By accessing and using Pogo-lab, you accept these terms of service in full. "
+"If you do not agree, please do not use the service."
 
 msgid "Descripción del servicio"
-msgstr ""
+msgstr "Service description"
 
 msgid ""
 "Pogo-lab es una plataforma educativa y analítica que ayuda a entender las "
@@ -1898,46 +2025,48 @@ msgid ""
 "relacionados). Ofrece herramientas de cálculo, registro de observaciones, "
 "análisis estadísticos y datasets comunitarios anonimizados."
 msgstr ""
+"Pogo-lab is an educational and analytical platform that helps you understand"
+" Pokémon GO mechanics (IV probabilities, Lucky trades, and related topics). "
+"It offers calculation tools, observation logging, statistical analysis, and "
+"anonymized community datasets."
 
 msgid "Registro y cuentas"
-msgstr ""
+msgstr "Registration and accounts"
 
 msgid "Debes proporcionar información veraz durante el registro."
-msgstr ""
+msgstr "You must provide truthful information during registration."
 
 msgid "Eres responsable de mantener la confidencialidad de tu contraseña."
-msgstr ""
+msgstr "You are responsible for keeping your password confidential."
 
 msgid "Debes tener al menos 13 años para crear una cuenta."
-msgstr ""
+msgstr "You must be at least 13 years old to create an account."
 
 msgid ""
 "Nos reservamos el derecho de suspender cuentas que violen estos términos."
-msgstr ""
+msgstr "We reserve the right to suspend accounts that violate these terms."
 
 msgid "Conducta del usuario"
-msgstr ""
+msgstr "User conduct"
 
 msgid "Al usar el servicio, te comprometes a:"
-msgstr ""
+msgstr "By using the service, you agree to:"
 
 msgid "No falsificar datos de observaciones a propósito."
-msgstr ""
+msgstr "Not intentionally falsify observation data."
 
 msgid "No usar el servicio para spam, acoso o actividades ilegales."
-msgstr ""
+msgstr "Not use the service for spam, harassment, or illegal activities."
 
 msgid "No intentar acceder a datos de otros usuarios sin autorización."
-msgstr ""
+msgstr "Not attempt to access other users' data without authorization."
 
 msgid ""
 "No sobrecargar la infraestructura con solicitudes automatizadas excesivas."
-msgstr ""
+msgstr "Not overload the infrastructure with excessive automated requests."
 
-#, fuzzy
-#| msgid "contribuciones/"
 msgid "Datos y contribuciones"
-msgstr "contributions/"
+msgstr "Data and contributions"
 
 msgid ""
 "Al registrar observaciones de intercambios, conservas el control de tus "
@@ -1946,9 +2075,13 @@ msgid ""
 "(licenciados bajo CC BY 4.0), siempre que hayas dado tu consentimiento "
 "explícito."
 msgstr ""
+"By logging trade observations, you retain control of your data. You grant us"
+" a non-exclusive license to use it in anonymized, aggregated form in the "
+"project's public analyses and datasets (licensed under CC BY 4.0), provided "
+"you have given your explicit consent."
 
 msgid "Limitación de responsabilidad"
-msgstr ""
+msgstr "Limitation of liability"
 
 msgid ""
 "Pogo-lab se proporciona \"tal cual\", sin garantías de ningún tipo. No nos "
@@ -1956,29 +2089,41 @@ msgid ""
 "recomendaciones del sitio, ni de pérdidas en el juego derivadas del uso de "
 "nuestras herramientas."
 msgstr ""
+"Pogo-lab is provided \"as is\", without warranties of any kind. We are not "
+"responsible for decisions made based on the site's analyses or "
+"recommendations, nor for in-game losses resulting from the use of our tools."
 
 msgid "Propiedad intelectual"
-msgstr ""
+msgstr "Intellectual property"
 
 msgid ""
-"El código fuente, los análisis, textos y gráficos originales de Pogo-lab son "
-"propiedad de sus autores y están protegidos por derechos de autor (© 2026, "
-"todos los derechos reservados). No se otorga ninguna licencia de uso, copia, "
-"modificación o distribución salvo autorización expresa por escrito. Pokémon, "
-"Pokémon GO y marcas relacionadas son propiedad de sus respectivos titulares."
+"El código fuente, los análisis, textos y gráficos originales de Pogo-lab son"
+" propiedad de sus autores y están protegidos por derechos de autor (© 2026, "
+"todos los derechos reservados). No se otorga ninguna licencia de uso, copia,"
+" modificación o distribución salvo autorización expresa por escrito. "
+"Pokémon, Pokémon GO y marcas relacionadas son propiedad de sus respectivos "
+"titulares."
 msgstr ""
+"The source code, analyses, and original text and graphics of Pogo-lab are "
+"the property of their authors and are protected by copyright (© 2026, all "
+"rights reserved). No license to use, copy, modify, or distribute is granted "
+"except by express written authorization. Pokémon, Pokémon GO, and related "
+"trademarks are the property of their respective owners."
 
 msgid "Modificaciones"
-msgstr ""
+msgstr "Modifications"
 
 msgid ""
 "Nos reservamos el derecho de modificar estos términos en cualquier momento. "
 "Los cambios entrarán en vigor al ser publicados. El uso continuado del "
 "servicio constituye la aceptación de los nuevos términos."
 msgstr ""
+"We reserve the right to modify these terms at any time. Changes take effect "
+"once published. Continued use of the service constitutes acceptance of the "
+"new terms."
 
 msgid "Ley aplicable y jurisdicción"
-msgstr ""
+msgstr "Applicable law and jurisdiction"
 
 msgid ""
 "Estos términos se rigen por las leyes de la República de Chile. Cualquier "
@@ -1986,80 +2131,11 @@ msgid ""
 "competentes de Chile. Si alguna disposición de estos términos es declarada "
 "inválida, las demás mantendrán su plena vigencia."
 msgstr ""
+"These terms are governed by the laws of the Republic of Chile. Any dispute "
+"related to these terms will be resolved before the competent courts of "
+"Chile. If any provision of these terms is found invalid, the remaining "
+"provisions will remain in full force."
 
 msgid ""
 "Para consultas sobre estos términos, escríbenos a carlos@tooltician.com."
-msgstr ""
-"For questions about these terms, write to carlos@tooltician.com."
-
-#~ msgid "DPS"
-#~ msgstr "DPS"
-
-#~ msgid "TDO"
-#~ msgstr "TDO"
-
-#~ msgid "No hay atacantes registrados para este tipo."
-#~ msgstr "No attackers registered for this type."
-
-#, python-format
-#~ msgid "Tipo de ataque no válido: %(type)s"
-#~ msgstr "Invalid attack type: %(type)s"
-
-#~ msgid "Fuego"
-#~ msgstr "Fire"
-
-#~ msgid "Agua"
-#~ msgstr "Water"
-
-#~ msgid "Planta"
-#~ msgstr "Grass"
-
-#~ msgid "Eléctrico"
-#~ msgstr "Electric"
-
-#~ msgid "Hielo"
-#~ msgstr "Ice"
-
-#~ msgid "Lucha"
-#~ msgstr "Fighting"
-
-#~ msgid "Veneno"
-#~ msgstr "Poison"
-
-#~ msgid "Tierra"
-#~ msgstr "Ground"
-
-#~ msgid "Volador"
-#~ msgstr "Flying"
-
-#~ msgid "Psíquico"
-#~ msgstr "Psychic"
-
-#~ msgid "Bicho"
-#~ msgstr "Bug"
-
-#~ msgid "Roca"
-#~ msgstr "Rock"
-
-#~ msgid "Fantasma"
-#~ msgstr "Ghost"
-
-#~ msgid "Dragón"
-#~ msgstr "Dragon"
-
-#~ msgid "Siniestro"
-#~ msgstr "Dark"
-
-#~ msgid "Acero"
-#~ msgstr "Steel"
-
-#~ msgid "Hada"
-#~ msgstr "Fairy"
-
-#, fuzzy
-#~| msgid "Mecánicas"
-#~ msgid "Mecánicas modeladas"
-#~ msgstr "Mechanics"
-
-#~ msgid "El sistema está funcionando correctamente."
-#~ msgstr "The system is working correctly."
+msgstr "For questions about these terms, write to carlos@tooltician.com."

@@ -726,7 +726,7 @@ class TestTradeObservationModel:
             hp=13,
         )
         assert "Obs #" in str(obs)
-        assert "Best" in str(obs) or "best" in str(obs)
+        assert obs.get_friendship_level_display() in str(obs)
 
 
 class TestDedupHash:

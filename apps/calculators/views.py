@@ -1,6 +1,7 @@
 import math
 
 from django.shortcuts import render
+from django.utils.translation import gettext_lazy as _
 
 from engine.breakpoints import find_breakpoints, get_fast_moves_for_species
 from engine.catch import catch_multiplier, catch_probability
@@ -83,15 +84,15 @@ FRIENDSHIP_CHOICES = [
 ]
 
 TRADE_TYPE_CHOICES = [
-    ("normal", "Normal"),
+    ("normal", _("Normal")),
     ("lucky", "Lucky"),
-    ("lucky_guaranteed", "Lucky garantizado (amigos 90 días+)"),
+    ("lucky_guaranteed", _("Lucky garantizado (amigos 90 días+)")),
 ]
 
 TARGET_CHOICES = [
     ("hundo", "Hundo (15/15/15)"),
-    ("stat_min", "Stat individual >= X"),
-    ("sum_min", "Suma de IV >= X"),
+    ("stat_min", _("Stat individual >= X")),
+    ("sum_min", _("Suma de IV >= X")),
 ]
 
 
@@ -332,7 +333,7 @@ def _cost_result(params):
 LEAGUE_CHOICES = [
     ("1500", "Great League (1500 CP)"),
     ("2500", "Ultra League (2500 CP)"),
-    ("10000", "Master League (sin límite)"),
+    ("10000", _("Master League (sin límite)")),
 ]
 
 
@@ -405,9 +406,9 @@ BALL_CHOICES = [
 ]
 
 BERRY_CHOICES = [
-    ("1.0", "Sin baya"),
-    ("1.5", "Baya Frambu"),
-    ("2.5", "Baya Frambu Dorada"),
+    ("1.0", _("Sin baya")),
+    ("1.5", _("Baya Frambu")),
+    ("2.5", _("Baya Frambu Dorada")),
 ]
 
 THROW_CHOICES = [
@@ -418,11 +419,11 @@ THROW_CHOICES = [
 ]
 
 MEDAL_CHOICES = [
-    ("1.0", "Sin medalla"),
-    ("1.1", "Bronce"),
-    ("1.2", "Plata"),
-    ("1.3", "Oro"),
-    ("1.4", "Platino"),
+    ("1.0", _("Sin medalla")),
+    ("1.1", _("Bronce")),
+    ("1.2", _("Plata")),
+    ("1.3", _("Oro")),
+    ("1.4", _("Platino")),
 ]
 
 
@@ -583,11 +584,11 @@ def _eff_label(eff):
 # ══════════════════════════════════════════════════════════════════════════════
 
 SHINY_RATES = [
-    ("0.002", "1/500 — Estándar"),
+    ("0.002", _("1/500 — Estándar")),
     ("0.008", "1/125 — Permaboost"),
-    ("0.02", "1/50 — Día de Comunidad"),
-    ("0.05", "1/20 — Legendario shiny"),
-    ("0.1", "1/10 — Evento especial"),
+    ("0.02", _("1/50 — Día de Comunidad")),
+    ("0.05", _("1/20 — Legendario shiny")),
+    ("0.1", _("1/10 — Evento especial")),
 ]
 
 
