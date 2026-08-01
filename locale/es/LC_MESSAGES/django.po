@@ -1,23 +1,20 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
-#, fuzzy
+# Pogo-lab Spanish translations
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: Pogo-lab\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-23 21:43+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"POT-Creation-Date: 2026-08-01 04:13+0000\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
-"1 : 2;\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#, python-format
+msgid ""
+"Este enlace de invitación es para %(invited)s. Usa el email que recibió la "
+"invitación."
+msgstr ""
 
 msgid "Información personal"
 msgstr ""
@@ -28,22 +25,53 @@ msgstr ""
 msgid "Fechas"
 msgstr ""
 
+msgid "estado"
+msgstr ""
+
+msgid "Enviar invitaciones por correo"
+msgstr ""
+
+#, python-brace-format
+msgid "{sent} invitaciones enviadas, {skipped} omitidas."
+msgstr ""
+
+msgid "Errores en invitaciones ID: "
+msgstr ""
+
+msgid "Tu invitación a Pogo-lab"
+msgstr ""
+
 msgid "dirección de email"
 msgstr ""
 
-msgid "Iniciar sesión"
+msgid "email invitado"
 msgstr ""
 
-msgid "¿No tienes cuenta?"
+msgid "token"
 msgstr ""
 
-msgid "Regístrate"
+msgid "creada por"
 msgstr ""
 
-msgid "Registrarse"
+msgid "canjeada por"
 msgstr ""
 
-msgid "¿Ya tienes cuenta?"
+msgid "enviada el"
+msgstr ""
+
+msgid "canjeada el"
+msgstr ""
+
+msgid "expira el"
+msgstr ""
+
+msgid "creada el"
+msgstr ""
+
+msgid "invitación"
+msgstr ""
+
+msgid "invitaciones"
 msgstr ""
 
 msgid "Pendiente"
@@ -190,6 +218,12 @@ msgstr ""
 msgid "combinaciones rankeadas"
 msgstr ""
 
+msgid ""
+"El 2026-07-24 se corrigió el cálculo de HP en el stat product (antes usaba "
+"un valor continuo en vez del HP entero real); el orden del ranking puede "
+"diferir de cálculos anteriores de esta calculadora."
+msgstr ""
+
 msgid "Rank"
 msgstr ""
 
@@ -277,6 +311,11 @@ msgid "Atacante"
 msgstr ""
 
 msgid "Fast Move"
+msgstr "Movimiento rápido"
+
+msgid ""
+"Se muestran todos los fast moves del motor: aún no verificamos cuáles "
+"aprende cada especie en el juego real."
 msgstr ""
 
 msgid "IV Ataque (0–15)"
@@ -566,6 +605,57 @@ msgstr ""
 msgid "Selecciona el tipo defensivo y presiona Ver efectividad."
 msgstr ""
 
+msgid "Normal"
+msgstr ""
+
+msgid "Lucky garantizado (amigos 90 días+)"
+msgstr ""
+
+msgid "Stat individual >= X"
+msgstr ""
+
+msgid "Suma de IV >= X"
+msgstr ""
+
+msgid "Master League (sin límite)"
+msgstr ""
+
+msgid "Sin baya"
+msgstr ""
+
+msgid "Baya Frambu"
+msgstr ""
+
+msgid "Baya Frambu Dorada"
+msgstr ""
+
+msgid "Sin medalla"
+msgstr ""
+
+msgid "Bronce"
+msgstr ""
+
+msgid "Plata"
+msgstr ""
+
+msgid "Oro"
+msgstr ""
+
+msgid "Platino"
+msgstr ""
+
+msgid "1/500 — Estándar"
+msgstr ""
+
+msgid "1/50 — Día de Comunidad"
+msgstr ""
+
+msgid "1/20 — Legendario shiny"
+msgstr ""
+
+msgid "1/10 — Evento especial"
+msgstr ""
+
 msgid "Mecánica"
 msgstr ""
 
@@ -668,6 +758,13 @@ msgid "Rápido"
 msgstr ""
 
 msgid "Cargado"
+msgstr ""
+
+msgid "Nivel no válido:"
+msgstr ""
+
+#, python-format
+msgid "el nivel solicitado no está soportado; se usó el nivel %(lvl)s."
 msgstr ""
 
 #, python-format
@@ -971,19 +1068,16 @@ msgid "afirmaciones citadas"
 msgstr ""
 
 msgid "Good Friends"
-msgstr ""
+msgstr "Buenos Amigos"
 
 msgid "Great Friends"
-msgstr ""
+msgstr "Grandes Amigos"
 
 msgid "Ultra Friends"
-msgstr ""
+msgstr "Amigos Íntimos"
 
 msgid "Best Friends"
-msgstr ""
-
-msgid "Normal"
-msgstr ""
+msgstr "Mejores Amigos"
 
 msgid "Lucky garantizado"
 msgstr ""
@@ -1044,7 +1138,6 @@ msgid "%(counter)s observación guardada."
 msgid_plural "%(counter)s observaciones guardadas."
 msgstr[0] ""
 msgstr[1] ""
-msgstr[2] ""
 
 msgid "Volver a sesiones"
 msgstr ""
@@ -1213,6 +1306,9 @@ msgstr ""
 msgid "dps/"
 msgstr ""
 
+msgid "Iniciar sesión"
+msgstr ""
+
 msgid "Correo electrónico"
 msgstr ""
 
@@ -1225,10 +1321,30 @@ msgstr ""
 msgid "Recordarme"
 msgstr ""
 
+msgid "¿No tienes cuenta?"
+msgstr ""
+
+msgid "Regístrate"
+msgstr ""
+
+msgid "Registrarse"
+msgstr ""
+
 msgid "Confirmar contraseña"
 msgstr ""
 
 msgid "Confirmo que tengo al menos 13 años."
+msgstr ""
+
+msgid "¿Ya tienes cuenta?"
+msgstr ""
+
+msgid "Registro cerrado"
+msgstr ""
+
+msgid ""
+"Pogo-lab se encuentra en beta cerrada. Para registrarte necesitas una "
+"invitación válida. Pide a quien te invitó que te reenvíe el enlace."
 msgstr ""
 
 msgid "Eliminar cuenta"
@@ -1367,12 +1483,6 @@ msgid ""
 "honesta y trazable."
 msgstr ""
 
-msgid "Ficha 01 · Matemática verificada"
-msgstr ""
-
-msgid "Pogo-lab"
-msgstr ""
-
 msgid "Matemática honesta para entender las mecánicas de Pokémon GO."
 msgstr ""
 
@@ -1380,12 +1490,6 @@ msgid "Calcular probabilidades"
 msgstr ""
 
 msgid "Explorar mecánicas"
-msgstr ""
-
-msgid "Trazable"
-msgstr ""
-
-msgid "Sesgo"
 msgstr ""
 
 msgid "Ciclo del producto"
@@ -1421,7 +1525,7 @@ msgstr ""
 msgid "¿Por qué Pogo-lab?"
 msgstr ""
 
-msgid "01 · Sin magia negra"
+msgid "Sin magia negra"
 msgstr ""
 
 msgid ""
@@ -1429,7 +1533,7 @@ msgid ""
 "palabra: verifícalo."
 msgstr ""
 
-msgid "02 · Modelo correcto"
+msgid "Modelo correcto"
 msgstr ""
 
 msgid ""
@@ -1437,7 +1541,7 @@ msgid ""
 "simulación."
 msgstr ""
 
-msgid "03 · Procedencia separada"
+msgid "Procedencia separada"
 msgstr ""
 
 msgid ""
@@ -1445,7 +1549,7 @@ msgid ""
 "etiqueta de confianza."
 msgstr ""
 
-msgid "04 · Decisiones, no números"
+msgid "Decisiones, no números"
 msgstr ""
 
 #, python-format
