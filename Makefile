@@ -62,10 +62,10 @@ tailwind-install:
 	echo "tailwindcss $$TW_VERSION instalado (sha256: $$TW_HASH)"
 
 tailwind-build: tailwindcss
-	./tailwindcss -i static/css/input.css -o static/css/output.css --minify
+	./tailwindcss -i tailwind/input.css -o static/css/output.css --minify
 
 tailwind-watch: tailwindcss
-	./tailwindcss -i static/css/input.css -o static/css/output.css --watch
+	./tailwindcss -i tailwind/input.css -o static/css/output.css --watch
 
 clean:
 	rm -rf .venv __pycache__ .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage

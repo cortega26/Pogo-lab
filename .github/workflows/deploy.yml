@@ -55,10 +55,7 @@ jobs:
             uv run python manage.py check --deploy
             uv run python manage.py migrate --noinput
             uv run python manage.py createcachetable
-            # input.css es el fuente de Tailwind (@import "tailwindcss";), no
-            # un asset a servir; el post-procesado con hash de manifest lo
-            # interpreta como una referencia rota y falla si no se ignora.
-            uv run python manage.py collectstatic --noinput --ignore=input.css
+            uv run python manage.py collectstatic --noinput
             sudo systemctl restart pogo-lab.service
             curl --fail --silent --show-error --retry 5 \
               --retry-connrefused \
