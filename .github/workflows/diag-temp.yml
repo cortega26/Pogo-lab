@@ -15,19 +15,18 @@ jobs:
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
             set -x
-            echo "--- host ---"
-            hostname; curl -s ifconfig.me || true; echo
-            echo "--- repo path / HEAD ---"
-            cd /opt/pogo-lab && pwd && git rev-parse HEAD && git log --oneline -1
-            echo "--- .env relevant ---"
-            grep -E '^DEBUG|^DJANGO_SETTINGS_MODULE' .env || true
-            echo "--- staticfiles.json ---"
-            ls -la staticfiles/staticfiles.json 2>&1 || true
-            head -c 500 staticfiles/staticfiles.json 2>&1 || true
-            echo
-            echo "--- STORAGES resuelto por Django ---"
-            uv run python -c "from django.conf import settings; print(settings.STORAGES.get('staticfiles')); print('DEBUG=', settings.DEBUG)"
-            echo "--- url resuelta para css/output.css ---"
+            export PATH="/home/ubuntu/.local/bin:$PATH"
+            cd /opt/pogo-lab
+            echo "--- settings module sin exportar nada (igual que deploy.yml hoy) ---"
+            uv run python -c "import django; django.setup(); from django.conf import settings; print('SETTINGS_MODULE env:', __import__('os').environ.get('DJANGO_SETTINGS_MODULE')); print('DEBUG=', settings.DEBUG); print('STORAGES[staticfiles]=', settings.STORAGES.get('staticfiles')); print('DATABASES[default][NAME]=', settings.DATABASES['default'].get('NAME')); print('DATABASES[default][HOST]=', settings.DATABASES['default'].get('HOST'))"
+            echo "--- url resuelta para css/output.css (sin exportar nada) ---"
             uv run python -c "from django.templatetags.static import static; print(static('css/output.css'))"
-            echo "--- systemd service status ---"
-            sudo systemctl status pogo-lab.service --no-pager -l | head -15
+            echo "--- lo mismo pero exportando DJANGO_SETTINGS_MODULE=config.settings.prod ---"
+            export DJANGO_SETTINGS_MODULE=config.settings.prod
+            uv run python -c "import django; django.setup(); from django.conf import settings; print('DEBUG=', settings.DEBUG); print('DATABASES[default][NAME]=', settings.DATABASES['default'].get('NAME')); print('DATABASES[default][HOST]=', settings.DATABASES['default'].get('HOST'))"
+            echo "--- collectstatic verbose con prod explicito ---"
+            uv run python manage.py collectstatic --noinput -v 2 2>&1 | tail -30
+            echo "--- staticfiles.json tras collectstatic con prod explicito ---"
+            ls -la staticfiles/staticfiles.json 2>&1 || true
+            echo "--- url resuelta tras fix ---"
+            uv run python -c "from django.templatetags.static import static; print(static('css/output.css'))"
