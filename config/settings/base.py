@@ -126,7 +126,21 @@ LANGUAGES = [
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Nombres con hash de contenido (output.<hash>.css) para que cambiar un
+# estático genere una URL nueva y así invalide el caché de 30 días de
+# nginx/Cloudflare automáticamente. El setting legacy STATICFILES_STORAGE
+# quedó deprecado y Django ya no lo traduce solo a STORAGES — hay que usar
+# el dict nuevo o cae en el backend plano sin hash (bug real detectado en
+# producción: auditoría de frontend 2026-08-01).
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
