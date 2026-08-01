@@ -1,0 +1,33 @@
+name: Diag Temp
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose static manifest on live host
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            set -x
+            echo "--- host ---"
+            hostname; curl -s ifconfig.me || true; echo
+            echo "--- repo path / HEAD ---"
+            cd /opt/pogo-lab && pwd && git rev-parse HEAD && git log --oneline -1
+            echo "--- .env relevant ---"
+            grep -E '^DEBUG|^DJANGO_SETTINGS_MODULE' .env || true
+            echo "--- staticfiles.json ---"
+            ls -la staticfiles/staticfiles.json 2>&1 || true
+            head -c 500 staticfiles/staticfiles.json 2>&1 || true
+            echo
+            echo "--- STORAGES resuelto por Django ---"
+            uv run python -c "from django.conf import settings; print(settings.STORAGES.get('staticfiles')); print('DEBUG=', settings.DEBUG)"
+            echo "--- url resuelta para css/output.css ---"
+            uv run python -c "from django.templatetags.static import static; print(static('css/output.css'))"
+            echo "--- systemd service status ---"
+            sudo systemctl status pogo-lab.service --no-pager -l | head -15
