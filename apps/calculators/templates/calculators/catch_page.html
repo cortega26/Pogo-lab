@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% load i18n %}
+{% extends "base.html" %}{% load i18n calculators_extras %}
 {% block title %}{% trans "Probabilidad de Captura — Pogo-lab" %}{% endblock %}
 {% block description %}{% trans "Calcula la probabilidad de capturar un Pokémon salvaje según la especie, nivel, bola, baya, tipo de tiro y medallas." %}{% endblock %}
 {% block og_title %}{% trans "Calculadora de Captura — Pogo-lab" %}{% endblock %}
@@ -14,10 +14,13 @@
   <form hx-post="{% url 'catch_calculator' %}" hx-target="#catch-results" hx-swap="innerHTML" class="specimen-card p-6 mb-8">
     {% csrf_token %}
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      <div><label class="field-label" for="catch-species">{% trans "Especie" %}</label>
-        <select name="species" id="catch-species" class="input-field">
-          {% for val, label in species_choices %}<option value="{{ val }}" {% if val == species_id %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select></div>
+      <div><label class="field-label" for="catch-species-search">{% trans "Especie" %}</label>
+        <input type="text" id="catch-species-search" class="input-field" list="species-datalist" autocomplete="off"
+               value="{{ species_choices|choice_label:species_id }}"
+               data-species-search data-target="catch-species"
+               placeholder="{% trans "Buscar especie…" %}">
+        <input type="hidden" name="species" id="catch-species" value="{{ species_id }}">
+        {% include "calculators/_species_datalist.html" %}</div>
       <div><label class="field-label" for="catch-level">{% trans "Nivel" %}</label>
         <select name="level" id="catch-level" class="input-field">
           {% for val, label in level_choices %}<option value="{{ val }}" {% if val|stringformat:".0f" == level|stringformat:".0f" %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -48,7 +51,7 @@
   <div id="catch-results">
     {% if error %}<div class="border-2 border-danger-500 bg-danger-50 p-4 text-sm text-danger-600 dark:border-danger-400 dark:bg-danger-500/10 dark:text-danger-400" role="alert"><span class="font-semibold">{% trans "Error:" %}</span> {{ error }}</div>
     {% elif result %}{% include "calculators/_catch_result.html" %}
-    {% else %}<p class="text-center text-sm text-slate-400 dark:text-slate-500">{% trans "Configura los modificadores y presiona Calcular." %}</p>{% endif %}
+    {% else %}<p class="text-center text-sm text-slate-600 dark:text-slate-400">{% trans "Configura los modificadores y presiona Calcular." %}</p>{% endif %}
   </div>
 </div>
 {% endblock %}

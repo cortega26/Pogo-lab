@@ -1,7 +1,7 @@
 {% load i18n %}{% if result %}
 <div class="specimen-card p-6 overflow-x-auto">
   <h2 class="font-display text-xl font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{{ result.species|capfirst }} · {{ result.move }}</h2>
-  <p class="mt-1 font-mono text-xs text-slate-400 dark:text-slate-500">{% trans "IV ATK" %} {{ result.iv_atk }} · {% trans "Defensa Boss" %} {{ result.defender_def }}{% if result.weather %} · {% trans "Clima" %}{% endif %}</p>
+  <p class="mt-1 font-mono text-xs text-slate-600 dark:text-slate-400">{% trans "IV ATK" %} {{ result.iv_atk }} · {% trans "Defensa Boss" %} {{ result.defender_def }}{% if result.weather %} · {% trans "Clima" %}{% endif %}</p>
   {% if result.breakpoints %}
   <table class="mt-4 w-full text-left font-mono text-sm">
     <thead><tr class="border-b-2 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
@@ -15,9 +15,6 @@
       </tr>{% endfor %}</tbody>
   </table>
   {% else %}<p class="mt-4 text-sm text-slate-500">{% trans "No se encontraron breakpoints en el rango L20–L50." %}</p>{% endif %}
-  {% if share_url %}
-  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
-    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
-  {% endif %}
+  {% include "calculators/_share_link.html" %}
 </div>
 {% endif %}

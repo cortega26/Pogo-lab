@@ -11,6 +11,8 @@ from engine.dps_data import (
     FAST_MOVES,
     SPECIES,
     TYPE_COLORS,
+    TYPE_TEXT_COLOR_DARK,
+    TYPE_TEXT_COLORS,
     PokemonType,
     type_multiplier,
 )
@@ -23,6 +25,13 @@ def _type_color(tipo: str) -> str:
         return "#888888"
 
 
+def _type_text_color(tipo: str) -> str:
+    try:
+        return TYPE_TEXT_COLORS[PokemonType(tipo)]
+    except (ValueError, KeyError):
+        return TYPE_TEXT_COLOR_DARK
+
+
 def get_type_stats(tipo: str | None = None) -> list[dict]:
     if tipo:
         ranked = rank_by_type(tipo, level=40)
@@ -32,6 +41,7 @@ def get_type_stats(tipo: str | None = None) -> list[dict]:
                 "key": tipo,
                 "name": tipo.capitalize(),
                 "color": color,
+                "text_color": _type_text_color(tipo),
                 "count": len(ranked),
             }
         ]
@@ -43,6 +53,7 @@ def get_type_stats(tipo: str | None = None) -> list[dict]:
                 "key": t,
                 "name": t.capitalize(),
                 "color": _type_color(t),
+                "text_color": _type_text_color(t),
                 "count": len(ranked),
             }
         )

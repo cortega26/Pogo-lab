@@ -1,0 +1,4 @@
+{% load i18n %}
+<datalist id="species-datalist">
+  {% for val, label in species_choices %}<option value="{{ label }}" data-key="{{ val }}"></option>{% endfor %}
+</datalist>

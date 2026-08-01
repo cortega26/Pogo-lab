@@ -6,7 +6,7 @@ from django import template
 from django.urls import translate_url
 from django.utils.safestring import mark_safe
 
-from engine.dps_data import TYPE_COLORS, PokemonType
+from engine.dps_data import TYPE_COLORS, TYPE_TEXT_COLOR_DARK, TYPE_TEXT_COLORS, PokemonType
 
 register = template.Library()
 
@@ -181,3 +181,16 @@ def type_color(type_name: str) -> str:
         return TYPE_COLORS[PokemonType(type_name)]
     except (ValueError, KeyError):
         return "#A8A77A"
+
+
+@register.filter
+def type_text_color(type_name: str) -> str:
+    """Devuelve el color de texto (oscuro o claro) legible sobre el color del tipo.
+
+    Un texto blanco fijo falla WCAG AA en tipos pastel (Electric, Ice, etc.);
+    cada tipo usa el color de texto que garantiza >=4.5:1 de contraste.
+    """
+    try:
+        return TYPE_TEXT_COLORS[PokemonType(type_name)]
+    except (ValueError, KeyError):
+        return TYPE_TEXT_COLOR_DARK

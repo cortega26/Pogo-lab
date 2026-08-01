@@ -64,6 +64,36 @@ TYPE_COLORS: dict[PokemonType, str] = {
     PokemonType.FAIRY: "#D685AD",
 }
 
+TYPE_TEXT_COLOR_DARK = "#201A15"
+"""Tinta oscura (token `slate-900`) para texto sobre fichas de tipo claras."""
+
+TYPE_TEXT_COLOR_LIGHT = "#FBF8F1"
+"""Papel claro (token `white`) para texto sobre fichas de tipo oscuras."""
+
+TYPE_TEXT_COLORS: dict[PokemonType, str] = {
+    # Elegido por color oficial de tipo para cumplir WCAG AA (>=4.5:1); un
+    # texto blanco fijo falla en la mayoría de los tipos pastel (p.ej.
+    # Electric 1.4:1, Ice 1.5:1) — ver auditoría de frontend 2026-08-01.
+    PokemonType.NORMAL: TYPE_TEXT_COLOR_DARK,
+    PokemonType.FIRE: TYPE_TEXT_COLOR_DARK,
+    PokemonType.WATER: TYPE_TEXT_COLOR_DARK,
+    PokemonType.GRASS: TYPE_TEXT_COLOR_DARK,
+    PokemonType.ELECTRIC: TYPE_TEXT_COLOR_DARK,
+    PokemonType.ICE: TYPE_TEXT_COLOR_DARK,
+    PokemonType.FIGHTING: TYPE_TEXT_COLOR_LIGHT,
+    PokemonType.POISON: TYPE_TEXT_COLOR_LIGHT,
+    PokemonType.GROUND: TYPE_TEXT_COLOR_DARK,
+    PokemonType.FLYING: TYPE_TEXT_COLOR_DARK,
+    PokemonType.PSYCHIC: TYPE_TEXT_COLOR_DARK,
+    PokemonType.BUG: TYPE_TEXT_COLOR_DARK,
+    PokemonType.ROCK: TYPE_TEXT_COLOR_DARK,
+    PokemonType.GHOST: TYPE_TEXT_COLOR_LIGHT,
+    PokemonType.DRAGON: TYPE_TEXT_COLOR_LIGHT,
+    PokemonType.DARK: TYPE_TEXT_COLOR_LIGHT,
+    PokemonType.STEEL: TYPE_TEXT_COLOR_DARK,
+    PokemonType.FAIRY: TYPE_TEXT_COLOR_DARK,
+}
+
 # Type effectiveness (18x18), derivada por cálculo de engine.types.TYPE_CHART.
 # Keys: (attack_type, defender_type). Solo se listan pares != 1.0 (neutro).
 # No se hardcodea aquí: una segunda tabla a mano es exactamente el bug que

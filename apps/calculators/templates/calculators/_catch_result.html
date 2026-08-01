@@ -9,10 +9,7 @@
     <dt>{% trans "BCR" %}</dt><dd>{{ result.bcr }}</dd>
     <dt>{% trans "Multiplicador" %}</dt><dd>{{ result.multiplier }}</dd>
   </dl>
-  <p class="mt-3 font-mono text-xs text-slate-400 dark:text-slate-500">{{ result.species|capfirst }} · {% trans "Nivel" %} {{ result.level }}</p>
-  {% if share_url %}
-  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
-    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
-  {% endif %}
+  <p class="mt-3 font-mono text-xs text-slate-600 dark:text-slate-400">{{ result.species|capfirst }} · {% trans "Nivel" %} {{ result.level }}</p>
+  {% include "calculators/_share_link.html" %}
 </div>
 {% endif %}

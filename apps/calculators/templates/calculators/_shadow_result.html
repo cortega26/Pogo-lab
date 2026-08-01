@@ -14,9 +14,6 @@
       <tr><td class="py-1.5 pr-2">{% trans "Caramelos (L1→nivel)" %}</td><td class="py-1.5 px-2">{{ result.candy_purified }}</td><td class="py-1.5 px-2 font-bold text-red-600">{{ result.candy_shadow }}</td><td class="py-1.5 pl-2 text-red-600">+{{ result.candy_shadow|add:result.candy_purified }}</td></tr>
     </tbody>
   </table>
-  {% if share_url %}
-  <div class="mt-4"><label class="field-label">{% trans "Enlace compartible" %}</label>
-    <input type="text" readonly value="{{ request.build_absolute_uri }}?share={{ share_url }}" class="input-field font-mono text-xs" onclick="this.select();navigator.clipboard?.writeText(this.value)"></div>
-  {% endif %}
+  {% include "calculators/_share_link.html" %}
 </div>
 {% endif %}

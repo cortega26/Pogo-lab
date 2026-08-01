@@ -80,13 +80,13 @@
           </td>
           <td class="px-2 py-2 hidden sm:table-cell">
             <div class="flex gap-1">
-              <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                    style="background-color: {{ a.species.type1|type_color }}">
+              <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                    style="background-color: {{ a.species.type1|type_color }}; color: {{ a.species.type1|type_text_color }};">
                 {{ a.species.type1|capfirst }}
               </span>
               {% if a.species.type2 %}
-              <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                    style="background-color: {{ a.species.type2|type_color }}">
+              <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                    style="background-color: {{ a.species.type2|type_color }}; color: {{ a.species.type2|type_text_color }};">
                 {{ a.species.type2|capfirst }}
               </span>
               {% endif %}
@@ -107,7 +107,7 @@
           <td class="px-3 py-2 text-right font-mono text-sm text-slate-600 dark:text-slate-400">
             {{ a.tdo|floatformat:1 }}
           </td>
-          <td class="px-3 py-2 text-right font-mono text-sm text-slate-500 dark:text-slate-500 hidden lg:table-cell">
+          <td class="px-3 py-2 text-right font-mono text-sm text-slate-500 dark:text-slate-400 hidden lg:table-cell">
             {{ a.edps|floatformat:1 }}
           </td>
           <td class="px-2 py-2 text-center">
