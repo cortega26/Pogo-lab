@@ -59,9 +59,7 @@ def _evidence_items(ruleset: MechanicRuleSet | None, locale: str) -> list[Eviden
             EvidenceItem(
                 summary=claim.quote_summary if is_canonical_spanish else None,
                 source_label=(
-                    claim.source.title
-                    if is_canonical_spanish
-                    else _source_label(claim.source)
+                    claim.source.title if is_canonical_spanish else _source_label(claim.source)
                 ),
                 source_url=claim.source.url,
                 source_type=str(claim.source.get_source_type_display()),
