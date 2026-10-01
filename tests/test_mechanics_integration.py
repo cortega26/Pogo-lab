@@ -6,6 +6,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import Q
+from django.utils import translation
 
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
 from apps.sources.models import SourceClaim, SourceReference
@@ -312,7 +313,8 @@ class TestMechanicViews:
     def test_english_mechanics_list_uses_published_translation(
         self, client, trade_mechanic, seed_content_pages
     ):
-        resp = client.get("/en/mechanics/")
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/")
         assert resp.status_code == 200
         html = resp.content.decode()
         assert "IVs in Trades" in html
@@ -337,7 +339,8 @@ class TestMechanicViews:
             confidence_level="high",
         )
 
-        resp = client.get("/en/mechanics/iv-en-intercambios/")
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/iv-en-intercambios/")
         assert resp.status_code == 200
         html = resp.content.decode()
 
@@ -354,7 +357,8 @@ class TestMechanicViews:
     def test_english_mechanics_detail_fails_closed_without_translation(
         self, client, published_ruleset
     ):
-        resp = client.get("/en/mechanics/iv-en-intercambios/")
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/iv-en-intercambios/")
         assert resp.status_code == 404
 
 
