@@ -67,7 +67,7 @@ class TestHealthz:
         monkeypatch.setattr(
             views,
             "resolve_trade_floor",
-            lambda *args, **kwargs: (5, SimpleNamespace(version=1)),
+            lambda *_args, **_kwargs: (5, SimpleNamespace(version=1)),
         )
 
         response = Client().get("/en/")
