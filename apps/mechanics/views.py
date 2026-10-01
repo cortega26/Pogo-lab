@@ -19,6 +19,7 @@ class MechanicCard:
 
 @dataclass(frozen=True)
 class EvidenceItem:
+    summary: str | None
     source_label: str
     source_url: str | None
     source_type: str
@@ -47,15 +48,17 @@ def _source_label(source) -> str:
     return str(source.get_source_type_display())
 
 
-def _evidence_items(ruleset: MechanicRuleSet | None) -> list[EvidenceItem]:
+def _evidence_items(ruleset: MechanicRuleSet | None, locale: str) -> list[EvidenceItem]:
     if ruleset is None:
         return []
 
     items: list[EvidenceItem] = []
     for claim in ruleset.claims.select_related("source", "parameter").all():
+        is_canonical_spanish = locale.split("-", 1)[0] == "es"
         items.append(
             EvidenceItem(
-                source_label=_source_label(claim.source),
+                summary=claim.quote_summary if is_canonical_spanish else None,
+                source_label=claim.source.title if is_canonical_spanish else _source_label(claim.source),
                 source_url=claim.source.url,
                 source_type=str(claim.source.get_source_type_display()),
                 confidence=str(claim.get_confidence_level_display()),
@@ -111,6 +114,6 @@ def mechanic_detail(request, slug):
             "mechanic": mechanic,
             "translation": translation,
             "ruleset": ruleset,
-            "evidence_items": _evidence_items(ruleset),
+            "evidence_items": _evidence_items(ruleset, locale),
         },
     )
