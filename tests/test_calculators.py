@@ -4,6 +4,7 @@ import re
 from datetime import UTC, datetime
 
 import pytest
+from django.test import Client
 from django.urls import reverse
 
 from apps.calculators.services import (
@@ -74,6 +75,30 @@ class TestCalcInput:
         )
         assert inputs.threshold is None
         assert inputs.confidence == 0.5
+
+
+@pytest.mark.django_db
+class TestCalculatorResultRendering:
+    def test_english_result_shows_50_percent_confidence_not_1_percent(self):
+        response = Client().post(
+            "/en/calculator/",
+            {
+                "friendship_level": "best",
+                "trade_type": "normal",
+                "n": "10",
+                "target_kind": "hundo",
+                "confidence": "0.5",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert "Trades for 50% confidence" in html
+        assert "Trades for 1% confidence" not in html
+        assert "Post-trade IVs follow a uniform distribution" in html
+        assert "Copy link" in html
+        assert "Copied!" in html
+        assert "¡Copiado!" not in html
 
 
 class TestCalcResult:
@@ -170,6 +195,31 @@ class TestComputeScenario:
         )
         result = compute_scenario(inputs)
         assert len(result.assumptions) == 3
+
+    def test_confidence_percentage_is_display_ready(self):
+        inputs = CalcInput(
+            friendship_level="best",
+            trade_type="normal",
+            n=10,
+            target_kind="hundo",
+            confidence=0.95,
+        )
+        result = compute_scenario(inputs)
+        assert result.params["confidence_pct"] == 95
+
+    def test_assumptions_follow_active_language(self):
+        from django.utils import translation
+
+        inputs = CalcInput(
+            friendship_level="best",
+            trade_type="normal",
+            n=10,
+            target_kind="hundo",
+        )
+        with translation.override("en"):
+            result = compute_scenario(inputs)
+        assert result.assumptions[0].startswith("Post-trade IVs")
+        assert all("Los IVs" not in assumption for assumption in result.assumptions)
 
     def test_lucky_assumptions(self):
         inputs = CalcInput(

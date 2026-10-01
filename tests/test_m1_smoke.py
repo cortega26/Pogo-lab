@@ -59,6 +59,21 @@ class TestHealthz:
         html = response.content.decode().lower()
         assert "pogo-lab" in html
 
+    def test_home_has_product_proof_surface(self):
+        response = Client().get("/en/")
+        html = response.content.decode()
+        assert "Reproducible example" in html
+        assert "Hundo probability" in html
+        assert "1331" in html
+        assert "3986" in html
+
+    def test_mobile_nav_keeps_language_selector_and_localized_labels(self):
+        response = Client().get("/en/")
+        html = response.content.decode()
+        assert 'id="language-selector"' in html
+        assert 'data-open-label="Open menu"' in html
+        assert 'data-close-label="Close menu"' in html
+
 
 @pytest.mark.django_db
 class TestI18n:

@@ -17,11 +17,17 @@
     </div>
     <div>
       <dt class="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Probabilidad por intercambio" %}</dt>
-      <dd class="font-mono text-lg font-bold text-slate-900 dark:text-slate-100">{{ result.p_per_trade|floatformat:6 }}</dd>
+      <dd class="font-mono text-lg font-bold text-slate-900 dark:text-slate-100">
+        {{ result.p_per_trade_percent|floatformat:4 }}%
+        <span class="mt-0.5 block text-[11px] font-normal text-slate-500 dark:text-slate-400">p={{ result.p_per_trade|floatformat:6 }}</span>
+      </dd>
     </div>
     <div>
       <dt class="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Probabilidad acumulada (n=" %}{{ result.params.n }}{% trans ")" %}</dt>
-      <dd class="font-mono text-lg font-bold text-accent-600 dark:text-accent-400">{{ result.p_cumulative|floatformat:6 }}</dd>
+      <dd class="font-mono text-lg font-bold text-accent-600 dark:text-accent-400">
+        {{ result.p_cumulative_percent|floatformat:2 }}%
+        <span class="mt-0.5 block text-[11px] font-normal text-slate-500 dark:text-slate-400">p={{ result.p_cumulative|floatformat:6 }}</span>
+      </dd>
     </div>
     <div>
       <dt class="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Éxitos esperados" %}</dt>
@@ -29,11 +35,14 @@
     </div>
     <div>
       <dt class="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Probabilidad de cero éxitos" %}</dt>
-      <dd class="font-mono text-lg font-bold text-slate-900 dark:text-slate-100">{{ result.p_zero|floatformat:6 }}</dd>
+      <dd class="font-mono text-lg font-bold text-slate-900 dark:text-slate-100">
+        {{ result.p_zero_percent|floatformat:2 }}%
+        <span class="mt-0.5 block text-[11px] font-normal text-slate-500 dark:text-slate-400">p={{ result.p_zero|floatformat:6 }}</span>
+      </dd>
     </div>
     <div>
       <dt class="font-mono text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {% blocktrans with conf=result.params.confidence|floatformat:0 %}
+        {% blocktrans with conf=result.params.confidence_pct %}
         Intercambios para confianza al {{ conf }}%
         {% endblocktrans %}
       </dt>
