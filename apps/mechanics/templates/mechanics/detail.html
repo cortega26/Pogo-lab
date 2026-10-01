@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load i18n seo_tags %}
 
-{% block title %}{{ translation.seo_title|default:translation.title }} — Pogo-lab{% endblock %}
+{% block title %}{% if translation.seo_title %}{{ translation.seo_title }}{% else %}{{ translation.title }} — Pogo-lab{% endif %}{% endblock %}
 
 {% block extra_head %}
   {% if translation.seo_title %}
@@ -125,6 +125,9 @@
       <div class="divide-y-2 divide-slate-200 dark:divide-slate-800">
         {% for evidence in evidence_items %}
           <div class="p-5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30">
+            {% if evidence.summary %}
+              <p class="mb-2 text-sm text-slate-700 dark:text-slate-300">{{ evidence.summary }}</p>
+            {% endif %}
             <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               {% if evidence.source_url %}
                 <a href="{{ evidence.source_url }}" rel="noopener noreferrer"
