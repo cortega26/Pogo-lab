@@ -59,7 +59,17 @@ class TestHealthz:
         html = response.content.decode().lower()
         assert "pogo-lab" in html
 
-    def test_home_has_product_proof_surface(self):
+    def test_home_has_product_proof_surface(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from apps.core import views
+
+        monkeypatch.setattr(
+            views,
+            "resolve_trade_floor",
+            lambda *args, **kwargs: (5, SimpleNamespace(version=1)),
+        )
+
         response = Client().get("/en/")
         html = response.content.decode()
         assert "Reproducible example" in html
