@@ -13,21 +13,21 @@ from engine.probability import p_at_least_one, p_hundo, trades_for_confidence
 logger = logging.getLogger(__name__)
 
 
-def _hero_probability_example() -> dict[str, int | float | None]:
-    """Small live proof-point for the homepage, derived from the real engine."""
+def _hero_probability_example() -> dict[str, int | float] | None:
+    """Small live proof-point for the homepage, derived from a published ruleset."""
 
-    ruleset_version: int | None = None
     try:
         floor, ruleset = resolve_trade_floor("best", "normal")
-        ruleset_version = ruleset.version if ruleset else None
     except RulesetUnavailableError:
-        # Keep the public homepage useful in an unseeded/dev database.
-        floor = 5
+        return None
+
+    if ruleset is None:
+        return None
 
     p_single = float(p_hundo(floor))
     return {
         "floor": floor,
-        "ruleset_version": ruleset_version,
+        "ruleset_version": ruleset.version,
         "odds_denominator": round(1 / p_single),
         "ten_trades_pct": p_at_least_one(p_single, 10) * 100,
         "hundred_trades_pct": p_at_least_one(p_single, 100) * 100,
