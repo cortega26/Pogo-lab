@@ -59,13 +59,39 @@ class TestHealthz:
         html = response.content.decode().lower()
         assert "pogo-lab" in html
 
-    def test_home_has_product_proof_surface(self):
+    def test_home_has_product_proof_surface(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from apps.core import views
+
+        monkeypatch.setattr(
+            views,
+            "resolve_trade_floor",
+            lambda *_args, **_kwargs: (5, SimpleNamespace(version=1)),
+        )
+
         response = Client().get("/en/")
         html = response.content.decode()
         assert "Reproducible example" in html
         assert "Hundo probability" in html
         assert "1331" in html
         assert "3986" in html
+
+    def test_home_hides_product_proof_when_ruleset_is_unavailable(self, monkeypatch):
+        from apps.core import views
+        from apps.mechanics.services import RulesetUnavailableError
+
+        def unavailable(*args, **kwargs):
+            raise RulesetUnavailableError("no published ruleset")
+
+        monkeypatch.setattr(views, "resolve_trade_floor", unavailable)
+
+        response = Client().get("/en/")
+        html = response.content.decode()
+
+        assert response.status_code == 200
+        assert "Reproducible example" not in html
+        assert "Derived live from the current engine" not in html
 
     def test_mobile_nav_keeps_language_selector_and_localized_labels(self):
         response = Client().get("/en/")
