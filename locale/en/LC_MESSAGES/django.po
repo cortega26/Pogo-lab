@@ -2139,3 +2139,106 @@ msgstr ""
 msgid ""
 "Para consultas sobre estos términos, escríbenos a carlos@tooltician.com."
 msgstr "For questions about these terms, write to carlos@tooltician.com."
+
+# Product polish sprint — live calculator assumptions and homepage proof surface.
+msgid "Los IVs post-intercambio siguen una distribución uniforme en [f, 15]."
+msgstr "Post-trade IVs follow a uniform distribution in [f, 15]."
+
+msgid "Los stats (ATK/DEF/HP) son independientes entre sí (S3)."
+msgstr "ATK/DEF/HP stats are independent of each other (S3)."
+
+#, python-format
+msgid "Piso f=%(floor)s definido manualmente por el usuario."
+msgstr "Floor f=%(floor)s was set manually by the user."
+
+msgid "El piso f proviene de datos comunitarios verificados (M2)."
+msgstr "Floor f comes from verified community data (M2)."
+
+msgid "Los intercambios Lucky usan piso 12 según datos comunitarios."
+msgstr "Lucky trades use floor 12 according to community data."
+
+msgid "Cerrar menú"
+msgstr "Close menu"
+
+msgid "Laboratorio estadístico · Pokémon GO"
+msgstr "Statistical lab · Pokémon GO"
+
+msgid "Calculadoras reproducibles, reglas versionadas y fuentes trazables. Cada resultado expone el modelo y los supuestos que lo sostienen."
+msgstr "Reproducible calculators, versioned rules, and traceable sources. Every result exposes the model and assumptions behind it."
+
+msgid "Idiomas"
+msgstr "Languages"
+
+msgid "Modelo"
+msgstr "Model"
+
+msgid "Versionado"
+msgstr "Versioned"
+
+msgid "Fuentes"
+msgstr "Sources"
+
+msgid "Trazables"
+msgstr "Traceable"
+
+msgid "Abrir la calculadora de probabilidades"
+msgstr "Open probability calculator"
+
+msgid "Ejemplo reproducible"
+msgstr "Reproducible example"
+
+msgid "modelo actual"
+msgstr "current model"
+
+msgid "Mejor amigo · intercambio normal"
+msgstr "Best Friend · normal trade"
+
+msgid "Probabilidad de Hundo"
+msgstr "Hundo probability"
+
+msgid "por intercambio"
+msgstr "per trade"
+
+msgid "10 intercambios"
+msgstr "10 trades"
+
+msgid "100 intercambios"
+msgstr "100 trades"
+
+msgid "confianza"
+msgstr "confidence"
+
+#, python-format
+msgid "Derivado en vivo del motor actual con piso f=%(floor)s; no es una captura estática."
+msgstr "Derived live from the current engine with floor f=%(floor)s; this is not a static snapshot."
+
+msgid "Del dato a la decisión"
+msgstr "From data to decision"
+
+msgid "Diseñado para verificar, no para creer"
+msgstr "Designed to be verified, not believed"
+
+# Product polish sprint — close remaining template i18n gaps.
+msgid "Buscar especie…"
+msgstr "Search species…"
+
+msgid "Calculadoras"
+msgstr "Calculators"
+
+msgid "Convertimos probabilidades en acciones: ¿cuántos intercambios necesitas para estar 95% seguro?"
+msgstr "We turn probabilities into actions: how many trades do you need to be 95% sure?"
+
+msgid "Copiar enlace"
+msgstr "Copy link"
+
+msgid "Pokémon Lucky (50% desc.)"
+msgstr "Lucky Pokémon (50% off)"
+
+msgid "Pokémon Shadow (+20%)"
+msgstr "Shadow Pokémon (+20%)"
+
+msgid "Recursos"
+msgstr "Resources"
+
+msgid "¡Copiado!"
+msgstr "Copied!"
