@@ -354,6 +354,49 @@ class TestMechanicViews:
         assert "Ámbito canónico en español" not in html
         assert "Resumen español que no debe filtrarse" not in html
 
+    def test_spanish_mechanics_detail_preserves_canonical_evidence(
+        self, client, published_ruleset, seed_content_pages
+    ):
+        source = SourceReference.objects.create(
+            title="Fuente comunitaria en español",
+            url="https://example.com/research",
+            source_type="community_research",
+            status="vigente",
+        )
+        SourceClaim.objects.create(
+            source=source,
+            ruleset=published_ruleset,
+            scope="Ámbito canónico en español",
+            quote_summary="Resumen español que debe conservarse.",
+            confidence_level="high",
+        )
+
+        with translation.override("es"):
+            resp = client.get("/es/mecanicas/iv-en-intercambios/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "Resumen español que debe conservarse." in html
+        assert "Fuente comunitaria en español" in html
+
+    def test_english_mechanics_seo_title_is_not_double_branded(
+        self, client, published_ruleset, seed_content_pages
+    ):
+        from apps.content.models import ContentPageTranslation
+
+        en = ContentPageTranslation.objects.get(
+            page__slug="iv-en-intercambios",
+            locale="en",
+        )
+        en.seo_title = "How IVs Work in Trades | Pogo-lab"
+        en.save(update_fields=["seo_title", "updated_at"])
+
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/iv-en-intercambios/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "<title>How IVs Work in Trades | Pogo-lab</title>" in html
+        assert "Pogo-lab — Pogo-lab" not in html
+
     def test_english_mechanics_detail_fails_closed_without_translation(
         self, client, published_ruleset
     ):
