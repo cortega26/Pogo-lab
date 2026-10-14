@@ -43,10 +43,10 @@ jobs:
               -o "$RUN/cipher.b64" \
               https://raw.githubusercontent.com/cortega26/Pogo-lab/dc3793dbab636fafc456d1302ddad8e7310fc5a3/deploy/shadow/oci-shadow-http-capsule.cms.b64
             sudo base64 -d "$RUN/cipher.b64" | sudo tee "$RUN/cipher.cms" >/dev/null
-            echo '8628ac9ce10e9987784b679692aae28289d2c96e1ca68944e465714a57e923cb  '"$RUN"'/cipher.cms' | sha256sum -c -
+            echo '8628ac9ce10e9987784b679692aae28289d2c96e1ca68944e465714a57e923cb  '"$RUN"'/cipher.cms' | sudo sha256sum -c -
             sudo openssl cms -decrypt -inform DER -in "$RUN/cipher.cms" \
               -recip "$KEY/cert.pem" -inkey "$KEY/key.pem" -out "$RUN/source.tar.gz"
-            echo '5dd5b681156b61c71d1e54aaeb6f5f6568a143ae2727ff1f1bee05d50e64f77b  '"$RUN"'/source.tar.gz' | sha256sum -c -
+            echo '5dd5b681156b61c71d1e54aaeb6f5f6568a143ae2727ff1f1bee05d50e64f77b  '"$RUN"'/source.tar.gz' | sudo sha256sum -c -
             sudo mkdir -p "$RUN/src"
             sudo cp -a "$APP/src/fintual_executor" "$RUN/src/"
             sudo tar -xzf "$RUN/source.tar.gz" -C "$RUN/src"
