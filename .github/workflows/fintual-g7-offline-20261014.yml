@@ -1,0 +1,65 @@
+name: Fintual G7 hardened HTTPX offline tests (one-shot)
+on:
+  push:
+    branches: [ci/fintual-g7-offline-tests-20261014]
+    paths: [.github/workflows/fintual-g7-offline-20261014.yml]
+permissions:
+  contents: read
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Isolated Python 3.14 test suite on Oracle (NO credentials or live orders)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            EXPECTED_PROD=abf4db01082c77feef364a8925852a2633afbad2
+            CODE_SHA=dde8b085221c45cc97886689de699a177af6c521
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            HOSTKEY=/var/lib/fintual-ci-source-readonly/known_hosts
+            for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(systemctl is-active "$service")" = active || {
+                echo "STOP: SERVICE_NOT_ACTIVE $service"; exit 10;
+              }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$EXPECTED_PROD"
+            test -x "$PY" && test -x "$UV"
+            STAGE="$(mktemp -d /tmp/fintual-g7-offline.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOSTKEY -i $KEY" \
+              git clone --quiet --depth 1 --single-branch --branch feat/httpx-g7-failclosed-prep-20261014 \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$CODE_SHA"
+            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
+              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
+              --directory "$STAGE/repo" --frozen --group dev --extra shadow \
+              --python "$PY" --quiet
+            echo 'OFFLINE_SOURCE_PINNED=PASS'
+            sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 180s "$STAGE/venv/bin/python" -m pytest \
+              -q "$STAGE/repo/tests/test_http_g7_session_freeze.py" \
+              "$STAGE/repo/tests/test_http_broker.py" \
+              "$STAGE/repo/tests/test_http_broker_end_to_end_mock.py" \
+              "$STAGE/repo/tests/test_http_order_ambiguous_recovery.py" \
+              "$STAGE/repo/tests/test_shadow_longrun_certification.py"
+            sudo -n "$STAGE/venv/bin/ruff" check \
+              "$STAGE/repo/src/fintual_executor/http_broker.py" \
+              "$STAGE/repo/tests/test_http_g7_session_freeze.py"
+            sudo -n "$STAGE/venv/bin/python" -m compileall -q \
+              "$STAGE/repo/src/fintual_executor/http_broker.py" \
+              "$STAGE/repo/tests/test_http_g7_session_freeze.py"
+            for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(systemctl is-active "$service")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$EXPECTED_PROD"
+            echo 'G7_OFFLINE_ADVERSARIAL_TESTS_PASS=TRUE'
+            echo 'G5_WATCH_AND_ORIGINAL_PRODUCTION_UNTOUCHED=TRUE'
