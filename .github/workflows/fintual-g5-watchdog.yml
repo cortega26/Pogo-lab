@@ -1,0 +1,189 @@
+name: Fintual G5 hourly safety watch (notifications only)
+on:
+  push:
+    branches: [ops/fintual-g5-watchdog-20261014]
+    paths: [.github/workflows/fintual-g5-watchdog.yml]
+  schedule:
+    - cron: "12 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: fintual-g5-hourly-safety
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Inspect read-only G5 journal and original production baseline
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          capture_stdout: true
+          script: |
+            /usr/bin/python3 - <<'PY'
+            import datetime as dt
+            import json
+            import subprocess
+
+            unit = "fintual-g5-shadow-20261014.service"
+            original_sha = "abf4db01082c77feef364a8925852a2633afbad2"
+
+            def cmd(*parts):
+                p = subprocess.run(parts, text=True, capture_output=True, timeout=45)
+                return p.returncode, p.stdout.strip()
+
+            original = all(
+                cmd("systemctl", "is-active", service)[1] == "active"
+                for service in (
+                    "fintual-executor.service",
+                    "fintual-browser.service",
+                    "fintual-xvfb.service",
+                )
+            )
+            rc, sha = cmd(
+                "sudo", "-n", "-u", "fintual", "git",
+                "-C", "/opt/fintual-executor", "rev-parse", "HEAD"
+            )
+            original = original and rc == 0 and sha == original_sha
+            rc, raw = cmd(
+                "journalctl", "-u", unit, "--no-pager", "-o", "json",
+                "--since=2026-10-14 20:51:00 UTC",
+            )
+            entries = []
+            if rc == 0:
+                for line in raw.splitlines():
+                    try:
+                        envelope = json.loads(line)
+                        row = json.loads(envelope.get("MESSAGE", ""))
+                        if isinstance(row, dict) and row.get("phase") in (
+                            "BOOTSTRAP", "HTTP_READS", "AUTH_REQUIRED", "END"
+                        ):
+                            timestamp = dt.datetime.fromtimestamp(
+                                int(envelope["__REALTIME_TIMESTAMP"]) / 1000000,
+                                tz=dt.timezone.utc,
+                            )
+                            entries.append((timestamp, row))
+                    except (ValueError, TypeError, KeyError, OverflowError):
+                        continue
+
+            boot = [row for _, row in entries if row.get("phase") == "BOOTSTRAP" and row.get("ok") is True]
+            samples = [
+                (time, row) for time, row in entries
+                if row.get("phase") == "HTTP_READS" and row.get("ok") is True
+            ]
+            failures = [row for _, row in entries if row.get("ok") is False]
+            ends = [row for _, row in entries if row.get("phase") == "END"]
+            ending = ends[-1] if ends else None
+            age = (
+                (dt.datetime.now(dt.timezone.utc) - samples[-1][0]).total_seconds()
+                if samples else float("inf")
+            )
+
+            if not original:
+                status, reason = "FAIL", "ORIGINAL_PRODUCTION_UNHEALTHY"
+            elif rc:
+                status, reason = "FAIL", "JOURNAL_UNREADABLE"
+            elif not boot or not samples:
+                status, reason = "FAIL", "NO_AUTHENTICATED_BOOTSTRAP"
+            elif failures:
+                status, reason = "FAIL", "SESSION_OR_READ_FAILED"
+            elif ending:
+                if (
+                    ending.get("ok") is True
+                    and int(ending.get("elapsed_seconds", 0)) >= 86400
+                    and int(ending.get("checkpoints", 0)) >= 90
+                    and len(samples) >= 90
+                ):
+                    status, reason = "PASS", "REAL_24H_G5_CONFIRMED"
+                else:
+                    status, reason = "FAIL", "INCOMPLETE_24H_RESULT"
+            elif cmd("systemctl", "is-active", unit)[1] != "active":
+                status, reason = "FAIL", "SHADOW_SERVICE_NOT_ACTIVE"
+            elif age > 2100:
+                status, reason = "FAIL", "LAST_SAMPLE_STALE"
+            else:
+                status, reason = "RUNNING", "HEALTHY"
+
+            print("G5_STATUS=" + status)
+            print("G5_REASON=" + reason)
+            print("G5_CHECKPOINTS=" + str(len(samples)))
+            print("ORIGINAL_PRODUCTION_HEALTHY=" + str(original).upper())
+            PY
+      - name: Notify owner only on failure or final result
+        if: always()
+        env:
+          PROBE_STDOUT: ${{ steps.probe.outputs.stdout }}
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          text = os.environ.get("PROBE_STDOUT", "")
+          def marker(name):
+              matches = re.findall(
+                  r"(?m)^" + re.escape(name) + r"=([A-Z0-9_]+)$", text
+              )
+              return matches[-1] if matches else "UNKNOWN"
+
+          outcome = os.environ.get("PROBE_OUTCOME")
+          status = marker("G5_STATUS") if outcome == "success" else "FAIL"
+          if status == "RUNNING":
+              print("Watch active. No alert necessary.")
+              raise SystemExit(0)
+          if status not in ("PASS", "FAIL"):
+              status = "FAIL"
+
+          if status == "PASS":
+              title = "Fintual G5 PASS — G7/G8 pendientes antes de migrar"
+          else:
+              title = "Fintual G5 ALERTA — revisar sesión o servicio"
+
+          body = (
+              f"**Estado:** {status}\n"
+              f"**Causa:** {marker('G5_REASON')}\n"
+              f"**Checkpoints:** {marker('G5_CHECKPOINTS')}\n"
+              f"**Producción original saludable:** {marker('ORIGINAL_PRODUCTION_HEALTHY')}\n"
+              f"**Evidencia:** {os.environ['GH_RUN']}\n\n"
+              "Esta automatización NO inicia/detiene Chrome, NO cambia órdenes "
+              "ni activa HTTPX para dinero real. Si G5 pasó, G7 y G8 permanecen "
+              "pendientes y no se autoriza cutover automático."
+          )
+          repo = os.environ["GH_REPO"]
+          def gh(*args):
+              result = subprocess.run(
+                  ["gh", "api", *args], capture_output=True,
+                  text=True, timeout=30,
+              )
+              if result.returncode:
+                  raise RuntimeError("Failed to publish GitHub notification")
+              return json.loads(result.stdout)
+
+          issues = gh(f"repos/{repo}/issues?state=all&per_page=100")
+          if any(item.get("title") == title for item in issues):
+              print("Existing owner notification; avoiding duplicates.")
+              raise SystemExit(0)
+
+          report = gh(
+              "-X", "POST", f"repos/{repo}/issues",
+              "-f", "title=" + title,
+              "-f", "body=" + body,
+              "-f", "assignees[]=cortega26",
+          )
+          print("Owner notification created: " + report["html_url"])
+          PY
