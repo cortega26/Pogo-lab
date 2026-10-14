@@ -183,4 +183,9 @@ jobs:
               "-f", "assignees[]=cortega26",
           )
           print("Owner notification created: " + report["html_url"])
+          if status == "FAIL":
+              # One distinct failed Actions run can also trigger GitHub's
+              # workflow-failure email, if enabled in owner preferences.
+              # Later hourly checks see the issue and exit 0 (no alert storm).
+              raise SystemExit(1)
           PY
