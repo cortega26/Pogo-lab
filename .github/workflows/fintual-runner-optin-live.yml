@@ -1,0 +1,120 @@
+name: Fintual HTTPX runner PR23 — live one-shot no orders
+
+on:
+  push:
+    branches: [ops/fintual-http-shadow-g0-20261013]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Exercise actual runner.py once with HTTPX, sanitized config and ephemeral state
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 6m
+          script: |
+            set -euo pipefail
+            STAGE=/opt/fintual-pr23-oneshot-20261014
+            PROD=/opt/fintual-executor
+            KEY=/var/lib/fintual-ci-source-readonly
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            SHA=dba2ba970bcc3b727ed3fec4264c435ec856113a
+            cleanup() { sudo rm -rf -- "$STAGE" || true; }
+            trap cleanup EXIT
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -n -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            test "$(sudo -n -u fintual "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            echo 'GATE 0: active financial services, immutable source and isolated interpreter verified'
+            sudo install -d -m 0755 -o root -g root "$STAGE"
+            sudo install -d -m 0700 -o fintual -g fintual "$STAGE/work"
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --depth 1 --single-branch --branch feat/browserless-runner-readonly-optin-20261014 \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo" \
+              2>&1 | sudo tee "$STAGE/clone.log" >/dev/null; then
+              echo 'PRIVATE_SOURCE_FETCH: FAILED'
+              exit 15
+            fi
+            test "$(sudo git -C "$STAGE/repo" rev-parse HEAD)" = "$SHA"
+            echo 'GATE 1: exact PR #23 source pinned'
+            sudo -u fintual env HOME=/home/fintual UV_NO_CONFIG=1 \
+              "$UV" pip install --python "$PY" --target "$STAGE/work/vendor" httpx==0.28.1 --quiet \
+              >/dev/null 2>&1
+            sudo chown -R fintual:fintual "$STAGE/work"
+            echo 'GATE 2: dedicated HTTPX dependency, no change to production venv'
+            # Create an isolated config with trading explicitly DISABLED.
+            # Neither contents nor any trading data are exposed in workflow logs.
+            sudo -u fintual "$PY" - "$STAGE/work/config.json" <<'PY'
+            import json, os, pathlib, sys
+            src = pathlib.Path("/etc/fintual-executor/config.json")
+            config = json.loads(src.read_text())
+            config["execution_enabled"] = False
+            output = pathlib.Path(sys.argv[1])
+            fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w") as file:
+                json.dump(config, file)
+            assert config["execution_enabled"] is False
+            print("DISARMED_CONFIG: PASS")
+            PY
+            # PrivateTmp prevents any possible collision with live ledger/lock.
+            # Capture potentially financial stdout privately; public log gets booleans only.
+            sudo systemd-run --collect --wait --pipe --quiet \
+              -p User=fintual -p Group=fintual \
+              -p MemoryMax=384M -p CPUQuota=50% -p TasksMax=64 \
+              -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes \
+              -p PrivateTmp=yes \
+              -p "InaccessiblePaths=/var/lib/fintual-executor /etc/fintual-executor/market-data.env" \
+              -p "WorkingDirectory=$STAGE/repo" \
+              -p "Environment=PYTHONPATH=$STAGE/work/vendor:$STAGE/repo/src" \
+              -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+              -p "ReadWritePaths=$STAGE/work" \
+              /bin/bash -c '
+                "$1" -m fintual_executor.runner \
+                  --broker-transport http-readonly --once \
+                  --config "$2" --state /tmp/fintual-httpx-pr23-state.sqlite3 \
+                  --lock /tmp/fintual-httpx-pr23-runner.lock \
+                  > "$3" 2>&1
+              ' _ "$PY" "$STAGE/work/config.json" "$STAGE/work/runner-output.log"
+            # Read-only diagnostic can report success even with symbol errors;
+            # validate EACH symbol result independently from sanitized JSON.
+            sudo -u fintual "$PY" - "$STAGE/work/config.json" "$STAGE/work/runner-output.log" <<'PY'
+            import json, pathlib, sys
+            config = json.loads(pathlib.Path(sys.argv[1]).read_text())
+            rows = []
+            for line in pathlib.Path(sys.argv[2]).read_text(errors="replace").splitlines():
+                try:
+                    obj = json.loads(line)
+                    if isinstance(obj, dict):
+                        rows.append(obj)
+                except ValueError:
+                    pass
+            terminal = next((x for x in rows if x.get("state") == "MARKET_CLOSED"), None)
+            symbols = set(config["symbols"])
+            success = {x.get("symbol") for x in rows if x.get("ok") is True and x.get("symbol") in symbols}
+            failures = [x for x in rows if x.get("ok") is False]
+            if failures:
+                print("HTTPX_RUNNER_ONE_SHOT: FAIL, sanitized_failure_count=" + str(len(failures)))
+                raise SystemExit(2)
+            if terminal is not None:
+                print("HTTPX_RUNNER_ONE_SHOT: PASS_MARKET_CLOSED_NO_SYMBOL_EVALUATION")
+            elif success == symbols:
+                print("HTTPX_RUNNER_ONE_SHOT: PASS_ALL_SYMBOL_EVALUATIONS count=" + str(len(success)))
+            else:
+                print("HTTPX_RUNNER_ONE_SHOT: BLOCKED_INCOMPLETE_READS count=" + str(len(success)))
+                raise SystemExit(3)
+            print("LEDGER_ISOLATION: PRIVATE_TMP; NO_LIVE_BROKER_MUTATIONS")
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -n -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            echo 'POSTFLIGHT: live executor/browser preserved and test files deleted on EXIT'
