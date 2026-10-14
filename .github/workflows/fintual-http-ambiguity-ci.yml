@@ -1,4 +1,4 @@
-name: Fintual HTTP ambiguity regression — isolated CI
+name: Fintual final main Python 3.14.8 — isolated CI
 
 on:
   push:
@@ -21,11 +21,11 @@ jobs:
           command_timeout: 12m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-http-ambiguity-ci-20261014
+            RUN=/opt/fintual-final-python3148-ci-20261014
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
-            EXPECTED_MAIN=8c43f80fcdf5f75033fc96723f4f8dd103f8af63
+            EXPECTED_MAIN=5c5116f5eced05d3ccef228354bbc850edb07c9d
             cleanup() {
               sudo rm -rf -- "$RUN" || true
             }
@@ -51,7 +51,7 @@ jobs:
             test "$(systemctl is-active fintual-browser.service)" = active
             echo 'GATE 0: financial services active, production SHA unchanged'
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUN/known_hosts -i $KEY/github_ed25519" \
-                git clone --quiet --depth 1 --single-branch --branch test/http-order-ambiguous-recovery-20261014 \
+                git clone --quiet --depth 1 --single-branch --branch main \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
                 2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
               echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
@@ -64,21 +64,10 @@ jobs:
               exit 10
             fi
             echo 'GATE 1: exact browserless evaluation branch SHA cloned'
-            sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home" "$RUN/python"
-            echo '--- Installing isolated Python 3.13 runtime and pinned dependencies ---'
-            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" python install \
-                --install-dir "$RUN/python" 3.13 \
-                2>&1 | sudo tee "$RUN/python-install.log" >/dev/null; then
-              echo 'ISOLATED_PYTHON_INSTALL: FAIL'
-              sudo tail -n 8 "$RUN/python-install.log"
-              exit 12
-            fi
-            echo 'ISOLATED_PYTHON_INSTALL: PASS'
-            PY="$(sudo find "$RUN/python" -path "*/bin/python3.13" -print -quit)"
-            if test -z "$PY" || ! sudo test -x "$PY"; then
-              echo 'ISOLATED_PYTHON_DISCOVERY: FAIL'
-              exit 13
-            fi
+            sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home"
+            echo '--- Reuse existing immutable staged Python 3.14.8; no production changes ---'
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            test "$(sudo "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
             echo "ISOLATED_PYTHON_VERSION: $(sudo "$PY" --version)"
             if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
                 --python "$PY" --target "$RUN/vendor" \
