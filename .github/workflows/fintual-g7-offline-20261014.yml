@@ -48,7 +48,7 @@ jobs:
             test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$CODE_SHA"
             sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
               UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
-              --directory "$STAGE/repo" --frozen --group dev --extra shadow \
+              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
               --python "$PY" --quiet
             echo 'OFFLINE_SOURCE_PINNED=PASS'
             sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
