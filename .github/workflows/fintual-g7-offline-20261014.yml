@@ -26,11 +26,18 @@ jobs:
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             HOSTKEY=/var/lib/fintual-ci-source-readonly/known_hosts
             for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(systemctl is-active "$service")" = active || {
+              state="$(systemctl is-active "$service" || true)"
+              echo "CHECK_SERVICE=$service STATE=$state"
+              test "$state" = active || {
                 echo "STOP: SERVICE_NOT_ACTIVE $service"; exit 10;
               }
             done
-            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$EXPECTED_PROD"
+            prod_sha="$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)"
+            echo "PROD_SHA_EXPECTED_MATCH=$(test "$prod_sha" = "$EXPECTED_PROD" && echo yes || echo no)"
+            test "$prod_sha" = "$EXPECTED_PROD"
+            for item in "$PY" "$UV" "$KEY" "$HOSTKEY"; do
+              if sudo -n test -e "$item"; then echo "RUNTIME_RESOURCE_PRESENT=yes"; else echo "STOP: RUNTIME_RESOURCE_MISSING"; exit 11; fi
+            done
             test -x "$PY" && test -x "$UV"
             STAGE="$(mktemp -d /tmp/fintual-g7-offline.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$STAGE"' EXIT
