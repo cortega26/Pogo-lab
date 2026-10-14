@@ -1,0 +1,136 @@
+name: Fintual Python 3.14 / 3.15 compatibility matrix
+
+on:
+  push:
+    branches:
+      - ops/fintual-http-shadow-g0-20261013
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - name: Read-only financial runtime + disposable Python compatibility matrix
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 12m
+          script: |
+            set -euo pipefail
+            ROOT=/opt/fintual-python-matrix-20261014
+            PROD=/opt/fintual-executor
+            KEY=/var/lib/fintual-ci-source-readonly
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            MAIN=42897d82b9ba25d162b66e8996751bffddfaa595
+            cleanup() {
+              sudo rm -rf -- "$ROOT" || true
+            }
+            trap cleanup EXIT
+            echo '=== HOST INTERPRETERS / RESOURCE GATE ==='
+            python3 --version
+            sudo -u fintual "$PROD/.venv/bin/python" --version
+            free -m
+            for svc in fintual-executor.service fintual-browser.service; do
+              test "$(systemctl is-active "$svc")" = active
+              echo "$svc: active"
+            done
+            test "$(sudo -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            sudo test -s "$KEY/github_ed25519"
+            sudo install -d -m 0700 -o root -g root "$ROOT"
+            echo '=== GATE 0 PASS: private repo, services untouched ==='
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$ROOT/repo" \
+              2>&1 | sudo tee "$ROOT/clone.log" >/dev/null; then
+              echo 'PRIVATE_CLONE: FAIL'
+              exit 20
+            fi
+            test "$(sudo git -C "$ROOT/repo" rev-parse HEAD)" = "$MAIN"
+            echo '=== GATE 1 PASS: exact main SHA ==='
+            for SPEC in 3.14.8 3.15.0; do
+              LABEL="${SPEC//./_}"
+              STAGE="$ROOT/$LABEL"
+              sudo install -d -m 0700 -o root -g root "$STAGE"
+              echo "=== BEGIN PYTHON $SPEC ==="
+              echo '--- Download separate interpreter ---'
+              if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" "$UV" python install \
+                --install-dir "$STAGE/python" "$SPEC" \
+                2>&1 | sudo tee "$STAGE/python.log" >/dev/null; then
+                echo "PYTHON_$LABEL: INTERPRETER_UNAVAILABLE"
+                sudo tail -n 6 "$STAGE/python.log" || true
+                continue
+              fi
+              PY="$(sudo find "$STAGE/python" -path "*/bin/python$SPEC" -print -quit)"
+              if [ -z "$PY" ]; then
+                PY="$(sudo find "$STAGE/python" -path "*/bin/python${SPEC%.*}" -print -quit)"
+              fi
+              if [ -z "$PY" ] || ! sudo test -x "$PY"; then
+                echo "PYTHON_$LABEL: EXECUTABLE_NOT_FOUND"
+                continue
+              fi
+              sudo "$PY" --version
+              echo '--- Resolve runtime + shadow + dev dependencies ---'
+              if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" "$UV" pip install \
+                --python "$PY" --target "$STAGE/vendor" \
+                "$ROOT/repo[dev,shadow]" \
+                2>&1 | sudo tee "$STAGE/deps.log" >/dev/null; then
+                echo "PYTHON_$LABEL: DEPENDENCY_RESOLUTION_FAILED"
+                sudo tail -n 7 "$STAGE/deps.log" || true
+                continue
+              fi
+              echo "PYTHON_$LABEL: DEPENDENCIES_PASS"
+              sudo mkdir -p "$STAGE/home"
+              sudo chown -R nobody:nogroup "$STAGE"
+              sudo chmod 0700 "$ROOT"
+              sudo chown -R nobody:nogroup "$ROOT/repo"
+              sudo chmod 0755 "$ROOT"
+              sudo systemd-run --collect --wait --pipe --quiet \
+                -p User=nobody -p Group=nogroup \
+                -p "WorkingDirectory=$ROOT/repo" \
+                -p "Environment=PY_EXEC=$PY" \
+                -p "Environment=STAGE=$STAGE" \
+                -p "Environment=HOME=$STAGE/home" \
+                -p "Environment=PYTHONPATH=$STAGE/vendor:$ROOT/repo/src" \
+                -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+                -p MemoryMax=512M -p CPUQuota=50% -p TasksMax=64 \
+                -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes \
+                -p PrivateTmp=yes -p IPAddressDeny=any \
+                -p RestrictAddressFamilies=AF_UNIX \
+                -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser" \
+                -p "ReadWritePaths=$ROOT" \
+                /usr/bin/bash -c '
+                  set -eu
+                  "$PY_EXEC" -m compileall -q src
+                  echo "COMPILE: PASS"
+                  "$STAGE/vendor/bin/ruff" check src tests > "$STAGE/ruff.log" 2>&1 ||
+                    { echo "RUFF: FAIL"; grep -E "^(I[0-9]|F[0-9]|E[0-9]|Found)" "$STAGE/ruff.log" | head -n 6 || true; exit 21; }
+                  echo "RUFF: PASS"
+                  "$PY_EXEC" -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1 ||
+                    { echo "PYTEST: FAIL"; grep -E "^(FAILED|ERROR) " "$STAGE/pytest.log" | head -n 8 || true; tail -n 3 "$STAGE/pytest.log"; exit 22; }
+                  echo "PYTEST: PASS"
+                  grep -E "[0-9]+ passed" "$STAGE/pytest.log" | tail -n 1 || true
+                ' || { echo "PYTHON_$LABEL: SUITE_FAILED"; continue; }
+              echo "PYTHON_$LABEL: CORE_SUITE_PASS"
+              echo '--- Optional Google Sheet sync dependency resolution ---'
+              if sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" "$UV" pip install \
+                --python "$PY" --target "$STAGE/optional" \
+                "$ROOT/repo[sheet-sync]" \
+                2>&1 | sudo tee "$STAGE/optional.log" >/dev/null; then
+                echo "PYTHON_$LABEL: OPTIONAL_SHEETS_DEPENDENCIES_PASS"
+              else
+                echo "PYTHON_$LABEL: OPTIONAL_SHEETS_DEPENDENCIES_FAIL"
+                sudo tail -n 6 "$STAGE/optional.log" || true
+              fi
+            done
+            echo '=== GATE 2: VERIFY FINANCIAL PRODUCTION UNCHANGED ==='
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            echo 'PRODUCTION_UNCHANGED: PASS'
