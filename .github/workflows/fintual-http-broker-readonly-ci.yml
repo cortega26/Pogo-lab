@@ -1,4 +1,4 @@
-name: Fintual HTTP broker reconciliation — isolated CI
+name: Fintual HTTP order contract rebased — isolated CI
 
 on:
   push:
@@ -21,11 +21,11 @@ jobs:
           command_timeout: 12m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-broker-ci-isolated-20261014
+            RUN=/opt/fintual-broker-rebased-ci-20261014
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
-            EXPECTED_MAIN=04055149458f26c8ff93a0e1ba022b4b23819d5b
+            EXPECTED_MAIN=773e6f4cf2461bb0b2d1fa64c14fdcc8be608002
             cleanup() {
               sudo rm -rf -- "$RUN" || true
             }
@@ -47,7 +47,7 @@ jobs:
             test "$(systemctl is-active fintual-browser.service)" = active
             echo 'GATE 0: financial services active, production SHA unchanged'
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
-                git clone --quiet --depth 1 --single-branch --branch feat/http-broker-transport-gated-20261014 \
+                git clone --quiet --depth 1 --single-branch --branch feat/http-order-contract-rebased-20261014 \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
                 2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
               echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
