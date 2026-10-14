@@ -71,8 +71,6 @@ jobs:
             echo '--- Node runtime / admin port availability ---'
             command -v node >/dev/null && node --version || echo 'Node not installed'
             command -v npm >/dev/null && npm --version || echo 'npm not installed'
-            if ss -ltnH | awk '{print $4}' | grep -qE '(^|:)3000
-; then echo 'TCP 3000: occupied'; else echo 'TCP 3000: available'; fi
             if sudo -n true >/dev/null 2>&1; then echo 'SSH user passwordless sudo: yes'; else echo 'SSH user passwordless sudo: no'; fi
             echo '--- Tunnel configurations (presence only; no contents or credentials) ---'
             for p in /etc/cloudflared/config.yml /etc/cloudflared/config.yaml /home/ubuntu/.cloudflared/config.yml; do if test -f "$p"; then echo "$p: exists"; else echo "$p: absent"; fi; done
