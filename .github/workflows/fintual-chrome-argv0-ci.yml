@@ -1,0 +1,144 @@
+name: Fintual Chrome Linux argv0 regression — isolated CI
+
+on:
+  push:
+    branches: [ops/fintual-chrome-argv0-ci-20261014]
+    paths:
+      - .github/workflows/fintual-chrome-argv0-ci.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fintual-chrome-argv0-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - name: Execute complete tests as unprivileged user with memory and network limits
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 12m
+          script: |
+            set -euo pipefail
+            RUN=/opt/fintual-chrome-argv0-ci-${{ github.run_id }}
+            KEY=/var/lib/fintual-ci-source-readonly
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PRODUCT=/opt/fintual-executor
+            EXPECTED_MAIN=06ef0e7ba51b87fa188650a3d57482caf0832caa
+            cleanup() {
+              sudo rm -rf -- "$RUN" || true
+            }
+            trap cleanup EXIT
+            echo 'DIAGNOSTIC: checking services'
+            for svc in fintual-executor.service fintual-browser.service; do
+              echo "$svc: $(systemctl is-active "$svc" || true)"
+            done
+            echo 'DIAGNOSTIC: checking production SHA'
+            CURRENT="$(sudo -n -u fintual git -C "$PRODUCT" rev-parse HEAD)"
+            echo "production_sha=$CURRENT"
+            test "$CURRENT" = abf4db01082c77feef364a8925852a2633afbad2
+            echo 'DIAGNOSTIC: checking key files (boolean only)'
+            sudo test -s "$KEY/github_ed25519" && echo 'private_key_present=yes'
+            sudo test -s "$KEY/known_hosts" && echo 'host_key_file_present=yes'
+            echo 'DIAGNOSTIC: checking isolated workspace'
+            sudo install -d -m 0700 -o root -g root "$RUN"
+            curl -fsSL --max-time 15 https://api.github.com/meta \
+              | python3 -c 'import json,sys; print(chr(10).join("github.com "+k for k in json.load(sys.stdin)["ssh_keys"]))' \
+              | sudo tee "$RUN/known_hosts" >/dev/null
+            sudo grep -q '^github.com ssh-ed25519 ' "$RUN/known_hosts"
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            echo 'GATE 0: financial services active, production SHA unchanged'
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUN/known_hosts -i $KEY/github_ed25519" \
+                git clone --quiet --depth 1 --single-branch --branch fix/isolated-chrome-process-title-20261014 \
+                git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
+                2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
+              echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
+              sudo grep -Ei 'fatal:|error:|Permission denied|Connection|Host key|repository not found|already exists|read-only file system|No space' "$RUN/clone.log" | head -n 5 || true
+              exit 9
+            fi
+            GOT="$(sudo git -C "$RUN/repo" rev-parse HEAD)"
+            if test "$GOT" != "$EXPECTED_MAIN"; then
+              echo 'SOURCE_SHA_GATE: FAIL (main moved; no tests executed)'
+              exit 10
+            fi
+            echo 'GATE 1: exact current Chrome argv0 fix SHA cloned'
+            sudo mkdir -p "$RUN/cache" "$RUN/home"
+            echo '--- Reuse existing immutable staged Python 3.14.8; no production changes ---'
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            test "$(sudo "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            echo "ISOLATED_PYTHON_VERSION: $(sudo "$PY" --version)"
+            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" lock --check --directory "$RUN/repo" --quiet; then
+              echo 'LOCK_CHECK: FAIL'
+              exit 14
+            fi
+            echo 'LOCK_CHECK: PASS'
+            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" UV_PROJECT_ENVIRONMENT="$RUN/venv" "$UV" sync \
+                --directory "$RUN/repo" --frozen --extra dev --extra shadow --python "$PY" --quiet \
+                2>&1 | sudo tee "$RUN/install.log" >/dev/null; then
+              echo 'FROZEN_SHADOW_SYNC: FAIL'
+              sudo tail -n 7 "$RUN/install.log"
+              exit 11
+            fi
+            echo 'FROZEN_SHADOW_SYNC: PASS'
+            sudo chown -R nobody:nogroup "$RUN"
+            sudo chmod 0700 "$RUN"
+            echo 'GATE 2: dependencies available in disposable venv-equivalent target'
+            echo '--- Running lint and complete pytest suite without financial access ---'
+            sudo systemd-run --collect --wait --pipe --quiet \
+              -p User=nobody -p Group=nogroup \
+              -p "WorkingDirectory=$RUN/repo" \
+              -p "Environment=STAGE=$RUN" \
+              -p "Environment=PY_EXEC=$RUN/venv/bin/python" \
+              -p "Environment=HOME=$RUN/home" \
+              -p "Environment=PYTHONPATH=$RUN/repo/src" \
+              -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+              -p MemoryMax=512M -p CPUQuota=50% -p TasksMax=64 \
+              -p NoNewPrivileges=yes -p ProtectHome=yes -p ProtectSystem=strict \
+              -p PrivateTmp=yes -p IPAddressDeny=any \
+              -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser" \
+              -p RestrictAddressFamilies=AF_UNIX \
+              -p "ReadWritePaths=$RUN" \
+              /usr/bin/bash -c '
+                set -eu
+                if "$PY_EXEC" -m compileall -q src > "$STAGE/compile.log" 2>&1; then
+                  echo "COMPILE: PASS"
+                else
+                  echo "COMPILE: FAIL"
+                  exit 21
+                fi
+                lint_failed=0
+                if "$STAGE/venv/bin/ruff" check src tests > "$STAGE/ruff.log" 2>&1; then
+                  echo "RUFF: PASS"
+                else
+                  lint_failed=1
+                  echo "RUFF: FAIL"
+                  grep -E "^(E[0-9]|F[0-9]|I[0-9]|Found [0-9])|--> .*\\.py:[0-9]+:" "$STAGE/ruff.log" | head -n 20 || true
+                fi
+                if "$PY_EXEC" -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1; then
+                  echo "PYTEST: PASS"
+                  grep -E "^[0-9]+ passed" "$STAGE/pytest.log" | tail -n 1 || true
+                else
+                  echo "PYTEST: FAIL"
+                  grep -E "^(FAILED|ERROR) " "$STAGE/pytest.log" | head -n 12 || true
+                  grep -E "([0-9]+ failed|[0-9]+ errors|[0-9]+ passed)" "$STAGE/pytest.log" | tail -n 1 || true
+                  exit 23
+                fi
+                if [ "$lint_failed" -ne 0 ]; then
+                  echo "GATE 3: BLOCKED BY RUFF"
+                  exit 22
+                fi
+                echo "GATE 3: ALL OFFLINE CHECKS PASS"
+              '
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PRODUCT" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$PRODUCT" status --porcelain --untracked-files=no)"
+            echo 'GATE 4: financial production unchanged; disposable files removed on EXIT'
