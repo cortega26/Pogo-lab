@@ -38,7 +38,8 @@ jobs:
                 git clone --quiet --depth 1 --single-branch --branch chore/standardize-python-3148-20261014 \
                 git@github.com:cortega26/fintual-executor.git "$ROOT/repo" \
                 2>&1 | sudo tee "$ROOT/clone.log" >/dev/null; then
-              echo 'PRIVATE_REPO_FETCH: FAIL'
+              echo 'PRIVATE_REPO_FETCH: FAIL (diagnostic class only)'
+              sudo grep -Ei 'fatal:|error:|Permission denied|Connection|host key|not found|already exists|no space|could not|unsupported' "$ROOT/clone.log" | head -n 8 || true
               exit 11
             fi
             test "$(sudo git -C "$ROOT/repo" rev-parse HEAD)" = "$EXPECTED"
