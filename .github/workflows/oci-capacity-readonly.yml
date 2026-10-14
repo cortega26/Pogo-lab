@@ -1,0 +1,60 @@
+name: OCI capacity audit (read-only)
+
+on:
+  push:
+    branches:
+      - ops/oci-capacity-readonly-20261013
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.repository == 'cortega26/Pogo-lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Read CPU, memory, disk and relevant service status over existing SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            set -eu
+            echo '=== OCI CAPACITY AUDIT (NO CONFIGURATION CHANGES) ==='
+            date -u '+UTC: %Y-%m-%d %H:%M:%S'
+            echo "Architecture: $(uname -m)"
+            echo "CPU logical count: $(nproc)"
+            echo '--- CPU hardware ---'
+            lscpu | grep -E '^((Architecture|CPU\(s\)|Model name|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\))):' || true
+            echo '--- CPU current usage (2-second system-wide sample) ---'
+            before="$(awk '/^cpu / {idle=$5+$6; total=0; for(i=2;i<=NF;i++) total+=$i; print idle, total}' /proc/stat)"
+            sleep 2
+            after="$(awk '/^cpu / {idle=$5+$6; total=0; for(i=2;i<=NF;i++) total+=$i; print idle, total}' /proc/stat)"
+            awk -v b="$before" -v a="$after" 'BEGIN {split(b,x," ");split(a,y," ");d=y[2]-x[2]; idle=y[1]-x[1];if(d>0) printf "CPU busy: %.1f%% over 2s\n",100*(d-idle)/d;else print "CPU sample unavailable"}'
+            echo '--- Load averages and uptime ---'
+            uptime
+            echo '--- RAM / swap ---'
+            free -m
+            echo '--- Filesystems (capacity and used) ---'
+            df -hT / /opt /var /var/lib
+            echo '--- Root inodes ---'
+            df -ih /
+            echo '--- Disk layout ---'
+            lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
+            echo '--- Top RSS processes (command name only; RSS in KiB) ---'
+            ps -eo comm,pcpu,rss --sort=-rss | head -n 14
+            echo '--- Relevant services (active/inactive/not-found) ---'
+            for svc in pogo-lab.service nginx.service postgresql.service fintual-executor.service fintual-browser.service fintual-xvfb.service cloudflared.service; do
+              printf '%s: ' "$svc"
+              systemctl is-active "$svc" 2>/dev/null || true
+            done
+            echo '--- Relevant installation directories ---'
+            for dir in /opt/pogo-lab /opt/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser; do
+              if test -d "$dir"; then echo "$dir: exists"; else echo "$dir: absent"; fi
+            done
+            echo '--- Listening TCP ports (numbers only) ---'
+            ss -ltnH | awk '{split($4,a,":");print a[length(a)]}' | sort -n -u
+            echo '=== AUDIT COMPLETE ==='
