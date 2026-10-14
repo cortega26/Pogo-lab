@@ -21,7 +21,7 @@ jobs:
           command_timeout: 12m
           script: |
             set -euo pipefail
-            RUN=/dev/shm/fintual-main-ci-isolated-20261014
+            RUN=/opt/fintual-main-ci-isolated-20261014
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
@@ -59,10 +59,20 @@ jobs:
               exit 10
             fi
             echo 'GATE 1: exact reviewed private main SHA cloned'
-            sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home"
-            echo '--- Installing pinned Python dependencies into isolated target ---'
+            sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home" "$RUN/python"
+            echo '--- Installing isolated Python 3.13 runtime and pinned dependencies ---'
+            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" python install \
+                --install-dir "$RUN/python" 3.13 \
+                2>&1 | sudo tee "$RUN/python-install.log" >/dev/null; then
+              echo 'ISOLATED_PYTHON_INSTALL: FAIL'
+              sudo tail -n 8 "$RUN/python-install.log"
+              exit 12
+            fi
+            PY="$(sudo env UV_NO_CONFIG=1 UV_PYTHON_INSTALL_DIR="$RUN/python" "$UV" python find --managed-python 3.13)"
+            test -x "$PY"
+            echo "ISOLATED_PYTHON_VERSION: $(sudo "$PY" --version)"
             if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
-                --python /usr/bin/python3 --target "$RUN/vendor" \
+                --python "$PY" --target "$RUN/vendor" \
                 'pytest>=8' 'ruff>=0.13' 'httpx==0.28.1' \
                 'playwright==1.58.0' 'websockets==17.1' \
                 2>&1 | sudo tee "$RUN/install.log" >/dev/null; then
@@ -78,17 +88,19 @@ jobs:
               -p User=nobody -p Group=nogroup \
               -p "WorkingDirectory=$RUN/repo" \
               -p "Environment=STAGE=$RUN" \
+              -p "Environment=PY_EXEC=$PY" \
               -p "Environment=HOME=$RUN/home" \
               -p "Environment=PYTHONPATH=$RUN/vendor:$RUN/repo/src" \
               -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
               -p MemoryMax=512M -p CPUQuota=50% -p TasksMax=64 \
               -p NoNewPrivileges=yes -p ProtectHome=yes -p ProtectSystem=strict \
               -p PrivateTmp=yes -p IPAddressDeny=any \
+              -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser" \
               -p RestrictAddressFamilies=AF_UNIX \
               -p "ReadWritePaths=$RUN" \
               /usr/bin/bash -c '
                 set -eu
-                if /usr/bin/python3 -m compileall -q src > "$STAGE/compile.log" 2>&1; then
+                if "$PY_EXEC" -m compileall -q src > "$STAGE/compile.log" 2>&1; then
                   echo "COMPILE: PASS"
                 else
                   echo "COMPILE: FAIL"
@@ -101,7 +113,7 @@ jobs:
                   grep -E "^(E[0-9]|F[0-9]|I[0-9]|Found [0-9])" "$STAGE/ruff.log" | head -n 12 || true
                   exit 22
                 fi
-                if /usr/bin/python3 -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1; then
+                if "$PY_EXEC" -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1; then
                   echo "PYTEST: PASS"
                   grep -E "^[0-9]+ passed" "$STAGE/pytest.log" | tail -n 1 || true
                 else
