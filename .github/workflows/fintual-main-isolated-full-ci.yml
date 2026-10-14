@@ -69,7 +69,7 @@ jobs:
               exit 12
             fi
             echo 'ISOLATED_PYTHON_INSTALL: PASS'
-            PY="$(sudo find "$RUN/python" -name python3.13 -print -quit)"
+            PY="$(sudo find "$RUN/python" -path "*/bin/python3.13" -print -quit)"
             if test -z "$PY" || ! sudo test -x "$PY"; then
               echo 'ISOLATED_PYTHON_DISCOVERY: FAIL'
               exit 13
