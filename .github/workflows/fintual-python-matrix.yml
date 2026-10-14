@@ -55,7 +55,17 @@ jobs:
             fi
             test "$(sudo git -C "$ROOT/repo" rev-parse HEAD)" = "$MAIN"
             echo '=== GATE 1 PASS: exact main SHA ==='
-            for SPEC in 3.14 3.15; do
+            echo '--- Fetch vetted uv 0.13.1 only inside the scratch directory ---'
+            sudo install -d -m 0700 -o root -g root "$ROOT/uv-tools"
+            sudo curl -fLsS --retry 2 --max-time 60 \
+              https://github.com/astral-sh/uv/releases/download/0.13.1/uv-aarch64-unknown-linux-gnu.tar.gz \
+              -o "$ROOT/uv-tools/uv.tar.gz"
+            echo '9041c73c99fdc5892cf128140beb354eca9231d502068cc36e6cb53a8e59ad14  '"$ROOT"'/uv-tools/uv.tar.gz' | sudo sha256sum -c -
+            sudo tar -xzf "$ROOT/uv-tools/uv.tar.gz" -C "$ROOT/uv-tools"
+            UV="$ROOT/uv-tools/uv-aarch64-unknown-linux-gnu/uv"
+            sudo test -x "$UV"
+            echo "ISOLATED_UV_VERSION: $(sudo "$UV" --version)"
+            for SPEC in 3.14.8 3.15.0; do
               LABEL="${SPEC//./_}"
               STAGE="$ROOT/$LABEL"
               sudo install -d -m 0700 -o root -g root "$STAGE"
