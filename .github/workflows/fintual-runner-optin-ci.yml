@@ -113,8 +113,8 @@ jobs:
                 fi
                 lint_failed=0
                 # Import-only diagnostics, no private source or broker data in logs.
-                "$STAGE/vendor/bin/ruff" check --diff src/fintual_executor/runner.py 2>/dev/null |
-                  grep -E '^[+-][^+-]' | head -n 40 || true
+                "$STAGE/vendor/bin/ruff" check --fix --diff src/fintual_executor/runner.py 2>/dev/null |
+                  sed -n '1,85p' || true
                 if "$STAGE/vendor/bin/ruff" check src tests > "$STAGE/ruff.log" 2>&1; then
                   echo "RUFF: PASS"
                 else
