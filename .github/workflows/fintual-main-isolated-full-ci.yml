@@ -1,8 +1,7 @@
 name: Fintual main — isolated complete Python CI
 
 on:
-  push:
-    branches: [ops/fintual-http-shadow-g0-20261013]
+  workflow_dispatch:
 
 permissions:
   contents: read
