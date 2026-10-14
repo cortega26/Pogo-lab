@@ -1,9 +1,7 @@
 name: Fintual shadow — isolated exact HTTPX code parity
 
 on:
-  push:
-    branches:
-      - ops/fintual-http-shadow-g0-20261013
+  workflow_dispatch:
 
 permissions:
   contents: read
