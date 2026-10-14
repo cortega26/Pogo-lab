@@ -1,0 +1,64 @@
+name: Fintual isolated Unix session-owner IPC tests (one-shot)
+on:
+  push:
+    branches: [ci/fintual-ipc-offline-20261014]
+    paths: [.github/workflows/fintual-ipc-offline-20261014.yml]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - name: Test session IPC across OS processes without touching Fintual production
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 11m
+          script: |
+            set -euo pipefail
+            EXPECTED=abf4db01082c77feef364a8925852a2633afbad2
+            TESTED=4461b5d7d8e9fb37d2dfe1d7e220ffeaecbb4944
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            HOSTKEY=/var/lib/fintual-ci-source-readonly/known_hosts
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(systemctl is-active "$unit")" = active || { echo "STOP: SERVICE_HEALTH_PRECHECK"; exit 10; }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$EXPECTED"
+            STAGE="$(mktemp -d /tmp/fintual-ipc-offline.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOSTKEY -i $KEY" \
+              git clone --quiet --depth 1 --single-branch --branch feat/httpx-readonly-ipc-owner-20261014 \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$TESTED"
+            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
+              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
+              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
+              --python "$PY" --quiet
+            echo "STAGED_SOURCE_SHA_PASS=TRUE"
+            sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 240s "$STAGE/venv/bin/python" -m pytest -q \
+              "$STAGE/repo/tests/test_http_session_ipc.py" \
+              "$STAGE/repo/tests/test_http_order_runner_integration.py" \
+              "$STAGE/repo/tests/test_browserless_runner.py" \
+              "$STAGE/repo/tests/test_http_g7_session_freeze.py" \
+              "$STAGE/repo/tests/test_shadow_longrun_certification.py"
+            sudo -n "$STAGE/venv/bin/ruff" check \
+              "$STAGE/repo/src/fintual_executor/runner.py" \
+              "$STAGE/repo/src/fintual_executor/session_ipc.py" \
+              "$STAGE/repo/tests/test_http_session_ipc.py"
+            sudo -n "$STAGE/venv/bin/python" -m compileall -q \
+              "$STAGE/repo/src/fintual_executor/runner.py" \
+              "$STAGE/repo/src/fintual_executor/session_ipc.py" \
+              "$STAGE/repo/tests/test_http_session_ipc.py"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(systemctl is-active "$unit")" = active || { echo "STOP: SERVICE_HEALTH_POSTCHECK"; exit 11; }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$EXPECTED"
+            echo 'IPC_CROSS_PROCESS_TESTS=PASS'
+            echo 'ORIGINAL_TRADER_AND_G5_UNCHANGED=TRUE'
