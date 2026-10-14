@@ -73,13 +73,22 @@ jobs:
             echo '--- Resolve exactly committed uv.lock against 3.14.8 ARM64 ---'
             if ! sudo -u nobody env HOME="$ROOT/home" UV_NO_CONFIG=1 UV_CACHE_DIR="$ROOT/cache" \
                 "$UV" sync --frozen --project "$ROOT/repo" --python "$PY" \
-                --extra dev --extra shadow \
+                --extra dev \
                 2>&1 | sudo tee "$ROOT/home/uvsync.log" >/dev/null; then
               echo 'FROZEN_LOCK: FAIL'
               sudo tail -n 8 "$ROOT/home/uvsync.log"
               exit 12
             fi
-            echo 'FROZEN_LOCK: PASS'
+            echo 'FROZEN_LOCK_BASE_AND_DEV: PASS'
+            # The pre-existing lockfile lacks the new shadow extra introduced
+            # in PR16; install pinned HTTPX only in this ephemeral test venv.
+            if ! sudo -u nobody env HOME="$ROOT/home" UV_NO_CONFIG=1 UV_CACHE_DIR="$ROOT/cache" \
+                "$UV" pip install --python "$ROOT/repo/.venv/bin/python" httpx==0.28.1 \
+                2>&1 | sudo tee "$ROOT/home/httpx.log" >/dev/null; then
+              echo 'SHADOW_HTTPX_DEPENDENCY: FAIL'
+              exit 13
+            fi
+            echo 'SHADOW_HTTPX_DEPENDENCY: PASS; uv.lock shadow extra still requires regeneration'
             sudo systemd-run --collect --wait --pipe --quiet \
               -p User=nobody -p Group=nogroup \
               -p "WorkingDirectory=$ROOT/repo" \
