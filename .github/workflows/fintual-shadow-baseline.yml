@@ -40,4 +40,15 @@ jobs:
             sudo -n -u fintual /opt/fintual-executor/.venv/bin/python -c "import importlib.util; print('httpx_available:', bool(importlib.util.find_spec('httpx'))); print('playwright_available:', bool(importlib.util.find_spec('playwright')))"
             echo '--- Local browser endpoint HTTP status only ---'
             curl --silent --output /dev/null --write-out 'CDP status %{http_code}\n' --max-time 5 http://127.0.0.1:9222/json/version || true
+            echo '--- Read-only private Git remote access test ---'
+            if timeout 12s sudo -n -u fintual git -C /opt/fintual-executor ls-remote --exit-code origin refs/heads/feat/shadow-http-readonly-20261013 >/dev/null 2>&1; then
+              echo 'shadow_branch_access: yes'
+            else
+              echo 'shadow_branch_access: no'
+            fi
+            echo '--- Shadow test toolchain availability ---'
+            sudo -n -u fintual /opt/fintual-executor/.venv/bin/python -c "import importlib.util; print('pytest_available:', bool(importlib.util.find_spec('pytest'))); print('ruff_available:', bool(importlib.util.find_spec('ruff')))"
+            echo '--- OS Python & pip ---'
+            python3 --version
+            python3 -m pip --version || true
             echo 'GATE 0 COMPLETE: no runtime mutations'
