@@ -74,4 +74,16 @@ jobs:
             if sudo -n true >/dev/null 2>&1; then echo 'SSH user passwordless sudo: yes'; else echo 'SSH user passwordless sudo: no'; fi
             echo '--- Tunnel configurations (presence only; no contents or credentials) ---'
             for p in /etc/cloudflared/config.yml /etc/cloudflared/config.yaml /home/ubuntu/.cloudflared/config.yml; do if test -f "$p"; then echo "$p: exists"; else echo "$p: absent"; fi; done
+            echo '--- Existing Cloudflare tunnel ingress hostnames and services (redacted config) ---'
+            if test -r /etc/cloudflared/config.yml; then
+              grep -E '^[[:space:]]*(hostname|service):' /etc/cloudflared/config.yml || true
+            else
+              sudo grep -E '^[[:space:]]*(hostname|service):' /etc/cloudflared/config.yml || true
+            fi
+            echo '--- Oracle SSH username and unprivileged service feasibility ---'
+            id -un
+            if command -v git >/dev/null; then git --version; fi
+            echo '--- Runtime TCP listeners local binding ---'
+            ss -ltnH | awk '{print $4}' | grep -E '(:3000|:8000|:8010|:8088|:9222)
+ || true
             echo '=== AUDIT COMPLETE ==='
