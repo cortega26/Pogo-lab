@@ -21,7 +21,7 @@ jobs:
           command_timeout: 12m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-main-ci-isolated-20261014
+            RUN=/opt/fintual-broker-ci-isolated-20261014
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
