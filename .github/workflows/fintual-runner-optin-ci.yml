@@ -21,7 +21,7 @@ jobs:
           command_timeout: 12m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-runner-optin-ci-20261014
+            RUN=/opt/fintual-runner-merged-ci-20261014
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
