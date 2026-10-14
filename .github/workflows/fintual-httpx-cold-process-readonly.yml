@@ -1,0 +1,129 @@
+name: Fintual HTTPX cold-process recovery — read only
+
+on:
+  push:
+    branches: [ops/fintual-httpx-cold-process-readonly-20261014]
+    paths:
+      - .github/workflows/fintual-httpx-cold-process-readonly.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Exercise actual runner.py once with HTTPX, sanitized config and ephemeral state
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 6m
+          script: |
+            set -euo pipefail
+            STAGE=/opt/fintual-httpx-cold-process-${{ github.run_id }}
+            PROD=/opt/fintual-executor
+            KEY=/var/lib/fintual-ci-source-readonly
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            SHA=334d96b72c44ad110c6096c8e93393a74bb87665
+            cleanup() { sudo rm -rf -- "$STAGE" || true; }
+            trap cleanup EXIT
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -n -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            test "$(sudo -n -u fintual "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            echo 'GATE 0: active financial services, immutable source and isolated interpreter verified'
+            sudo install -d -m 0755 -o root -g root "$STAGE"
+            sudo install -d -m 0700 -o fintual -g fintual "$STAGE/work"
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo" \
+              2>&1 | sudo tee "$STAGE/clone.log" >/dev/null; then
+              echo 'PRIVATE_SOURCE_FETCH: FAILED'
+              exit 15
+            fi
+            test "$(sudo git -C "$STAGE/repo" rev-parse HEAD)" = "$SHA"
+            echo 'GATE 1: exact merged main source pinned'
+            sudo -u fintual env HOME=/home/fintual UV_NO_CONFIG=1 \
+              "$UV" pip install --python "$PY" --target "$STAGE/work/vendor" httpx==0.28.1 --quiet \
+              >/dev/null 2>&1
+            sudo chown -R fintual:fintual "$STAGE/work"
+            echo 'GATE 2: dedicated HTTPX dependency, no change to production venv'
+            # Create an isolated config with trading explicitly DISABLED.
+            # Neither contents nor any trading data are exposed in workflow logs.
+            sudo -u fintual "$PY" - "$STAGE/work/config.json" <<'PY'
+            import json, os, pathlib, sys
+            src = pathlib.Path("/etc/fintual-executor/config.json")
+            config = json.loads(src.read_text())
+            config["execution_enabled"] = False
+            output = pathlib.Path(sys.argv[1])
+            fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w") as file:
+                json.dump(config, file)
+            assert config["execution_enabled"] is False
+            print("DISARMED_CONFIG: PASS")
+            PY
+            # Two distinct Python processes. Each gets its own PrivateTmp
+            # ledger and lock, and bootstraps from the existing manually
+            # authenticated production Chrome before detaching CDP.
+            for ATTEMPT in 1 2; do
+              if ! sudo systemd-run --collect --wait --pipe --quiet \
+                -p User=fintual -p Group=fintual \
+                -p MemoryMax=384M -p CPUQuota=50% -p TasksMax=64 \
+                -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes \
+                -p PrivateTmp=yes \
+                -p "InaccessiblePaths=/var/lib/fintual-executor /etc/fintual-executor/market-data.env" \
+                -p "WorkingDirectory=$STAGE/repo" \
+                -p "Environment=PYTHONPATH=$STAGE/work/vendor:$STAGE/repo/src" \
+                -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+                -p "Environment=FINTUAL_REAL_EXECUTION=OFF" \
+                -p "Environment=FINTUAL_HTTP_MUTATIONS=OFF" \
+                -p "ReadWritePaths=$STAGE/work" \
+                /bin/bash -c '
+                  "$1" -m fintual_executor.runner \
+                    --broker-transport http-readonly --once \
+                    --config "$2" --state /tmp/fintual-httpx-recovery-state.sqlite3 \
+                    --lock /tmp/fintual-httpx-recovery-runner.lock \
+                    > "$3" 2>&1
+                ' _ "$PY" "$STAGE/work/config.json" "$STAGE/work/runner-$ATTEMPT.log"; then
+                echo "READONLY_PROCESS_$ATTEMPT: FAIL_RUNTIME"
+                exit 11
+              fi
+              # Parse the private financial output locally; only sanitized
+              # counts and statuses reach public GitHub logs.
+              sudo -u fintual "$PY" - "$STAGE/work/config.json" "$STAGE/work/runner-$ATTEMPT.log" "$ATTEMPT" <<'PY'
+            import json, pathlib, sys
+            config = json.loads(pathlib.Path(sys.argv[1]).read_text())
+            rows = []
+            for line in pathlib.Path(sys.argv[2]).read_text(errors="replace").splitlines():
+                try:
+                    obj = json.loads(line)
+                    if isinstance(obj, dict):
+                        rows.append(obj)
+                except ValueError:
+                    continue
+            attempt = sys.argv[3]
+            symbols = set(config["symbols"])
+            good = {x.get("symbol") for x in rows if x.get("ok") is True and x.get("symbol") in symbols}
+            bad = [x for x in rows if x.get("ok") is False]
+            closed = any(x.get("state") == "MARKET_CLOSED" for x in rows)
+            if bad or (not closed and good != symbols):
+                print("READONLY_PROCESS_" + attempt + ": FAIL_INCOMPLETE")
+                raise SystemExit(3)
+            status = "MARKET_CLOSED_NO_EVALUATION" if closed else "ALL_SYMBOLS_OK"
+            print("READONLY_PROCESS_" + attempt + ": " + status + " count=" + str(len(good)))
+            PY
+              test "$(systemctl is-active fintual-executor.service)" = active
+              test "$(systemctl is-active fintual-browser.service)" = active
+              test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            done
+            echo 'READONLY_PROCESS_RESTART: PASS_TWO_DISTINCT_PROCESSES_NO_PERSISTED_COOKIES'
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -n -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            echo 'POSTFLIGHT: live executor/browser preserved and test files deleted on EXIT'
