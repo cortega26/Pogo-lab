@@ -111,12 +111,13 @@ jobs:
                   echo "COMPILE: FAIL"
                   exit 21
                 fi
+                lint_failed=0
                 if "$STAGE/vendor/bin/ruff" check src tests > "$STAGE/ruff.log" 2>&1; then
                   echo "RUFF: PASS"
                 else
+                  lint_failed=1
                   echo "RUFF: FAIL"
-                  grep -E "^(E[0-9]|F[0-9]|I[0-9]|Found [0-9])" "$STAGE/ruff.log" | head -n 12 || true
-                  exit 22
+                  grep -E "^(E[0-9]|F[0-9]|I[0-9]|Found [0-9])|--> .*\\.py:[0-9]+:" "$STAGE/ruff.log" | head -n 20 || true
                 fi
                 if "$PY_EXEC" -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1; then
                   echo "PYTEST: PASS"
@@ -126,6 +127,10 @@ jobs:
                   grep -E "^(FAILED|ERROR) " "$STAGE/pytest.log" | head -n 12 || true
                   grep -E "([0-9]+ failed|[0-9]+ errors|[0-9]+ passed)" "$STAGE/pytest.log" | tail -n 1 || true
                   exit 23
+                fi
+                if [ "$lint_failed" -ne 0 ]; then
+                  echo "GATE 3: BLOCKED BY RUFF"
+                  exit 22
                 fi
                 echo "GATE 3: ALL OFFLINE CHECKS PASS"
               '
