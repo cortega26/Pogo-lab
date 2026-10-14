@@ -68,8 +68,12 @@ jobs:
               sudo tail -n 8 "$RUN/python-install.log"
               exit 12
             fi
-            PY="$(sudo env UV_NO_CONFIG=1 UV_PYTHON_INSTALL_DIR="$RUN/python" "$UV" python find --managed-python 3.13)"
-            test -x "$PY"
+            echo 'ISOLATED_PYTHON_INSTALL: PASS'
+            PY="$(sudo find "$RUN/python" -name python3.13 -print -quit)"
+            if test -z "$PY" || ! sudo test -x "$PY"; then
+              echo 'ISOLATED_PYTHON_DISCOVERY: FAIL'
+              exit 13
+            fi
             echo "ISOLATED_PYTHON_VERSION: $(sudo "$PY" --version)"
             if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
                 --python "$PY" --target "$RUN/vendor" \
