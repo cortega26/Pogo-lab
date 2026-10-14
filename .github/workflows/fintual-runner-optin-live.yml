@@ -1,8 +1,7 @@
 name: Fintual HTTPX runner PR23 — live one-shot no orders
 
 on:
-  push:
-    branches: [ops/fintual-http-shadow-g0-20261013]
+  workflow_dispatch:
 
 permissions:
   contents: read
