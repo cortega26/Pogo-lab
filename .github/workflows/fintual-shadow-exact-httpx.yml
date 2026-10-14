@@ -1,0 +1,139 @@
+name: Fintual shadow — isolated exact HTTPX code parity
+
+on:
+  push:
+    branches:
+      - ops/fintual-http-shadow-g0-20261013
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Decrypt pinned test module inside tmpfs, compare broker reads, remove test files
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 7m
+          script: |
+            set -eu
+            APP=/opt/fintual-executor
+            RUN=/dev/shm/fintual-shadow-oci-run-20261013
+            KEY=/dev/shm/fintual-shadow-oci-20261013
+            cleanup() {
+              sudo rm -rf "$RUN" || true
+            }
+            trap cleanup EXIT
+            if [ "$(sudo -u fintual git -C "$APP" rev-parse HEAD)" != "abf4db01082c77feef364a8925852a2633afbad2" ]; then
+              echo 'GATE FAIL: production SHA changed. No shadow executed.'
+              exit 10
+            fi
+            test -z "$(sudo -u fintual git -C "$APP" status --porcelain --untracked-files=no)"
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            sudo test -s "$KEY/key.pem"
+            echo 'GATE 0: production clean and active'
+            sudo install -d -m 0700 -o fintual -g fintual "$RUN"
+            sudo curl -fsSL --retry 2 --max-time 30 \
+              -o "$RUN/cipher.b64" \
+              https://raw.githubusercontent.com/cortega26/Pogo-lab/dc3793dbab636fafc456d1302ddad8e7310fc5a3/deploy/shadow/oci-shadow-http-capsule.cms.b64
+            sudo base64 -d "$RUN/cipher.b64" > "$RUN/cipher.cms"
+            echo '8628ac9ce10e9987784b679692aae28289d2c96e1ca68944e465714a57e923cb  '"$RUN"'/cipher.cms' | sha256sum -c -
+            sudo openssl cms -decrypt -inform DER -in "$RUN/cipher.cms" \
+              -recip "$KEY/cert.pem" -inkey "$KEY/key.pem" -out "$RUN/source.tar.gz"
+            echo '5dd5b681156b61c71d1e54aaeb6f5f6568a143ae2727ff1f1bee05d50e64f77b  '"$RUN"'/source.tar.gz' | sha256sum -c -
+            sudo mkdir -p "$RUN/src"
+            sudo cp -a "$APP/src/fintual_executor" "$RUN/src/"
+            sudo tar -xzf "$RUN/source.tar.gz" -C "$RUN/src"
+            test "$(git hash-object "$RUN/src/fintual_executor/shadow_http.py")" = f94d93ca23990751a4300cb94c9c8f52149b7372
+            sudo chown -R fintual:fintual "$RUN"
+            echo 'GATE 1: private source SHA matched; temporary isolated package staged'
+            sudo -u fintual /home/fintual/.uv-bootstrap/bin/uv pip install \
+              --python "$APP/.venv/bin/python" --target "$RUN/vendor" httpx==0.28.1 \
+              --quiet
+            sudo -u fintual env PYTHONPATH="$RUN/vendor:$RUN/src" "$APP/.venv/bin/python" - <<'PY'
+            import json
+            import httpx
+            from decimal import Decimal
+            from fintual_executor.client import (
+                FintualClient, MARKET_INFO_QUERY, ASSET_BUY_INPUT_QUERY,
+                PENDING_QUERY, MOVEMENTS_QUERY,
+            )
+            from fintual_executor.shadow_http import (
+                ReadOnlyHttpFintualClient, ShadowReadOnlyViolation,
+            )
+            from fintual_executor.execution import BUY_MUTATION
+
+            # Offline hard gate: a trade mutation must be rejected before HTTP.
+            seen = []
+            def mock_handler(request):
+                seen.append((request.method, request.url.path))
+                if request.url.path == "/gql/":
+                    return httpx.Response(200, json={"data": {"stocksAssetsMarketInfo": {"isMarketOpen": False}}})
+                raise RuntimeError("Unexpected offline HTTP request")
+            with ReadOnlyHttpFintualClient([], transport=httpx.MockTransport(mock_handler)) as client:
+                try:
+                    client.gql("StocksDeclareAssetMarketBuy", BUY_MUTATION)
+                except ShadowReadOnlyViolation:
+                    pass
+                else:
+                    raise RuntimeError("Trade mutation was not blocked")
+                assert seen == []
+                assert "stocksAssetsMarketInfo" in client.gql("StocksAssetsMarketInfo", MARKET_INFO_QUERY)
+            print(json.dumps({"phase": "OFFLINE_SHADOW_SECURITY", "ok": True}))
+
+            # One-shot strict parity. No ledger, no order submission, no token persistence.
+            browser = None
+            checks = []
+            try:
+                import pathlib
+                config = json.loads(pathlib.Path("/etc/fintual-executor/config.json").read_text())
+                symbols = config["symbols"]
+                assert isinstance(symbols, list) and symbols and all(
+                    isinstance(symbol, str) and symbol.isascii() and symbol.isalnum()
+                    for symbol in symbols
+                )
+                browser = FintualClient(execution_enabled=False).connect()
+                with ReadOnlyHttpFintualClient.from_browser_page(browser.page) as client:
+                    for label, op, query, variables in (
+                        ("market", "StocksAssetsMarketInfo", MARKET_INFO_QUERY, {}),
+                        ("wallet", "AssetBuyInputAmount", ASSET_BUY_INPUT_QUERY, {}),
+                        ("pending", "PendingStocksWalletMovements", PENDING_QUERY, {}),
+                    ):
+                        match = browser.gql(op, query, variables) == client.gql(op, query, variables)
+                        checks.append({"check": label, "match": match})
+                    for symbol in symbols:
+                        variables = {"assetSymbol": symbol, "limit": 10, "offset": 0}
+                        match = browser.gql("StocksAssetMovements", MOVEMENTS_QUERY, variables) == (
+                            client.gql("StocksAssetMovements", MOVEMENTS_QUERY, variables)
+                        )
+                        checks.append({"check": "movements:" + symbol, "match": match})
+                        # Use existing production read method; may renew pricing JWT.
+                        ref_price, ref_at = browser.current_price(symbol)
+                        new_price, new_at = client.current_price(symbol)
+                        checks.append({"check": "pricing:" + symbol, "match": ref_price == new_price and ref_at == new_at})
+                success = all(check["match"] for check in checks)
+                print(json.dumps({"phase": "EXACT_HTTPX_SHADOW_PARITY", "ok": success, "checks": checks}))
+                if not success:
+                    raise SystemExit(2)
+            except SystemExit:
+                raise
+            except Exception as exc:
+                print(json.dumps({"phase": "EXACT_HTTPX_SHADOW_PARITY", "ok": False,
+                                  "error_type": type(exc).__name__}))
+                raise SystemExit(3)
+            finally:
+                if browser is not None:
+                    browser.close()
+            PY
+            echo 'GATE 2: exact PR module passed runtime shadow parity'
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$APP" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$APP" status --porcelain --untracked-files=no)"
+            echo 'GATE 3: production remained active, clean and on identical SHA'
