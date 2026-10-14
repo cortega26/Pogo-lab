@@ -1,0 +1,227 @@
+name: Fintual - original executor recovery (manual only)
+
+# This workflow is intentionally NEVER triggered by push, pull_request, or cron.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'First select preflight. Select resume only after reviewing preflight.'
+        required: true
+        type: choice
+        default: preflight
+        options:
+          - preflight
+          - resume
+      confirmation:
+        description: 'For resume type exactly RESUME_ORIGINAL_REAL_TRADING'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fintual-original-executor-operator-resume
+  cancel-in-progress: false
+
+jobs:
+  operate:
+    # Never execute from a branch other than default/main. Preflight and resume
+    # are distinct manual dispatches; resume additionally requires exact text.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (inputs.mode == 'preflight' ||
+       (inputs.mode == 'resume' && inputs.confirmation == 'RESUME_ORIGINAL_REAL_TRADING'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check production and optionally resume ONLY the original executor
+        uses: appleboy/ssh-action@v1
+        env:
+          REQUESTED_MODE: ${{ inputs.mode }}
+          REQUESTED_CONFIRMATION: ${{ inputs.confirmation }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: REQUESTED_MODE,REQUESTED_CONFIRMATION
+          command_timeout: 9m
+          script: |
+            set -euo pipefail
+            if [ "$REQUESTED_MODE" != preflight ] && [ "$REQUESTED_MODE" != resume ]; then
+              echo 'STOP: UNEXPECTED_MODE'; exit 40
+            fi
+            if [ "$REQUESTED_MODE" = resume ] && [ "$REQUESTED_CONFIRMATION" != RESUME_ORIGINAL_REAL_TRADING ]; then
+              echo 'STOP: OWNER_CONFIRMATION_MISSING'; exit 41
+            fi
+
+            # Synchronize retries. No browser, config, code, or ledger mutations.
+            exec 9>/tmp/fintual-original-operator-resume.lock
+            flock -n 9 || { echo 'STOP: ANOTHER_RECOVERY_IN_PROGRESS'; exit 42; }
+            echo "OPERATOR_MODE=$REQUESTED_MODE"
+            date -u +'%Y-%m-%dT%H:%M:%SZ'
+            EXEC=fintual-executor.service
+            BROWSER=fintual-browser.service
+            XVFB=fintual-xvfb.service
+            PROD=/opt/fintual-executor
+            EXPECTED_SHA=abf4db01082c77feef364a8925852a2633afbad2
+
+            if [ "$(systemctl is-active "$EXEC")" != inactive ]; then
+              echo 'STOP: EXECUTOR_NOT_PAUSED'; exit 43
+            fi
+            for unit in "$BROWSER" "$XVFB"; do
+              test "$(systemctl is-active "$unit")" = active || {
+                echo 'STOP: BROWSER_OR_XVFB_UNAVAILABLE'; exit 44;
+              }
+            done
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = "$EXPECTED_SHA" || {
+              echo 'STOP: PRODUCTION_COMMIT_CHANGED'; exit 45;
+            }
+            test -z "$(sudo -n -u fintual git -C "$PROD" status --porcelain --untracked-files=no)" || {
+              echo 'STOP: PRODUCTION_WORKTREE_DIRTY'; exit 46;
+            }
+            CONFIG_HASH_BEFORE="$(sudo -n sha256sum /etc/fintual-executor/config.json /etc/fintual-executor/market-data.env | sha256sum | cut -d' ' -f1)"
+            sudo -n python3 - <<'PY'
+            import json
+            from pathlib import Path
+            import stat
+            cfg = Path('/etc/fintual-executor/config.json')
+            secret = Path('/etc/fintual-executor/market-data.env')
+            if json.loads(cfg.read_text()).get('execution_enabled') is not True:
+                raise SystemExit('STOP: ORIGINAL_EXECUTION_CONFIG_NOT_ARMED')
+            for item in (cfg, secret):
+                if not item.is_file() or stat.S_IMODE(item.stat().st_mode) & 0o007:
+                    raise SystemExit('STOP: RUNTIME_CONFIG_NOT_PRIVATE')
+            print('G0: ORIGINAL_PAUSED_EXECUTOR_AND_CONFIG=PASS')
+            PY
+
+            # Crucial: StateStore.connect() executes schema DDL. Read direct
+            # through a SQLite URI with mode=ro and PRAGMA query_only=ON.
+            sudo -n -u fintual /usr/bin/python3 - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            import stat
+            db = sqlite3.connect('file:/var/lib/fintual-executor/state.sqlite3?mode=ro', uri=True, timeout=15)
+            db.execute('PRAGMA query_only=ON')
+            n = db.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')").fetchone()[0]
+            ok = db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+            db.close()
+            print(f'LEDGER_OPEN_INTENTS={n}')
+            print('LEDGER_INTEGRITY=' + ('PASS' if ok else 'FAIL'))
+            if n or not ok:
+                raise SystemExit('STOP: LEDGER_NOT_CLEAR')
+            backups = Path('/var/lib/fintual-executor/pause-backups')
+            copies = [x for x in backups.glob('before-manual-auth-*.sqlite3') if x.is_file() and not x.is_symlink()]
+            if not copies:
+                raise SystemExit('STOP: PREPAUSE_BACKUP_MISSING')
+            latest = max(copies, key=lambda x: x.stat().st_mtime)
+            if stat.S_IMODE(latest.stat().st_mode) != 0o600:
+                raise SystemExit('STOP: PREPAUSE_BACKUP_PERMISSIONS')
+            con = sqlite3.connect(latest.as_uri() + '?mode=ro', uri=True, timeout=15)
+            con.execute('PRAGMA query_only=ON')
+            backup_ok = con.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+            con.close()
+            if not backup_ok:
+                raise SystemExit('STOP: PREPAUSE_BACKUP_INVALID')
+            print('G1: LEDGER_AND_PRIVATE_BACKUP=PASS')
+            PY
+
+            # Financial read-only broker check. No auth material or balances
+            # are printed, and all financial mutation flags are explicitly unset.
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/opt/fintual-executor/src \
+              /opt/fintual-executor/.venv/bin/python - <<'PY'
+            import json
+            from datetime import datetime, timezone
+            from pathlib import Path
+            from fintual_executor.client import FintualClient, get_market_info, get_pending
+            config = json.loads(Path('/etc/fintual-executor/config.json').read_text())
+            client = FintualClient(execution_enabled=False)
+            try:
+                client.connect()
+                pending = get_pending(client)
+                buys = pending.get('stocksPendingAssetMarketBuys')
+                sells = pending.get('stocksPendingAssetMarketSells')
+                if not isinstance(buys, list) or not isinstance(sells, list):
+                    raise RuntimeError('Missing broker pending response')
+                print('BROKER_PENDING_BUYS=' + str(len(buys)))
+                print('BROKER_PENDING_SELLS=' + str(len(sells)))
+                if buys or sells:
+                    raise RuntimeError('Broker has pending orders')
+                market = get_market_info(client)
+                opened = market.get('isMarketOpen')
+                if not isinstance(opened, bool):
+                    raise RuntimeError('Invalid broker market status')
+                symbols = config.get('symbols')
+                if not isinstance(symbols, list) or not symbols:
+                    raise RuntimeError('Missing configured symbols')
+                max_age = int(config.get('max_quote_age_seconds', 120))
+                for sym in symbols:
+                    price, at = client.current_price(sym)
+                    if not price:
+                        raise RuntimeError('Missing stock price')
+                    timestamp = datetime.fromisoformat(at.replace('Z', '+00:00'))
+                    if timestamp.tzinfo is None:
+                        raise RuntimeError('Naive pricing timestamp')
+                    age = (datetime.now(timezone.utc) - timestamp.astimezone(timezone.utc)).total_seconds()
+                    if opened and not (-2 <= age <= max_age):
+                        raise RuntimeError('Stale quote during open market')
+                print('G2: FINTUAL_AUTH_PENDING_ORDERS_AND_PRICES=PASS')
+            except Exception as exc:
+                print('STOP: BROKER_PREFLIGHT_' + type(exc).__name__)
+                raise SystemExit(47)
+            finally:
+                client.close()
+            PY
+
+            if [ "$REQUESTED_MODE" = preflight ]; then
+              echo 'RESULT=PREFLIGHT_PASS_NO_SERVICE_STARTED'
+              exit 0
+            fi
+
+            # User explicitly requested RESUME mode. Check status and source a
+            # final time; never change checkout, configuration or browser.
+            test "$(systemctl is-active "$EXEC")" = inactive
+            test "$(systemctl is-active "$BROWSER")" = active
+            test "$(systemctl is-active "$XVFB")" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = "$EXPECTED_SHA"
+            CONFIG_HASH_AFTER="$(sudo -n sha256sum /etc/fintual-executor/config.json /etc/fintual-executor/market-data.env | sha256sum | cut -d' ' -f1)"
+            test "$CONFIG_HASH_BEFORE" = "$CONFIG_HASH_AFTER" || {
+              echo 'STOP: CONFIG_CHANGED_DURING_PREFLIGHT'; exit 48;
+            }
+            echo 'G3: FINAL_RESUME_GATE=PASS'
+
+            sudo -n systemctl start "$EXEC"
+            test "$(systemctl is-active "$EXEC")" = active || {
+              echo 'START_ATTEMPTED_BUT_SERVICE_NOT_ACTIVE'; exit 49;
+            }
+            PID="$(systemctl show "$EXEC" --property=MainPID --value)"
+            test "$PID" -gt 1
+            echo 'ORIGINAL_EXECUTOR_STARTED=TRUE'
+            sleep 15
+            test "$(systemctl is-active "$EXEC")" = active || {
+              echo 'POSTSTART_FAILED_SERVICE_INACTIVE'; exit 50;
+            }
+            test "$(systemctl show "$EXEC" --property=MainPID --value)" = "$PID" || {
+              echo 'POSTSTART_FAILED_PID_CHANGED'; exit 51;
+            }
+            test "$(systemctl is-active "$BROWSER")" = active
+            test "$(systemctl is-active "$XVFB")" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = "$EXPECTED_SHA"
+            CONFIG_HASH_POST="$(sudo -n sha256sum /etc/fintual-executor/config.json /etc/fintual-executor/market-data.env | sha256sum | cut -d' ' -f1)"
+            test "$CONFIG_HASH_BEFORE" = "$CONFIG_HASH_POST"
+            sudo -n python3 - <<'PY'
+            import subprocess
+            from pathlib import Path
+            pid = int(subprocess.check_output(['systemctl','show','fintual-executor.service','-p','MainPID','--value'], text=True).strip())
+            if pid < 2:
+                raise SystemExit('POSTSTART_NO_PID')
+            env = Path(f'/proc/{pid}/environ').read_bytes().split(b'\0')
+            armed = b'FINTUAL_REAL_EXECUTION=YES_I_ACCEPT_REAL_ORDERS' in env
+            print('ORIGINAL_PROCESS_REAL_ORDER_ACK=' + str(armed).upper())
+            if not armed:
+                raise SystemExit('POSTSTART_ARMING_MISMATCH_NEEDS_REVIEW')
+            PY
+            echo 'RESULT=ORIGINAL_CDP_EXECUTOR_ACTIVE_AND_STABLE'
+            echo 'HTTPX_EXPERIMENTAL_NOT_DEPLOYED=TRUE'
