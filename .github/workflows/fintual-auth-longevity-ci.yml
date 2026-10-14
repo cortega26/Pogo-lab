@@ -1,4 +1,4 @@
-name: Fintual auth longevity gates — isolated Python CI
+name: Fintual merged auth longevity — isolated verification
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
-            EXPECTED_MAIN=4798cefc021314452c54ce1da03595373f6c6d38
+            EXPECTED_MAIN=7955027aad7f0d22ccba0916b31830394d19e1b5
             cleanup() {
               sudo rm -rf -- "$RUN" || true
             }
@@ -57,7 +57,7 @@ jobs:
             test "$(systemctl is-active fintual-browser.service)" = active
             echo 'GATE 0: financial services active, production SHA unchanged'
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUN/known_hosts -i $KEY/github_ed25519" \
-                git clone --quiet --depth 1 --single-branch --branch cert/auth-longrun-gates-20261014 \
+                git clone --quiet --depth 1 --single-branch --branch main \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
                 2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
               echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
@@ -69,7 +69,7 @@ jobs:
               echo 'SOURCE_SHA_GATE: FAIL (main moved; no tests executed)'
               exit 10
             fi
-            echo 'GATE 1: exact authentication certification branch SHA cloned'
+            echo 'GATE 1: exact merged main SHA cloned'
             sudo mkdir -p "$RUN/cache" "$RUN/home"
             echo '--- Reuse existing immutable staged Python 3.14.8; no production changes ---'
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
