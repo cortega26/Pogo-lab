@@ -68,7 +68,7 @@ jobs:
             if ! sudo -u nobody env HOME="$ROOT/home" UV_NO_CONFIG=1 UV_CACHE_DIR="$ROOT/cache" \
                 "$UV" sync --frozen --project "$ROOT/repo" --python "$PY" \
                 --extra dev --extra shadow \
-                >"$ROOT/home/uvsync.log" 2>&1; then
+                2>&1 | sudo tee "$ROOT/home/uvsync.log" >/dev/null; then
               echo 'FROZEN_LOCK: FAIL'
               sudo tail -n 8 "$ROOT/home/uvsync.log"
               exit 12
