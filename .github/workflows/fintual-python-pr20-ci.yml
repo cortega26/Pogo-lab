@@ -36,7 +36,7 @@ jobs:
             # Refresh GitHub's SSH host keys from authenticated HTTPS API; strict
             # host-key checking stays enabled. Do not rely on stale SSH cache.
             curl -fsSL --max-time 15 https://api.github.com/meta \
-              | python3 -c 'import json,sys; d=json.load(sys.stdin); print("\\n".join("github.com "+key for key in d["ssh_keys"]))' \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print("\n".join("github.com "+key for key in d["ssh_keys"]))' \
               | sudo tee "$ROOT/known_hosts" >/dev/null
             sudo grep -q '^github.com ssh-ed25519 ' "$ROOT/known_hosts"
             echo 'GATE 0: financial services and original checkout preserved'
