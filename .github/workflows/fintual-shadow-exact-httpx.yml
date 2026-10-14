@@ -53,7 +53,7 @@ jobs:
             test "$(sudo git hash-object "$RUN/src/fintual_executor/shadow_http.py")" = f94d93ca23990751a4300cb94c9c8f52149b7372
             sudo chown -R fintual:fintual "$RUN"
             echo 'GATE 1: private source SHA matched; temporary isolated package staged'
-            sudo -u fintual /home/fintual/.uv-bootstrap/bin/uv pip install \
+            sudo -u fintual env HOME=/home/fintual UV_NO_CONFIG=1 /home/fintual/.uv-bootstrap/bin/uv pip install \
               --python "$APP/.venv/bin/python" --target "$RUN/vendor" httpx==0.28.1 \
               --quiet
             sudo -u fintual env PYTHONPATH="$RUN/vendor:$RUN/src" "$APP/.venv/bin/python" - <<'PY'
