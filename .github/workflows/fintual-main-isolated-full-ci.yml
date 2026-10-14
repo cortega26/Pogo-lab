@@ -30,12 +30,21 @@ jobs:
               sudo rm -rf -- "$RUN" || true
             }
             trap cleanup EXIT
+            echo 'DIAGNOSTIC: checking services'
+            for svc in fintual-executor.service fintual-browser.service; do
+              echo "$svc: $(systemctl is-active "$svc" || true)"
+            done
+            echo 'DIAGNOSTIC: checking production SHA'
+            CURRENT="$(sudo -n -u fintual git -C "$PRODUCT" rev-parse HEAD)"
+            echo "production_sha=$CURRENT"
+            test "$CURRENT" = abf4db01082c77feef364a8925852a2633afbad2
+            echo 'DIAGNOSTIC: checking key files (boolean only)'
+            sudo test -s "$KEY/github_ed25519" && echo 'private_key_present=yes'
+            sudo test -s "$KEY/known_hosts" && echo 'host_key_file_present=yes'
+            echo 'DIAGNOSTIC: checking isolated workspace'
+            sudo install -d -m 0700 -o root -g root "$RUN"
             test "$(systemctl is-active fintual-executor.service)" = active
             test "$(systemctl is-active fintual-browser.service)" = active
-            test "$(sudo -u fintual git -C "$PRODUCT" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
-            sudo test -s "$KEY/github_ed25519"
-            sudo test -s "$KEY/known_hosts"
-            sudo install -d -m 0700 -o root -g root "$RUN"
             echo 'GATE 0: financial services active, production SHA unchanged'
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
                 git clone --quiet --depth 1 --single-branch --branch main \
