@@ -20,7 +20,7 @@ jobs:
           script: |
             set -euo pipefail
             EXPECTED=abf4db01082c77feef364a8925852a2633afbad2
-            TESTED=4461b5d7d8e9fb37d2dfe1d7e220ffeaecbb4944
+            TESTED=c18b89f85906ea73bd697b07bfb4ddd96ea24e28
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
