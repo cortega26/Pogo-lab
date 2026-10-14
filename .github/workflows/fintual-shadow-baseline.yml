@@ -1,0 +1,43 @@
+name: Fintual HTTP shadow — gate 0 read-only
+
+on:
+  push:
+    branches:
+      - ops/fintual-http-shadow-g0-20261013
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Read-only runtime preflight on existing Oracle host
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            set -eu
+            echo 'SHADOW GATE 0: READ ONLY'
+            date -u '+UTC: %Y-%m-%d %H:%M:%S'
+            for svc in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              printf '%s: ' "$svc"
+              systemctl is-active "$svc" || true
+              systemctl show "$svc" -p MemoryCurrent --no-pager || true
+            done
+            echo '--- Host capacity ---'
+            free -m
+            uptime
+            echo '--- Canonical running checkout (no fetch, pull or checkout) ---'
+            sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD
+            echo '--- Tracked worktree status (empty means clean) ---'
+            sudo -n -u fintual git -C /opt/fintual-executor status --porcelain --untracked-files=no
+            echo '--- Isolated shadow dependencies preinstalled? ---'
+            sudo -n -u fintual /opt/fintual-executor/.venv/bin/python -c "import importlib.util; print('httpx_available:', bool(importlib.util.find_spec('httpx'))); print('playwright_available:', bool(importlib.util.find_spec('playwright')))"
+            echo '--- Local browser endpoint HTTP status only ---'
+            curl --silent --output /dev/null --write-out 'CDP status %{http_code}\n' --max-time 5 http://127.0.0.1:9222/json/version || true
+            echo 'GATE 0 COMPLETE: no runtime mutations'
