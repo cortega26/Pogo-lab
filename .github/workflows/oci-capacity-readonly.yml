@@ -84,6 +84,4 @@ jobs:
             id -un
             if command -v git >/dev/null; then git --version; fi
             echo '--- Runtime TCP listeners local binding ---'
-            ss -ltnH | awk '{print $4}' | grep -E '(:3000|:8000|:8010|:8088|:9222)
- || true
             echo '=== AUDIT COMPLETE ==='
