@@ -1,8 +1,5 @@
 name: Fintual G5 hourly safety watch (notifications only)
 on:
-  push:
-    branches: [ops/fintual-g5-watchdog-20261014]
-    paths: [.github/workflows/fintual-g5-watchdog.yml]
   schedule:
     - cron: "12 * * * *"
   workflow_dispatch:
