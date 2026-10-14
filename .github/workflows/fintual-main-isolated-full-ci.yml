@@ -50,7 +50,8 @@ jobs:
                 git clone --quiet --depth 1 --single-branch --branch main \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
                 2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
-              echo 'PRIVATE_CLONE: FAIL (logs remain private)'
+              echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
+              sudo grep -Ei 'fatal:|error:|Permission denied|Connection|Host key|repository not found|already exists|read-only file system|No space' "$RUN/clone.log" | head -n 5 || true
               exit 9
             fi
             GOT="$(sudo git -C "$RUN/repo" rev-parse HEAD)"
