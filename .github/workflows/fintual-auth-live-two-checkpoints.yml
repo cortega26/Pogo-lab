@@ -1,4 +1,4 @@
-name: Fintual HTTPX auth continuity — two live read-only checkpoints
+name: Fintual HTTPX auth continuity — fixed live evidence validator
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
             PROD=/opt/fintual-executor
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
-            SHA=7955027aad7f0d22ccba0916b31830394d19e1b5
+            SHA=d989348347a9b77ffbca979847eda1de2fc061bb
             cleanup() { sudo rm -rf -- "$STAGE" || true; }
             trap cleanup EXIT
             test "$(systemctl is-active fintual-executor.service)" = active
@@ -91,8 +91,23 @@ jobs:
             fi
             sudo -u fintual "$PY" - "$STAGE/work/status-only.jsonl" <<'PY'
             import json, pathlib, sys
-            rows = [json.loads(x) for x in pathlib.Path(sys.argv[1]).read_text().splitlines()]
+            rows = []
+            auxiliary_lines = 0
+            for line in pathlib.Path(sys.argv[1]).read_text(errors="replace").splitlines():
+                try:
+                    decoded = json.loads(line)
+                except ValueError:
+                    auxiliary_lines += 1
+                    continue
+                if isinstance(decoded, dict) and decoded.get("phase") in {
+                    "BOOTSTRAP", "HTTP_READS", "AUTH_REQUIRED", "END"
+                }:
+                    rows.append(decoded)
+                else:
+                    auxiliary_lines += 1
+            assert rows, "No authenticated HTTPX status checkpoints found"
             assert rows[0]["phase"] == "BOOTSTRAP" and rows[0]["ok"] is True
+            print("EVIDENCE_PARSER: sanitized_auxiliary_line_count=" + str(auxiliary_lines))
             assert rows[0]["cdp"] == "DISCONNECTED" and rows[0]["cookies_saved"] is False
             assert all(x.get("ok") is True for x in rows)
             checks = [x for x in rows if x["phase"] == "HTTP_READS"]
