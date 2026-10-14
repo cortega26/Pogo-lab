@@ -1,9 +1,7 @@
 name: Fintual HTTP shadow — gate 0 read-only
 
 on:
-  push:
-    branches:
-      - ops/fintual-http-shadow-g0-20261013
+  workflow_dispatch:
 
 permissions:
   contents: read
