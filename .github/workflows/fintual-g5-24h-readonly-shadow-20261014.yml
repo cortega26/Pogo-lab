@@ -1,0 +1,144 @@
+name: Fintual G5 24h read-only in-memory HTTPX watch — isolated
+on:
+  push:
+    branches: [ops/fintual-g5-longrun-readonly-20261014]
+    paths:
+      - .github/workflows/fintual-g5-24h-readonly-shadow-20261014.yml
+permissions:
+  contents: read
+concurrency:
+  group: fintual-g5-longrun-once-20261014
+  cancel-in-progress: false
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Stage isolated read-only shadow and launch bounded transient 24h service
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 9m
+          script: |
+            set -euo pipefail
+            UNIT=fintual-g5-shadow-20261014
+            SHA=f8dfe15cbd63378e5e6e04c3f0f0726d7cc8b08b
+            ORACLE_SHA=abf4db01082c77feef364a8925852a2633afbad2
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            HOSTKEY=/var/lib/fintual-ci-source-readonly/known_hosts
+            STAGE=/opt/fintual-g5-shadow-20261014
+            echo 'MODE=READ_ONLY_G5_24H; NO_ORDER_CAPABILITY'
+            date -u +'%Y-%m-%dT%H:%M:%SZ'
+            if systemctl is-active --quiet "$UNIT.service"; then
+              echo 'STOP: LONGRUN_ALREADY_RUNNING'; exit 4
+            fi
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active || {
+                echo 'STOP: FINANCIAL_SERVICE_HEALTH'; exit 4;
+              }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORACLE_SHA" || {
+              echo 'STOP: FINANCIAL_SOURCE_CHANGED'; exit 4;
+            }
+            test -z "$(sudo -n -u fintual git -C /opt/fintual-executor status --porcelain --untracked-files=no)"
+            test -r "$UV" && test -x "$PY"
+            test "$(sudo -n "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            sudo -n test -s "$KEY"
+            sudo -n test -s "$HOSTKEY"
+            mem_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
+            echo "AVAILABLE_RAM_MIB=$((mem_kib/1024))"
+            test "$mem_kib" -ge 900000 || { echo 'STOP: INSUFFICIENT_RAM'; exit 5; }
+            test ! -e "$STAGE" || { echo 'STOP: EXPERIMENT_WORKSPACE_EXISTS'; exit 5; }
+            LAUNCHED=no
+            cleanup_if_not_launched() {
+              if [ "$LAUNCHED" != yes ]; then sudo -n rm -rf -- "$STAGE"; fi
+            }
+            trap cleanup_if_not_launched EXIT
+            sudo -n install -d -m 0700 -o root -g root "$STAGE"
+            echo 'G0: LIVE_PRODUCTION_BASELINE_PASS'
+            if ! sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOSTKEY -i $KEY" \
+              git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"; then
+              echo 'STOP: PRIVATE_SOURCE_CLONE_FAILED'; exit 6
+            fi
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SHA" || {
+              echo 'STOP: UNREVIEWED_SOURCE_SHA'; exit 6;
+            }
+            sudo -n install -d -m 0700 -o root -g root "$STAGE/cache" "$STAGE/home"
+            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" "$UV" lock --check \
+              --directory "$STAGE/repo" --quiet
+            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
+              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
+              --directory "$STAGE/repo" --frozen --extra shadow \
+              --python "$PY" --quiet
+            sudo -n /usr/bin/python3 - "$STAGE" <<'PY'
+            import json, os, pathlib, sys
+            stage=pathlib.Path(sys.argv[1])
+            source=json.loads(pathlib.Path('/etc/fintual-executor/config.json').read_text())
+            symbols=source.get('symbols')
+            if not isinstance(symbols,list) or not 1 <= len(symbols) <= 20:
+                raise SystemExit('STOP: INVALID_SYMBOL_CONFIGURATION')
+            if len(symbols)!=len(set(symbols)) or not all(isinstance(s,str) and s.isascii() and s.isalnum() and 1 <= len(s) <= 12 for s in symbols):
+                raise SystemExit('STOP: INVALID_SYMBOL_CONFIGURATION')
+            p=stage/'symbols.json'
+            fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            with os.fdopen(fd,'w') as f:
+                json.dump({'symbols':symbols},f)
+            print('SANITIZED_SYMBOLS_CONFIG=PASS')
+            PY
+            sudo -n /usr/bin/python3 - "$STAGE" <<'PY'
+            import os, pathlib,sys
+            stage=pathlib.Path(sys.argv[1])
+            p=stage/'probe.sh'
+            script='''#!/bin/bash
+            set -euo pipefail
+            trap 'rm -rf -- "/opt/fintual-g5-shadow-20261014"' EXIT
+            export HOME=/opt/fintual-g5-shadow-20261014/home
+            export PYTHONPATH=/opt/fintual-g5-shadow-20261014/repo/src
+            export PYTHONDONTWRITEBYTECODE=1
+            unset FINTUAL_REAL_EXECUTION FINTUAL_HTTP_MUTATIONS
+            echo "G5_READONLY_START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            /opt/fintual-g5-shadow-20261014/venv/bin/python -u -m fintual_executor.shadow_longrun \\
+              --config /opt/fintual-g5-shadow-20261014/symbols.json \\
+              --interval-seconds 900 --duration-seconds 86400 --min-checkpoints 90
+            code=$?
+            echo "G5_READONLY_EXIT_CODE=$code"
+            exit "$code"
+            '''
+            # Python triple-quoted body is purely static, contains no secrets.
+            p.write_text(script)
+            os.chmod(p,0o700)
+            PY
+            sudo -n chown -R fintual:fintual "$STAGE"
+            mem_kib="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
+            test "$mem_kib" -ge 800000 || { echo 'STOP: LOW_RAM_AFTER_STAGING'; exit 7; }
+            echo 'G1: PINNED_SHA_SANITIZED_CONFIG_FROZEN_ENV_PASS'
+            # Start a disposable OS service; no system service files are installed.
+            # The probe only reads Fintual market state and configured prices.
+            sudo -n systemd-run \
+              --unit="$UNIT" \
+              --collect \
+              -p User=fintual -p Group=fintual \
+              -p "WorkingDirectory=$STAGE/repo" \
+              -p "MemoryMax=512M" -p "CPUQuota=50%" -p "TasksMax=64" \
+              -p "NoNewPrivileges=yes" -p "ProtectSystem=strict" \
+              -p "PrivateTmp=yes" -p "ProtectHome=yes" \
+              -p "ReadWritePaths=$STAGE" \
+              -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser" \
+              -p "TimeoutStartSec=90000" \
+              /bin/bash "$STAGE/probe.sh"
+            LAUNCHED=yes
+            sleep 12
+            test "$(systemctl is-active "$UNIT.service")" = active || {
+              echo 'G5_LAUNCH_RESULT=EARLY_EXIT_CHECK_JOURNAL'; exit 8;
+            }
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORACLE_SHA"
+            echo 'G2: 24H_READONLY_OBSERVATION_RUNNING; FINANCIAL_PRODUCTION_UNCHANGED'
+            echo 'STATUS_COMMAND=systemctl status fintual-g5-shadow-20261014.service'
+            echo 'JOURNAL_COMMAND=journalctl -u fintual-g5-shadow-20261014.service'
