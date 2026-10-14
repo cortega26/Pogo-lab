@@ -1,0 +1,102 @@
+name: Fintual Python 3.14.8 PR20 isolated CI and frozen lock
+
+on:
+  push:
+    branches: [ops/fintual-http-shadow-g0-20261013]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Isolated Oracle ARM64 source and frozen lockfile test
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 11m
+          script: |
+            set -euo pipefail
+            ROOT=/opt/fintual-python-pr20-verify-20261014
+            FIN=/opt/fintual-executor
+            KEY=/var/lib/fintual-ci-source-readonly
+            EXPECTED=8413864b1359a8e0624e9f8e08eaffce434d1cde
+            cleanup() { sudo rm -rf -- "$ROOT" || true; }
+            trap cleanup EXIT
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$FIN" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -n -u fintual git -C "$FIN" status --porcelain --untracked-files=no)"
+            sudo install -d -m 0700 -o root -g root "$ROOT"
+            sudo test -s "$KEY/github_ed25519"
+            echo 'GATE 0: financial services and original checkout preserved'
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+                git clone --quiet --depth 1 --single-branch --branch chore/standardize-python-3148-20261014 \
+                git@github.com:cortega26/fintual-executor.git "$ROOT/repo" \
+                2>&1 | sudo tee "$ROOT/clone.log" >/dev/null; then
+              echo 'PRIVATE_REPO_FETCH: FAIL'
+              exit 11
+            fi
+            test "$(sudo git -C "$ROOT/repo" rev-parse HEAD)" = "$EXPECTED"
+            echo 'GATE 1: PR #20 exact commit verified'
+            sudo bash -n "$ROOT/repo/deploy/oracle/install-runtime.sh"
+            sudo bash -n "$ROOT/repo/deploy/oracle/install-sheet-sync-runtime.sh"
+            sudo grep -q '^3.14.8$' "$ROOT/repo/.python-version"
+            sudo grep -q 'TARGET_PYTHON=3.14.8' "$ROOT/repo/deploy/oracle/install-runtime.sh"
+            sudo grep -q 'TARGET_PYTHON=3.14.8' "$ROOT/repo/deploy/oracle/install-sheet-sync-runtime.sh"
+            echo 'GATE 2: installer shell syntax, default and guards recognized'
+            sudo install -d -m 0700 -o root -g root "$ROOT/tools"
+            sudo curl -fLsS --retry 2 --max-time 60 \
+              https://github.com/astral-sh/uv/releases/download/0.13.1/uv-aarch64-unknown-linux-gnu.tar.gz \
+              -o "$ROOT/tools/uv.tar.gz"
+            echo '9041c73c99fdc5892cf128140beb354eca9231d502068cc36e6cb53a8e59ad14  '"$ROOT"'/tools/uv.tar.gz' | sudo sha256sum -c -
+            sudo tar -xzf "$ROOT/tools/uv.tar.gz" -C "$ROOT/tools"
+            UV="$ROOT/tools/uv-aarch64-unknown-linux-gnu/uv"
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$ROOT/cache" "$UV" python install \
+                --install-dir "$ROOT/python" 3.14.8 >/dev/null
+            PY="$(sudo find "$ROOT/python" -path '*/bin/python3.14' -print -quit)"
+            test -n "$PY"
+            echo "ISOLATED_INTERPRETER: $(sudo "$PY" --version)"
+            sudo mkdir -p "$ROOT/home" "$ROOT/cache"
+            sudo chown -R nobody:nogroup "$ROOT"
+            echo '--- Resolve exactly committed uv.lock against 3.14.8 ARM64 ---'
+            if ! sudo -u nobody env HOME="$ROOT/home" UV_NO_CONFIG=1 UV_CACHE_DIR="$ROOT/cache" \
+                "$UV" sync --frozen --project "$ROOT/repo" --python "$PY" \
+                --extra dev --extra shadow \
+                >"$ROOT/home/uvsync.log" 2>&1; then
+              echo 'FROZEN_LOCK: FAIL'
+              sudo tail -n 8 "$ROOT/home/uvsync.log"
+              exit 12
+            fi
+            echo 'FROZEN_LOCK: PASS'
+            sudo systemd-run --collect --wait --pipe --quiet \
+              -p User=nobody -p Group=nogroup \
+              -p "WorkingDirectory=$ROOT/repo" \
+              -p "Environment=STAGE=$ROOT" \
+              -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+              -p "Environment=PYTHONPATH=$ROOT/repo/src" \
+              -p "Environment=HOME=$ROOT/home" \
+              -p MemoryMax=512M -p CPUQuota=50% -p TasksMax=64 \
+              -p NoNewPrivileges=yes -p ProtectHome=yes -p ProtectSystem=strict \
+              -p PrivateTmp=yes -p IPAddressDeny=any -p RestrictAddressFamilies=AF_UNIX \
+              -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser" \
+              -p "ReadWritePaths=$ROOT" \
+              /bin/bash -c '
+                set -eu
+                .venv/bin/python -m compileall -q src
+                echo "COMPILE_3148: PASS"
+                .venv/bin/ruff check src tests > "$STAGE/ruff.log" 2>&1 || { echo "RUFF: FAIL"; head -n 12 "$STAGE/ruff.log"; exit 14; }
+                echo "RUFF: PASS"
+                .venv/bin/python -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1 || { echo "PYTEST: FAIL"; grep -E "^(FAILED|ERROR) " "$STAGE/pytest.log" | head -n 10 || true; exit 15; }
+                echo "PYTEST: PASS"
+                grep -E "[0-9]+ passed" "$STAGE/pytest.log" | tail -n 1 || true
+              '
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$FIN" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -n -u fintual git -C "$FIN" status --porcelain --untracked-files=no)"
+            echo 'POSTFLIGHT: financial runtime unchanged; staging auto-cleaned'
