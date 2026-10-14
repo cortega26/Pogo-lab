@@ -43,10 +43,14 @@ jobs:
             sudo test -s "$KEY/known_hosts" && echo 'host_key_file_present=yes'
             echo 'DIAGNOSTIC: checking isolated workspace'
             sudo install -d -m 0700 -o root -g root "$RUN"
+            curl -fsSL --max-time 15 https://api.github.com/meta \
+              | python3 -c 'import json,sys; print(chr(10).join("github.com "+k for k in json.load(sys.stdin)["ssh_keys"]))' \
+              | sudo tee "$RUN/known_hosts" >/dev/null
+            sudo grep -q '^github.com ssh-ed25519 ' "$RUN/known_hosts"
             test "$(systemctl is-active fintual-executor.service)" = active
             test "$(systemctl is-active fintual-browser.service)" = active
             echo 'GATE 0: financial services active, production SHA unchanged'
-            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUN/known_hosts -i $KEY/github_ed25519" \
                 git clone --quiet --depth 1 --single-branch --branch test/http-order-ambiguous-recovery-20261014 \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
                 2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
