@@ -1,0 +1,46 @@
+name: Fintual isolated Chrome readiness — read-only preflight
+
+on:
+  push:
+    branches: [ops/fintual-isolated-chrome-preflight-20261014]
+    paths:
+      - .github/workflows/fintual-isolated-chrome-preflight.yml
+
+permissions:
+  contents: read
+
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect only active services, memory and independent display options
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            echo 'PRECHECK_SHA:'
+            sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD
+            echo 'PRECHECK_SERVICES:'
+            for s in fintual-executor.service fintual-browser.service fintual-xvfb.service; do echo "$s=$(systemctl is-active "$s" || true)"; done
+            echo 'PRECHECK_HOST_RAM_MIB:'
+            free -m
+            echo 'PRECHECK_SERVICE_MEMORY_BYTES:'
+            for s in fintual-browser.service fintual-executor.service; do echo "$s=$(systemctl show "$s" -p MemoryCurrent --value)"; done
+            echo 'PRECHECK_PORT_9223:'
+            if ss -ltnH '( sport = :9223 )' | grep -q .; then echo PORT_BUSY; else echo PORT_FREE; fi
+            echo 'PRECHECK_BROWSER:'
+            test -x /var/lib/fintual-browser/chrome && echo BINARY_PRESENT || echo BINARY_MISSING
+            echo 'PRECHECK_DISPLAY:'
+            for n in 99 98 97; do
+              test -S "/tmp/.X11-unix/X$n" && echo "DISPLAY_$n=USED" || echo "DISPLAY_$n=FREE"
+            done
+            echo 'PRECHECK_REMOTE_GUI:'
+            for cmd in xpra x11vnc vncserver Xvfb; do
+              if command -v "$cmd" >/dev/null 2>&1; then echo "$cmd=PRESENT"; else echo "$cmd=ABSENT"; fi
+            done
+            echo 'READ_ONLY_COMPLETE'
