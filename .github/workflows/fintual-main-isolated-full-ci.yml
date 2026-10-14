@@ -20,7 +20,7 @@ jobs:
           key: ${{ secrets.OCI_SSH_KEY }}
           command_timeout: 12m
           script: |
-            set -eu
+            set -euo pipefail
             RUN=/dev/shm/fintual-main-ci-isolated-20261014
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
@@ -49,7 +49,7 @@ jobs:
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
                 git clone --quiet --depth 1 --single-branch --branch main \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
-                >"$RUN/clone.log" 2>&1; then
+                2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
               echo 'PRIVATE_CLONE: FAIL (logs remain private)'
               exit 9
             fi
@@ -65,7 +65,7 @@ jobs:
                 --python /usr/bin/python3 --target "$RUN/vendor" \
                 'pytest>=8' 'ruff>=0.13' 'httpx==0.28.1' \
                 'playwright==1.58.0' 'websockets==17.1' \
-                >"$RUN/install.log" 2>&1; then
+                2>&1 | sudo tee "$RUN/install.log" >/dev/null; then
               echo 'ISOLATED_DEPENDENCIES: FAIL'
               sudo tail -n 7 "$RUN/install.log"
               exit 11
