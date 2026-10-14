@@ -1,0 +1,67 @@
+name: Fintual after successful Chrome-off desktop proof — production read-only verification
+on:
+  push:
+    branches: [ops/fintual-post-g6-verify-20261014]
+    paths:
+      - .github/workflows/fintual-post-g6-verify.yml
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Confirm Oracle remains paused and authenticated after separate desktop Chrome stop
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            set -euo pipefail
+            echo "G6_POST_TRIAL_ORACLE_CHECK"
+            date -u +'%Y-%m-%dT%H:%M:%SZ'
+            test "$(systemctl is-active fintual-executor.service)" = inactive || { echo "FAIL_EXECUTOR_NOT_PAUSED"; exit 4; }
+            test "$(systemctl is-active fintual-browser.service)" = active || { echo "FAIL_ORACLE_CHROME_INACTIVE"; exit 4; }
+            test "$(systemctl is-active fintual-xvfb.service)" = active || { echo "FAIL_ORACLE_XVFB_INACTIVE"; exit 4; }
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            echo 'G0: ORACLE_EXECUTOR_PAUSED_BROWSER_ACTIVE'
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH=/opt/fintual-executor/src PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-executor/.venv/bin/python - <<'PY'
+            from fintual_executor.client import FintualClient, get_pending, get_market_info
+            client = FintualClient(execution_enabled=False)
+            try:
+                client.connect()
+                pending = get_pending(client)
+                market = get_market_info(client)
+                buys = pending.get('stocksPendingAssetMarketBuys')
+                sells = pending.get('stocksPendingAssetMarketSells')
+                if not isinstance(buys, list) or not isinstance(sells, list):
+                    raise ValueError('pending shape invalid')
+                if not isinstance(market.get('isMarketOpen'), bool):
+                    raise ValueError('market shape invalid')
+                print('ORACLE_AUTH_AFTER_DESKTOP_STOP=PASS')
+                print('PENDING_BUYS='+str(len(buys)))
+                print('PENDING_SELLS='+str(len(sells)))
+            except Exception as exc:
+                print('ORACLE_AUTH_AFTER_DESKTOP_STOP=FAIL_'+type(exc).__name__)
+                raise SystemExit(7)
+            finally:
+                client.close()
+            PY
+            sudo -n -u fintual /usr/bin/python3 - <<'PY'
+            import sqlite3
+            db=sqlite3.connect('file:/var/lib/fintual-executor/state.sqlite3?mode=ro',uri=True,timeout=15)
+            db.execute('PRAGMA query_only=ON')
+            c=db.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')").fetchone()[0]
+            print('OPEN_LOCAL_INTENTS='+str(c))
+            ok=db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+            print('LEDGER_INTEGRITY_OK='+str(ok))
+            if not ok: raise SystemExit(8)
+            db.close()
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = inactive
+            test "$(systemctl is-active fintual-browser.service)" = active
+            echo 'G6_POST_TRIAL: ORACLE_INTACT_NO_REARM'
