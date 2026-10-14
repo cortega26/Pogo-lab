@@ -25,7 +25,7 @@ jobs:
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
-            EXPECTED_MAIN=a667d65d9a04cb8d611014f124ea4087b4630193
+            EXPECTED_MAIN=42897d82b9ba25d162b66e8996751bffddfaa595
             cleanup() {
               sudo rm -rf -- "$RUN" || true
             }
@@ -47,7 +47,7 @@ jobs:
             test "$(systemctl is-active fintual-browser.service)" = active
             echo 'GATE 0: financial services active, production SHA unchanged'
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
-                git clone --quiet --depth 1 --single-branch --branch fix/shadow-ruff-import-order-20261014 \
+                git clone --quiet --depth 1 --single-branch --branch main \
                 git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
                 2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
               echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
@@ -59,7 +59,7 @@ jobs:
               echo 'SOURCE_SHA_GATE: FAIL (main moved; no tests executed)'
               exit 10
             fi
-            echo 'GATE 1: exact reviewed private PR #19 SHA cloned'
+            echo 'GATE 1: exact reviewed new private main SHA cloned'
             sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home" "$RUN/python"
             echo '--- Installing isolated Python 3.13 runtime and pinned dependencies ---'
             if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" python install \
