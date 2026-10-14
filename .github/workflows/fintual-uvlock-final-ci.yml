@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: fintual-uvlock-pr27-validation
+  cancel-in-progress: false
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -23,7 +27,7 @@ jobs:
           command_timeout: 12m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-pr27-lock-final-ci-20261014
+            RUN=/opt/fintual-pr27-lock-final-ci-20261014-${{ github.run_id }}
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
