@@ -1,0 +1,72 @@
+name: Fintual HTTPX session lifetime — two-cycle live read-only gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - name: Run real decision evaluator over HTTPX without any order permissions
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            STAGE=/opt/fintual-browserless-longevity-20261014
+            LIVE=/opt/fintual-executor
+            READ_KEY=/var/lib/fintual-ci-source-readonly
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            EXPECTED=63c0cc073a64b0606749fcee50090c6e2f1daf54
+            cleanup() { sudo rm -rf -- "$STAGE" || true; }
+            trap cleanup EXIT
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$LIVE" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$LIVE" status --porcelain --untracked-files=no)"
+            sudo test -s "$READ_KEY/github_ed25519"
+            test "$(sudo -u fintual "$PY" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" = 3.14.8
+            echo 'GATE 0: live financial runtime and staged Python untouched'
+            sudo install -d -m 0755 -o root -g root "$STAGE"
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$READ_KEY/known_hosts -i $READ_KEY/github_ed25519" \
+              git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo" \
+              2>&1 | sudo tee "$STAGE/git.log" >/dev/null; then
+              echo 'PRIVATE_SOURCE_FETCH: FAIL'
+              exit 21
+            fi
+            test "$(sudo git -C "$STAGE/repo" rev-parse HEAD)" = "$EXPECTED"
+            echo 'GATE 1: exact reviewed browserless branch loaded separately'
+            sudo install -d -m 0755 -o fintual -g fintual "$STAGE/vendor"
+            if ! sudo -u fintual env HOME=/home/fintual UV_NO_CONFIG=1 UV_CACHE_DIR=/home/fintual/.cache/uv \
+              "$UV" pip install --python "$PY" --target "$STAGE/vendor" httpx==0.28.1 --quiet \
+              > /dev/null 2>&1; then
+              echo 'TEMPORARY_HTTPX_DEPENDENCY: FAIL'
+              exit 22
+            fi
+            echo 'GATE 2: HTTPX available in separate target; production venv untouched'
+            sudo systemd-run --collect --wait --pipe --quiet \
+              -p User=fintual -p Group=fintual \
+              -p MemoryMax=384M -p CPUQuota=50% -p TasksMax=64 \
+              -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes \
+              -p PrivateTmp=yes \
+              -p "InaccessiblePaths=/var/lib/fintual-executor /var/lib/fintual-browser/profile /etc/fintual-executor/market-data.env" \
+              -p "WorkingDirectory=$STAGE/repo" \
+              -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+              -p "Environment=PYTHONPATH=$STAGE/vendor:$STAGE/repo/src" \
+              "$PY" -m fintual_executor.browserless_evaluation \
+                --config /etc/fintual-executor/config.json --cycles 2 --interval-seconds 300
+            echo 'GATE 3: actual decision evaluator completed over browser-disconnected HTTPX'
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$LIVE" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$LIVE" status --porcelain --untracked-files=no)"
+            echo 'POSTFLIGHT: production intact; temporary evaluator removed on EXIT'

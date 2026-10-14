@@ -1,0 +1,38 @@
+name: Fintual private repository read-only deploy key (staging)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Generate isolated read-only source fetch identity (public key only)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            TARGET=/var/lib/fintual-ci-source-readonly
+            sudo install -d -m 0700 -o root -g root "$TARGET"
+            if ! sudo test -s "$TARGET/github_ed25519"; then
+              sudo ssh-keygen -q -t ed25519 -a 64 -N '' \
+                -C 'fintual-ci-source-readonly-oracle-20261014' \
+                -f "$TARGET/github_ed25519"
+              sudo chown root:root "$TARGET/github_ed25519" "$TARGET/github_ed25519.pub"
+              sudo chmod 0600 "$TARGET/github_ed25519"
+              sudo chmod 0644 "$TARGET/github_ed25519.pub"
+            fi
+            echo '=== PUBLIC DEPLOY KEY (READ-ONLY GITHUB) ==='
+            sudo cat "$TARGET/github_ed25519.pub"
+            echo '=== END PUBLIC KEY ==='
+            echo 'Private key remains root-owned in Oracle; no GitHub repo permissions granted yet.'

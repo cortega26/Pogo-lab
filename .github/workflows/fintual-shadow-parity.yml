@@ -1,0 +1,139 @@
+name: Fintual HTTP shadow — read-only parity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Compare broker reads through CDP and browser-free HTTP
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -eu
+            echo 'READ-ONLY SHADOW PARITY: no orders, no session persistence'
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-executor/src /opt/fintual-executor/.venv/bin/python - <<'PY'
+            import json
+            import http.cookiejar
+            import urllib.request
+            import urllib.error
+            import urllib.parse
+            from pathlib import Path
+            from decimal import Decimal
+            from playwright.sync_api import sync_playwright
+            from fintual_executor.client import (
+                ASSET_BUY_INPUT_QUERY, MARKET_INFO_QUERY, PENDING_QUERY, MOVEMENTS_QUERY,
+            )
+
+            class NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, request, fp, code, msg, headers, newurl):
+                    return None
+
+            def checked_http(opener, url, headers, *, payload=None):
+                request = urllib.request.Request(
+                    url, data=json.dumps(payload).encode() if payload is not None else None,
+                    headers=headers, method="POST" if payload is not None else "GET",
+                )
+                try:
+                    with opener.open(request, timeout=12) as response:
+                        return response.status, json.load(response) if response.status == 200 else None
+                except urllib.error.HTTPError as error:
+                    return error.code, None
+
+            checks = []
+            try:
+                config = json.loads(Path("/etc/fintual-executor/config.json").read_text())
+                symbols = config["symbols"]
+                assert isinstance(symbols, list) and symbols
+                assert all(isinstance(symbol, str) and symbol.isascii() and symbol.isalnum() for symbol in symbols)
+                with sync_playwright() as playwright:
+                    connection = playwright.chromium.connect_over_cdp("http://127.0.0.1:9222")
+                    pages = [page for ctx in connection.contexts for page in ctx.pages
+                             if page.url.startswith("https://fintual.cl/") and "/sign-in" not in page.url]
+                    if not pages:
+                        raise RuntimeError("Fintual authentication unavailable")
+                    page = pages[0]
+                    jar = http.cookiejar.CookieJar()
+                    for row in page.context.cookies(["https://fintual.cl"]):
+                        domain = str(row.get("domain", ""))
+                        if domain.lstrip(".") != "fintual.cl" and not domain.endswith(".fintual.cl"):
+                            continue
+                        jar.set_cookie(http.cookiejar.Cookie(
+                            version=0, name=row["name"], value=row["value"], port=None,
+                            port_specified=False, domain=domain, domain_specified=True,
+                            domain_initial_dot=domain.startswith("."),
+                            path=row.get("path", "/"), path_specified=True,
+                            secure=bool(row.get("secure", True)), expires=None,
+                            discard=True, comment=None, comment_url=None, rest={}, rfc2109=False
+                        ))
+                    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), NoRedirect())
+                    user_agent = page.evaluate("navigator.userAgent")
+                    headers = {"Accept": "application/json", "Content-Type": "application/json",
+                               "Origin": "https://fintual.cl", "Referer": "https://fintual.cl/app/goals",
+                               "User-Agent": user_agent}
+                    gql_reads = [
+                        ("market_info", "StocksAssetsMarketInfo", MARKET_INFO_QUERY, {}),
+                        ("buy_state", "AssetBuyInputAmount", ASSET_BUY_INPUT_QUERY, {}),
+                        ("pending", "PendingStocksWalletMovements", PENDING_QUERY, {}),
+                    ]
+                    for symbol in symbols:
+                        gql_reads.append(("movements:" + symbol, "StocksAssetMovements", MOVEMENTS_QUERY,
+                                          {"assetSymbol": symbol, "limit": 10, "offset": 0}))
+                    for label, operation, query, variables in gql_reads:
+                        if not query.lstrip().startswith("query "):
+                            raise RuntimeError("Read-only query contract violated")
+                        payload = {"operationName": operation, "query": query, "variables": variables}
+                        browser = page.evaluate("""async payload => {
+                          const r = await fetch('/gql/', {
+                            method:'POST', credentials:'same-origin',
+                            headers: {'Content-Type':'application/json','Accept':'application/json'},
+                            body:JSON.stringify(payload)
+                          });
+                          let body = null; try {body = await r.json()} catch(e) {}
+                          return {status:r.status, body};
+                        }""", payload)
+                        status, body = checked_http(opener, "https://fintual.cl/gql/", headers, payload=payload)
+                        match = (status == 200 and browser["status"] == 200 and
+                                 isinstance(body, dict) and isinstance(browser["body"], dict) and
+                                 body.get("data") == browser["body"].get("data"))
+                        checks.append({"check": label, "browser_http": browser["status"],
+                                       "direct_http": status, "match": bool(match)})
+                    for symbol in symbols:
+                        browser = page.evaluate("""async symbol => {
+                          const r = await fetch('/stocks-pricing-cl/current-prices?symbols=' +
+                            encodeURIComponent(symbol), {credentials:'include',
+                            headers:{'Accept':'application/json','Content-Type':'application/json'}});
+                          let body = null; try {body = await r.json()} catch(e) {}
+                          return {status:r.status, body};
+                        }""", symbol)
+                        url = "https://fintual.cl/stocks-pricing-cl/current-prices?symbols=" + urllib.parse.quote(symbol)
+                        status, body = checked_http(opener, url, headers)
+                        expected = (browser["body"] or {}).get("prices", [])
+                        actual = (body or {}).get("prices", [])
+                        match = (status == 200 and browser["status"] == 200 and len(expected) == len(actual) == 1
+                                 and actual[0].get("symbol") == expected[0].get("symbol") == symbol
+                                 and Decimal(str(actual[0]["price"])) == Decimal(str(expected[0]["price"]))
+                                 and actual[0].get("price_datetime") == expected[0].get("price_datetime"))
+                        checks.append({"check": "pricing:" + symbol, "browser_http": browser["status"],
+                                       "direct_http": status, "match": bool(match)})
+                    connection.close()
+                ok = all(item["match"] for item in checks)
+                print(json.dumps({"phase": "MULTI_READ_PARITY", "ok": ok, "checks": checks}))
+                if not ok:
+                    raise SystemExit(2)
+            except SystemExit:
+                raise
+            except Exception as error:
+                print(json.dumps({"phase": "MULTI_READ_PARITY", "ok": False, "error_type": type(error).__name__}))
+                raise SystemExit(3)
+            PY
+            echo 'READ-ONLY PARITY FINISHED; no trading services changed'

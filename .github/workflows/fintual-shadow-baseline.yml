@@ -1,0 +1,135 @@
+name: Fintual HTTP shadow — gate 0 read-only
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Read-only runtime preflight on existing Oracle host
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            set -eu
+            echo 'SHADOW GATE 0: READ ONLY'
+            date -u '+UTC: %Y-%m-%d %H:%M:%S'
+            for svc in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              printf '%s: ' "$svc"
+              systemctl is-active "$svc" || true
+              systemctl show "$svc" -p MemoryCurrent --no-pager || true
+            done
+            echo '--- Host capacity ---'
+            free -m
+            uptime
+            echo '--- Canonical running checkout (no fetch, pull or checkout) ---'
+            sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD
+            echo '--- Tracked worktree status (empty means clean) ---'
+            sudo -n -u fintual git -C /opt/fintual-executor status --porcelain --untracked-files=no
+            echo '--- Isolated shadow dependencies preinstalled? ---'
+            sudo -n -u fintual /opt/fintual-executor/.venv/bin/python -c "import importlib.util; print('httpx_available:', bool(importlib.util.find_spec('httpx'))); print('playwright_available:', bool(importlib.util.find_spec('playwright')))"
+            echo '--- Local browser endpoint HTTP status only ---'
+            curl --silent --output /dev/null --write-out 'CDP status %{http_code}\n' --max-time 5 http://127.0.0.1:9222/json/version || true
+            echo '--- Read-only private Git remote access test ---'
+            if timeout 12s sudo -n -u fintual git -C /opt/fintual-executor ls-remote --exit-code origin refs/heads/feat/shadow-http-readonly-20261013 >/dev/null 2>&1; then
+              echo 'shadow_branch_access: yes'
+            else
+              echo 'shadow_branch_access: no'
+            fi
+            echo '--- Shadow test toolchain availability ---'
+            sudo -n -u fintual /opt/fintual-executor/.venv/bin/python -c "import importlib.util; print('pytest_available:', bool(importlib.util.find_spec('pytest'))); print('ruff_available:', bool(importlib.util.find_spec('ruff')))"
+            echo '--- OS Python & pip ---'
+            python3 --version
+            python3 -m pip --version || true
+            echo '--- Read-only HTTP session feasibility (no order API) ---'
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-executor/src /opt/fintual-executor/.venv/bin/python - <<'PY'
+            import json
+            import http.cookiejar
+            import urllib.request
+            import urllib.error
+            from playwright.sync_api import sync_playwright
+            from fintual_executor.client import MARKET_INFO_QUERY
+
+            class NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, request, fp, code, msg, headers, newurl):
+                    return None
+
+            outcome = {"phase": "HTTP_COOKIE_FEASIBILITY", "ok": False}
+            try:
+                if not MARKET_INFO_QUERY.lstrip().startswith("query "):
+                    raise ValueError("non-read query rejected")
+                with sync_playwright() as pw:
+                    browser = pw.chromium.connect_over_cdp("http://127.0.0.1:9222")
+                    pages = [p for ctx in browser.contexts for p in ctx.pages
+                             if p.url.startswith("https://fintual.cl/")
+                             and "/sign-in" not in p.url]
+                    if not pages:
+                        raise RuntimeError("Authenticated browser page unavailable")
+                    page = pages[0]
+                    payload = {"operationName": "StocksAssetsMarketInfo",
+                               "query": MARKET_INFO_QUERY, "variables": {}}
+                    browser_result = page.evaluate("""async payload => {
+                        const r = await fetch('/gql/', {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                            body: JSON.stringify(payload)
+                        });
+                        let body = null;
+                        try {body = await r.json()} catch(e) {}
+                        return {status: r.status, body};
+                    }""", payload)
+                    jar = http.cookiejar.CookieJar()
+                    for row in page.context.cookies(["https://fintual.cl"]):
+                        domain = str(row.get("domain", ""))
+                        if domain.lstrip(".") != "fintual.cl" and not domain.endswith(".fintual.cl"):
+                            continue
+                        jar.set_cookie(http.cookiejar.Cookie(
+                            version=0, name=row["name"], value=row["value"], port=None,
+                            port_specified=False, domain=domain, domain_specified=True,
+                            domain_initial_dot=domain.startswith("."),
+                            path=row.get("path", "/"), path_specified=True,
+                            secure=bool(row.get("secure", True)), expires=None,
+                            discard=True, comment=None, comment_url=None,
+                            rest={}, rfc2109=False
+                        ))
+                    user_agent = page.evaluate("navigator.userAgent")
+                    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), NoRedirect())
+                    request = urllib.request.Request(
+                        "https://fintual.cl/gql/",
+                        data=json.dumps(payload).encode("utf-8"), method="POST",
+                        headers={"Accept": "application/json", "Content-Type": "application/json",
+                                 "Origin": "https://fintual.cl", "Referer": "https://fintual.cl/app/goals",
+                                 "User-Agent": user_agent}
+                    )
+                    http_status = 0
+                    http_body = None
+                    try:
+                        with opener.open(request, timeout=10) as response:
+                            http_status = response.status
+                            if http_status == 200:
+                                http_body = json.load(response)
+                    except urllib.error.HTTPError as error:
+                        http_status = error.code
+                    browser_ok = browser_result["status"] == 200 and isinstance(browser_result["body"], dict)
+                    parity = browser_ok and http_status == 200 and (
+                        browser_result["body"].get("data") == (http_body or {}).get("data")
+                    )
+                    outcome = {"phase": "HTTP_COOKIE_FEASIBILITY", "ok": bool(parity),
+                               "browser_status": browser_result["status"],
+                               "http_status": http_status, "match": bool(parity)}
+                    browser.close()
+            except Exception as error:
+                # Do not print HTTP bodies, browser contents, cookies or exception messages.
+                outcome = {"phase": "HTTP_COOKIE_FEASIBILITY", "ok": False,
+                           "error_type": type(error).__name__}
+            print(json.dumps(outcome))
+            PY
+            echo 'GATE 0 COMPLETE: no runtime mutations'

@@ -1,0 +1,83 @@
+name: Stage Fintual Python 3.14.8 runtime with production unchanged
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - name: Stage immutable ARM64 3.14.8 production-dependency venv
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            PROD=/opt/fintual-executor
+            OLD_SHA=abf4db01082c77feef364a8925852a2633afbad2
+            BASE=/opt/fintual-python-runtimes
+            TARGET=$BASE/cpython-3.14.8-abf4db0
+            TMP=/opt/fintual-python-stage-temp-20261014
+            EXPECTED_UV=9041c73c99fdc5892cf128140beb354eca9231d502068cc36e6cb53a8e59ad14
+            cleanup(){ sudo rm -rf -- "$TMP" || true; }
+            trap cleanup EXIT
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PROD" rev-parse HEAD)" = "$OLD_SHA"
+            test -z "$(sudo -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            test "$(sudo -u fintual "$PROD/.venv/bin/python" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.13.15
+            test ! -e "$TARGET"
+            AVAILABLE="$(awk '/MemAvailable:/ {print int($2/1024)}' /proc/meminfo)"
+            echo "HOST_RAM_AVAILABLE_MIB=$AVAILABLE"
+            if test "$AVAILABLE" -lt 900; then echo 'STAGE_ABORT: insufficient RAM headroom'; exit 12; fi
+            echo 'GATE 0: active financial runtime unchanged; sufficient memory'
+            sudo install -d -m 0755 -o root -g root "$BASE"
+            sudo install -d -m 0700 -o root -g root "$TMP"
+            sudo install -d -m 0755 -o root -g root "$TARGET"
+            sudo install -d -m 0755 -o root -g root "$TARGET/managed-python"
+            sudo install -d -m 0700 -o root -g root "$TMP/source"
+            sudo -u fintual git -C "$PROD" show HEAD:pyproject.toml | sudo tee "$TMP/source/pyproject.toml" >/dev/null
+            sudo -u fintual git -C "$PROD" show HEAD:uv.lock | sudo tee "$TMP/source/uv.lock" >/dev/null
+            sudo sha256sum "$TMP/source/uv.lock" | sudo tee "$TARGET/uv-lock-sha256.txt" >/dev/null
+            echo 'GATE 1: production commit dependency manifest captured without config/state'
+            sudo curl -fLsS --retry 2 --max-time 60 \
+              https://github.com/astral-sh/uv/releases/download/0.13.1/uv-aarch64-unknown-linux-gnu.tar.gz \
+              -o "$TMP/uv.tar.gz"
+            echo "$EXPECTED_UV  $TMP/uv.tar.gz" | sudo sha256sum -c -
+            sudo tar -xzf "$TMP/uv.tar.gz" -C "$TMP"
+            UV="$TMP/uv-aarch64-unknown-linux-gnu/uv"
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$TMP/cache" "$UV" python install \
+              --install-dir "$TARGET/managed-python" 3.14.8
+            PY="$(sudo find "$TARGET/managed-python" -path '*/bin/python3.14' -print -quit)"
+            test -n "$PY"
+            test "$(sudo "$PY" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            echo 'GATE 2: versioned managed Python 3.14.8 installed'
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$TMP/cache" UV_PROJECT_ENVIRONMENT="$TARGET/venv" \
+              "$UV" sync --frozen --no-dev --project "$TMP/source" --python "$PY"
+            test "$(sudo "$TARGET/venv/bin/python" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            sudo env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PROD/src" "$TARGET/venv/bin/python" - <<'PY'
+            import importlib
+            for name in ("playwright", "websockets", "fintual_executor.client",
+                         "fintual_executor.execution", "fintual_executor.runner"):
+                importlib.import_module(name)
+            print("IMPORT_GATE: PASS (no execution or broker connection)")
+            PY
+            sudo chown -R root:root "$TARGET"
+            sudo chmod -R go-w "$TARGET"
+            sudo chmod 0755 "$TARGET" "$TARGET/venv"
+            echo "$OLD_SHA" | sudo tee "$TARGET/source-commit.txt" >/dev/null
+            test "$(sudo -u fintual "$TARGET/venv/bin/python" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            echo 'GATE 3: staged venv executable by fintual; no dependency mutation in live venv'
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PROD" rev-parse HEAD)" = "$OLD_SHA"
+            test -z "$(sudo -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            test "$(sudo -u fintual "$PROD/.venv/bin/python" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.13.15
+            echo 'POSTFLIGHT: PASS; live Python remains 3.13.15, staged 3.14.8 ready'
