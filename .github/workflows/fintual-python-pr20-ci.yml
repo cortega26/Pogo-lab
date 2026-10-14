@@ -33,8 +33,14 @@ jobs:
             test -z "$(sudo -n -u fintual git -C "$FIN" status --porcelain --untracked-files=no)"
             sudo install -d -m 0700 -o root -g root "$ROOT"
             sudo test -s "$KEY/github_ed25519"
+            # Refresh GitHub's SSH host keys from authenticated HTTPS API; strict
+            # host-key checking stays enabled. Do not rely on stale SSH cache.
+            curl -fsSL --max-time 15 https://api.github.com/meta \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print("\\n".join("github.com "+key for key in d["ssh_keys"]))' \
+              | sudo tee "$ROOT/known_hosts" >/dev/null
+            sudo grep -q '^github.com ssh-ed25519 ' "$ROOT/known_hosts"
             echo 'GATE 0: financial services and original checkout preserved'
-            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$ROOT/known_hosts -i $KEY/github_ed25519" \
                 git clone --quiet --depth 1 --single-branch --branch chore/standardize-python-3148-20261014 \
                 git@github.com:cortega26/fintual-executor.git "$ROOT/repo" \
                 2>&1 | sudo tee "$ROOT/clone.log" >/dev/null; then
