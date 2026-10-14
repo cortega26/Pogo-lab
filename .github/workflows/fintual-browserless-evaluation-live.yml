@@ -1,4 +1,4 @@
-name: Fintual browserless full evaluator — live read-only gate
+name: Fintual HTTPX session lifetime — two-cycle live read-only gate
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   evaluate:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 13
     steps:
       - name: Run real decision evaluator over HTTPX without any order permissions
         uses: appleboy/ssh-action@v1
@@ -18,15 +18,15 @@ jobs:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          command_timeout: 6m
+          command_timeout: 10m
           script: |
             set -euo pipefail
-            STAGE=/opt/fintual-browserless-evaluation-20261014
+            STAGE=/opt/fintual-browserless-longevity-20261014
             LIVE=/opt/fintual-executor
             READ_KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
-            EXPECTED=80e5876b3bee0759fc971235be7390234dec7cf2
+            EXPECTED=63c0cc073a64b0606749fcee50090c6e2f1daf54
             cleanup() { sudo rm -rf -- "$STAGE" || true; }
             trap cleanup EXIT
             test "$(systemctl is-active fintual-executor.service)" = active
@@ -38,7 +38,7 @@ jobs:
             echo 'GATE 0: live financial runtime and staged Python untouched'
             sudo install -d -m 0755 -o root -g root "$STAGE"
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$READ_KEY/known_hosts -i $READ_KEY/github_ed25519" \
-              git clone --quiet --depth 1 --single-branch --branch feat/browserless-evaluation-dry-run-20261014 \
+              git clone --quiet --depth 1 --single-branch --branch main \
               git@github.com:cortega26/fintual-executor.git "$STAGE/repo" \
               2>&1 | sudo tee "$STAGE/git.log" >/dev/null; then
               echo 'PRIVATE_SOURCE_FETCH: FAIL'
@@ -64,7 +64,7 @@ jobs:
               -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
               -p "Environment=PYTHONPATH=$STAGE/vendor:$STAGE/repo/src" \
               "$PY" -m fintual_executor.browserless_evaluation \
-                --config /etc/fintual-executor/config.json --cycles 1
+                --config /etc/fintual-executor/config.json --cycles 2 --interval-seconds 300
             echo 'GATE 3: actual decision evaluator completed over browser-disconnected HTTPX'
             test "$(systemctl is-active fintual-executor.service)" = active
             test "$(systemctl is-active fintual-browser.service)" = active
