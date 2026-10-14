@@ -1,0 +1,103 @@
+name: Fintual authorized pause — READ ONLY preflight
+
+on:
+  push:
+    branches: [ops/fintual-pause-preflight-20261014]
+    paths:
+      - .github/workflows/fintual-pause-preflight.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Observe financial pending orders, read-only ledger, authenticated browser and recovery access
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -eu
+            echo '=== BASELINE (READ ONLY; NO SERVICE STOP) ==='
+            date -u +'%Y-%m-%dT%H:%M:%SZ'
+            for svc in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              printf '%s=' "$svc"
+              systemctl is-active "$svc" || true
+            done
+            sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD
+            if test -z "$(sudo -n -u fintual git -C /opt/fintual-executor status --porcelain --untracked-files=no)"; then echo 'PROD_WORKTREE_CLEAN=TRUE'; else echo 'PROD_WORKTREE_CLEAN=FALSE'; fi
+            echo '=== CONFIG AND EFFECTIVE ARMING (NO SECRETS OUTPUT) ==='
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json, pathlib, subprocess, stat
+            c=pathlib.Path('/etc/fintual-executor/config.json')
+            e=pathlib.Path('/etc/fintual-executor/market-data.env')
+            data=json.loads(c.read_text())
+            p=int(subprocess.check_output(['systemctl','show','-p','MainPID','--value','fintual-executor.service'],text=True).strip())
+            if p<2: raise SystemExit('STOP: no executor PID')
+            env=pathlib.Path(f'/proc/{p}/environ').read_bytes().split(b'\0')
+            yes=b'FINTUAL_REAL_EXECUTION=YES_I_ACCEPT_REAL_ORDERS' in env
+            print('EXPLICIT_EXECUTION_ENABLED='+str(data.get('execution_enabled') is True))
+            print('ACK_REAL_ORDERS='+str(yes))
+            print('EXECUTOR_ARMED='+str(data.get('execution_enabled') is True and yes))
+            for label, path in [('CONFIG',c),('MARKET_ENV',e)]:
+                mode=stat.S_IMODE(path.stat().st_mode)
+                print(label+'_IS_REGULAR='+str(path.is_file()))
+                print(label+'_PRIVATE_PERMS='+str((mode & 0o007)==0))
+            PY
+            echo '=== LEDGER READ ONLY QUERY ==='
+            sudo -n -u fintual /usr/bin/python3 - <<'PY'
+            import sqlite3
+            import sys
+            db='file:/var/lib/fintual-executor/state.sqlite3?mode=ro'
+            try:
+                conn=sqlite3.connect(db,uri=True,timeout=10)
+                conn.execute('PRAGMA query_only=ON')
+                names=[r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+                if 'order_intents' not in names:
+                    raise ValueError('Missing ledger order_intents table')
+                row=conn.execute("SELECT state,COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN') GROUP BY state").fetchall()
+                counts=dict(row)
+                print('LOCAL_OPEN_INTENTS_TOTAL='+str(sum(counts.values())))
+                for key in ('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN'):
+                    print('LOCAL_'+key+'='+str(counts.get(key,0)))
+                integrity=conn.execute('PRAGMA integrity_check').fetchone()[0]
+                print('LEDGER_INTEGRITY_OK='+str(integrity=='ok'))
+                conn.close()
+            except Exception as exc:
+                print('LOCAL_LEDGER_PREFLIGHT_FAILED='+type(exc).__name__)
+                sys.exit(5)
+            PY
+            echo '=== BROKER FINTUAL READ ONLY QUERY ==='
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS               PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/opt/fintual-executor/src               /opt/fintual-executor/.venv/bin/python - <<'PY'
+            from fintual_executor.client import FintualClient, get_pending, get_market_info
+            try:
+                client=FintualClient(execution_enabled=False).connect()
+                try:
+                    pending=get_pending(client)
+                    market=get_market_info(client)
+                    n_buys=len(pending.get('stocksPendingAssetMarketBuys',[]))
+                    n_sells=len(pending.get('stocksPendingAssetMarketSells',[]))
+                    print('BROKER_AUTH_READ=PASS')
+                    print('BROKER_PENDING_BUYS='+str(n_buys))
+                    print('BROKER_PENDING_SELLS='+str(n_sells))
+                    print('BROKER_MARKET_OPEN='+str(bool(market.get('isMarketOpen'))))
+                finally:
+                    client.close()
+            except Exception as exc:
+                print('BROKER_AUTH_READ=FAILED:'+type(exc).__name__)
+                raise SystemExit(6)
+            PY
+            echo '=== REMOTE RECOVERY ACCESS CAPABILITIES ==='
+            command -v x11vnc >/dev/null 2>&1 && echo X11VNC_BINARY_PRESENT=TRUE || echo X11VNC_BINARY_PRESENT=FALSE
+            command -v Xvfb >/dev/null 2>&1 && echo XVFB_BINARY_PRESENT=TRUE || echo XVFB_BINARY_PRESENT=FALSE
+            if systemctl list-unit-files --type=service --no-legend | grep -qiE '^([^ ]*(vnc|xpra|novnc)[^ ]*)\.service'; then echo REMOTE_GUI_UNIT_CONFIGURED=TRUE; else echo REMOTE_GUI_UNIT_CONFIGURED=FALSE; fi
+            if ss -ltnH '( sport = :5900 or sport = :5901 or sport = :6080 )' | grep -q .; then echo REMOTE_GUI_PORT_LISTENING=TRUE; else echo REMOTE_GUI_PORT_LISTENING=FALSE; fi
+            echo '=== POSTCHECK SERVICES & COMMIT ==='
+            for svc in fintual-executor.service fintual-browser.service; do test "$(systemctl is-active "$svc")" = active; done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            echo READ_ONLY_PREFLIGHT_COMPLETED_PRODUCTION_UNMODIFIED
