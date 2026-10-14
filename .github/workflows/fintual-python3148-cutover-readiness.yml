@@ -1,0 +1,48 @@
+name: Fintual Python 3.14.8 cutover readiness (no changes)
+
+on:
+  push:
+    branches: [ops/fintual-http-shadow-g0-20261013]
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Verify backup and service-override prerequisites only
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            set -euo pipefail
+            echo 'CUTOVER_DRY_RUN: READ ONLY'
+            date -u '+UTC_NOW=%F %T'
+            TZ=America/Santiago date '+CHILE_NOW=%F %T'
+            echo '--- systemd runtime ---'
+            systemctl is-active fintual-executor.service
+            systemctl is-active fintual-browser.service
+            systemctl show fintual-executor.service -p FragmentPath -p DropInPaths -p ExecMainPID --no-pager
+            echo '--- override collision ---'
+            if sudo test -e /etc/systemd/system/fintual-executor.service.d/70-python3148.conf; then
+              echo 'OVERRIDE_ALREADY_EXISTS: BLOCKED'
+              exit 2
+            fi
+            echo 'OVERRIDE_COLLISION: NONE'
+            echo '--- storage capacity ---'
+            df -m /var/lib/fintual-executor /opt /dev/shm | tail -n +2
+            echo '--- state database size in MB ---'
+            sudo stat -c 'LEDGER_SIZE_BYTES=%s' /var/lib/fintual-executor/state.sqlite3
+            echo '--- cipher tooling ---'
+            command -v openssl
+            openssl version
+            echo '--- staged interpreter ---'
+            sudo -u fintual /opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python --version
+            echo '--- production still original ---'
+            test "$(sudo -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            echo 'CUTOVER_DRY_RUN: READY_FOR_AFTER_HOURS_GATES'
