@@ -117,6 +117,22 @@ jobs:
                         ref_price, ref_at = browser.current_price(symbol)
                         new_price, new_at = client.current_price(symbol)
                         checks.append({"check": "pricing:" + symbol, "match": ref_price == new_price and ref_at == new_at})
+                    # Phase 3A: disconnect Playwright completely; do not stop
+                    # the production Chrome process or save any cookie.
+                    if not all(check["match"] for check in checks):
+                        raise RuntimeError("Initial parity mismatch")
+                    browser.close()
+                    browser = None
+                    import time
+                    for sequence, delay in enumerate((0, 45, 45), 1):
+                        if delay:
+                            time.sleep(delay)
+                        snapshot = client.gql("StocksAssetsMarketInfo", MARKET_INFO_QUERY)
+                        quote, observed = client.current_price(symbols[0])
+                        good = isinstance(snapshot.get("stocksAssetsMarketInfo"), dict) and quote.is_finite() and quote > 0 and bool(observed)
+                        checks.append({"check": "cdp_disconnected_checkpoint:" + str(sequence), "match": bool(good)})
+                        print(json.dumps({"phase": "NO_CDP_BROWSER_INDEPENDENCE", "checkpoint": sequence,
+                                          "ok": bool(good)}), flush=True)
                 success = all(check["match"] for check in checks)
                 print(json.dumps({"phase": "EXACT_HTTPX_SHADOW_PARITY", "ok": success, "checks": checks}))
                 if not success:
