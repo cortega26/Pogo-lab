@@ -1,0 +1,72 @@
+name: Fintual uv.lock regeneration — disposable ARM64 preflight
+
+on:
+  push:
+    branches: [ops/fintual-uvlock-20261014]
+    paths:
+      - .github/workflows/fintual-uvlock-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Regenerate optional HTTPX lock without production changes
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 9m
+          script: |
+            set -eu
+            RUN=/opt/fintual-uvlock-oneshot-20261014
+            KEY=/var/lib/fintual-ci-source-readonly
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            SHA=ee99d2dbf448d658df9fdece17555ea73d5d3ed8
+            PROD=/opt/fintual-executor
+            cleanup() { sudo rm -rf -- "$RUN" || true; }
+            trap cleanup EXIT
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            sudo install -d -m 0700 "$RUN"
+            sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" git clone --quiet --depth 1 --single-branch --branch main git@github.com:cortega26/fintual-executor.git "$RUN/repo" > /dev/null 2>&1
+            test "$(sudo git -C "$RUN/repo" rev-parse HEAD)" = "$SHA"
+            test "$(sudo "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            echo 'LOCK_GATE_0: source pinned, Python 3.14.8 and production intact'
+            echo "UV_VERSION: $(sudo "$UV" --version)"
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" lock --directory "$RUN/repo" --quiet
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" lock --check --directory "$RUN/repo" --quiet
+            echo 'LOCK_GATE_1: regenerated and uv lock --check PASS'
+            sudo "$PY" - "$RUN/repo" <<'PY'
+            import pathlib, subprocess, sys, tomllib
+            repo = pathlib.Path(sys.argv[1])
+            old = tomllib.loads(subprocess.check_output(["git", "-C", str(repo), "show", "HEAD:uv.lock"], text=True))
+            new = tomllib.loads((repo / "uv.lock").read_text())
+            previous = {p["name"]: p["version"] for p in old["package"] if "version" in p}
+            current = {p["name"]: p["version"] for p in new["package"] if "version" in p}
+            changed = [(n, version, current.get(n)) for n, version in previous.items() if current.get(n) != version]
+            added = sorted(set(current) - set(previous))
+            print("LOCK_EXISTING_VERSION_DRIFT_COUNT:", len(changed))
+            print("LOCK_ADDED_PACKAGES:", ",".join(added))
+            if changed:
+                print("LOCK_GATE_VERSION_DRIFT_BLOCKED")
+                raise SystemExit(9)
+            project = next(p for p in new["package"] if p["name"] == "fintual-executor")
+            assert "shadow" in project.get("optional-dependencies", {})
+            assert "httpx" in current
+            print("LOCK_GATE_2: no existing package versions changed; shadow extra resolved")
+            PY
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" UV_PROJECT_ENVIRONMENT="$RUN/venv" "$UV" sync --directory "$RUN/repo" --frozen --extra shadow --extra dev --python "$PY" --no-install-project --quiet
+            echo 'LOCK_GATE_3: frozen shadow+dev install PASS'
+            echo 'BEGIN_UV_LOCK_DIFF'
+            sudo git -C "$RUN/repo" --no-pager diff --no-ext-diff --unified=0 -- uv.lock
+            echo 'END_UV_LOCK_DIFF'
+            test "$(sudo -n -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test "$(systemctl is-active fintual-executor.service)" = active
+            echo 'LOCK_GATE_4: production unchanged and disposable files purged on EXIT'
