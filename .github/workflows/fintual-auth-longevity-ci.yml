@@ -31,7 +31,7 @@ jobs:
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PRODUCT=/opt/fintual-executor
-            EXPECTED_MAIN=c91252f12abfdb6fe25b407e2951b7c2b39dd4a8
+            EXPECTED_MAIN=52dc2900768d4a95d2359ed987e39c41689d7ce0
             cleanup() {
               sudo rm -rf -- "$RUN" || true
             }
