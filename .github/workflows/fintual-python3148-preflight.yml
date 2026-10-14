@@ -1,0 +1,75 @@
+name: Fintual Python 3.14.8 cutover gates — read only
+
+on:
+  push:
+    branches: [ops/fintual-http-shadow-g0-20261013]
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Test staged runtime, local ledger and broker pending-orders safely
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            set -euo pipefail
+            PROD=/opt/fintual-executor
+            STAGED=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$PROD" status --porcelain --untracked-files=no)"
+            test "$(sudo -u fintual "$STAGED" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" = 3.14.8
+            echo 'STAGED_INTERPRETER: PASS'
+            sudo -u fintual env PYTHONPATH="$PROD/src" PYTHONDONTWRITEBYTECODE=1 "$STAGED" - <<'PY'
+            import sqlite3, json
+            from fintual_executor.client import FintualClient, PENDING_QUERY
+
+            db = sqlite3.connect("file:/var/lib/fintual-executor/state.sqlite3?mode=ro", uri=True, timeout=5)
+            try:
+                db.execute("PRAGMA query_only=ON")
+                integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
+                states = ('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')
+                slots = ",".join("?" for _ in states)
+                open_count = db.execute(
+                    f"SELECT COUNT(*) FROM order_intents WHERE state IN ({slots})", states
+                ).fetchone()[0]
+                print("LEDGER_INTEGRITY: " + ("PASS" if integrity == "ok" else "BLOCKED"))
+                print("LOCAL_OPEN_INTENTS: " + ("NONE" if open_count == 0 else "BLOCKED"))
+            finally:
+                db.close()
+
+            client = FintualClient(execution_enabled=False)
+            try:
+                client.connect()
+                pending = client.gql("PendingStocksWalletMovements", PENDING_QUERY)
+                buys = pending.get("stocksPendingAssetMarketBuys")
+                sells = pending.get("stocksPendingAssetMarketSells")
+                if not isinstance(buys, list) or not isinstance(sells, list):
+                    print("BROKER_PENDING_ORDERS: UNKNOWN")
+                    raise SystemExit(13)
+                print("BROKER_PENDING_ORDERS: " + ("NONE" if not buys and not sells else "BLOCKED"))
+                print("AUTHENTICATED_CDP_READ_WITH_PYTHON3148: PASS")
+            except Exception as exc:
+                # Never print broker payloads, cookies or raw exception bodies.
+                print("BROKER_READ_PREFLIGHT: FAILED (" + type(exc).__name__ + ")")
+                raise SystemExit(14)
+            finally:
+                client.close()
+            if integrity != "ok" or open_count != 0 or buys or sells:
+                print("CUTOVER_READINESS: BLOCKED; NO SERVICE CHANGES")
+                raise SystemExit(15)
+            print("CUTOVER_READINESS: READ_ONLY_GATES_PASS; MAINTENANCE WINDOW STILL REQUIRED")
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PROD" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            echo 'POSTFLIGHT: production unchanged, no restarts or orders'
