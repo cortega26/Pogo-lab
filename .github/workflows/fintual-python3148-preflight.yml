@@ -1,8 +1,7 @@
 name: Fintual Python 3.14.8 cutover gates — read only
 
 on:
-  push:
-    branches: [ops/fintual-http-shadow-g0-20261013]
+  workflow_dispatch:
 
 permissions:
   contents: read
