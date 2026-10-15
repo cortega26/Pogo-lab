@@ -1,0 +1,65 @@
+name: Fintual G7 bounded pagination and UNKNOWN recovery acceptance
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g7-paginated-recovery-once.yml]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Test pinned G7 all history page guards in isolated temp checkout
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 4m
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            SOURCE_SHA=1c9a1da0491aed2aa40e35c6da69363c472a0cff
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo PRECHECK_SERVICE_NOT_ACTIVE; exit 21; }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            WORK="$(mktemp -d /tmp/fintual-g7-history-pages.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$WORK"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
+              timeout 45s git clone --quiet --depth 1 --single-branch --branch fix/g7-complete-bounded-unknown-history-20261015 \
+              git@github.com:cortega26/fintual-executor.git "$WORK/repo"
+            test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$SOURCE_SHA"
+            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$WORK/cache" \
+              UV_PROJECT_ENVIRONMENT="$WORK/venv" "$UV" sync \
+              --directory "$WORK/repo" --frozen --extra dev --extra shadow \
+              --python "$PY" --quiet
+            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$WORK/repo/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 120s "$WORK/venv/bin/python" -m pytest -q -x \
+              "$WORK/repo/tests/test_g7_paginated_unknown_recovery.py" \
+              "$WORK/repo/tests/test_reconcile_history_bounds.py" \
+              "$WORK/repo/tests/test_reconcile.py" \
+              "$WORK/repo/tests/test_g7_global_unknown_fence.py" \
+              "$WORK/repo/tests/test_http_broker_end_to_end_mock.py" \
+              "$WORK/repo/tests/test_state.py" \
+              "$WORK/repo/tests/test_orchestrator.py"
+            sudo -n "$WORK/venv/bin/ruff" check \
+              "$WORK/repo/src/fintual_executor/reconcile.py" \
+              "$WORK/repo/tests/test_g7_paginated_unknown_recovery.py"
+            sudo -n "$WORK/venv/bin/python" -m compileall -q \
+              "$WORK/repo/src/fintual_executor/reconcile.py" \
+              "$WORK/repo/tests/test_g7_paginated_unknown_recovery.py"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo POSTCHECK_SERVICE_NOT_ACTIVE; exit 22; }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G7_PAGINATED_UNKNOWN_RECOVERY_PASS=TRUE
+            echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
+            echo G5_UNIT_STILL_ACTIVE=TRUE
