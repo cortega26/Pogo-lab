@@ -1,4 +1,4 @@
-name: Fintual G8 new reviewed source stage and sanitized local financial read-only evidence
+name: Fintual G8 authenticated broker-history read-only parity check
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,11 +6,11 @@ on:
 permissions:
   contents: read
 jobs:
-  prepare:
+  read-only:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Stage SHA and inspect local SQLite/open intents with no broker login
+      - name: Read only broker history against intact live SQLite, no credentials emitted
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -21,71 +21,67 @@ jobs:
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            TARGET=1eda20c24d73f8678d59ba3240c76fd321709022
-            STAGEDIR=/var/lib/fintual-g8-stage
+            SOURCE=1eda20c24d73f8678d59ba3240c76fd321709022
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo ORIGINAL_OR_G5_NOT_ACTIVE; exit 21; }
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo PRECHECK_SERVICE_NOT_ACTIVE; exit 21; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            WORK="$(mktemp -d /tmp/fintual-g8-observe-stage.XXXXXXXX)"
+            WORK="$(mktemp -d /tmp/fintual-g8-broker-history.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$WORK"' EXIT
+            sudo -n chmod 0700 "$WORK"
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
               timeout 45s git clone --quiet --depth 1 --single-branch --branch main \
               git@github.com:cortega26/fintual-executor.git "$WORK/repo"
-            test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$TARGET"
-            sudo -n test -d "$STAGEDIR"
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$WORK/repo/src" "$PY" -m fintual_executor.g8_stage \
-              --checkout "$WORK/repo" --stage-directory "$STAGEDIR" --expected-sha "$TARGET"
-            sudo -n env TARGET="$TARGET" STAGEDIR="$STAGEDIR" /usr/bin/python3 - <<'PY'
-            import json,hashlib,stat,os
-            from pathlib import Path
-            d=Path(os.environ["STAGEDIR"])
-            s=os.environ["TARGET"]
-            m=d/(s+".manifest.json")
-            a=d/(s+".tar")
-            assert stat.S_IMODE(d.lstat().st_mode)==0o700
-            assert stat.S_IMODE(m.lstat().st_mode)==0o600
-            assert stat.S_IMODE(a.lstat().st_mode)==0o600
-            x=json.loads(m.read_text())
-            h=hashlib.sha256()
-            with a.open("rb") as f:
-                for b in iter(lambda:f.read(131072),b""):
-                    h.update(b)
-            assert x["archive_sha256"]==h.hexdigest() and x["git_sha"]==s
-            print("G8_CANONICAL_MAIN_STAGED_SHA="+s)
-            print("G8_CANONICAL_ARCHIVE_SHA256="+h.hexdigest())
-            print("G8_ARCHIVE_INTEGRITY=PASS")
-            PY
+            test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$SOURCE"
+            # Read-only CDP GraphQL history and SQLite URI mode=ro, no order environment flags.
+            # The CLI returns 3 even for a bounded parity pass (no cutover approval).
             sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
               PYTHONPATH="$WORK/repo/src" "$PY" - <<'PY'
             import json
             from pathlib import Path
-            from fintual_executor import g8_observe
-            local=g8_observe.observe_local(
-                checkout=Path("/opt/fintual-executor"),
-                ledger=Path("/var/lib/fintual-executor/state.sqlite3"),
-                config=Path("/etc/fintual-executor/config.json"),
-                market_env=Path("/etc/fintual-executor/market-data.env"),
-            )
-            print("G8_LOCAL_OBSERVATION_READONLY=TRUE")
-            print("G8_RUNNING_SOURCE_MATCHES_BASELINE="+str(local["git"]["head"]=="abf4db01082c77feef364a8925852a2633afbad2").upper())
-            print("G8_LOCAL_WORKTREE_CLEAN="+str(local["git"]["clean"]).upper())
-            print("G8_EXECUTOR_SERVICE_ACTIVE="+str(local["services"]["fintual-executor.service"]).upper())
-            print("G8_LOCAL_LEDGER_INTEGRITY_OK="+str(local["ledger"]["integrity_ok"]).upper())
-            print("G8_LOCAL_OPEN_INTENTS="+str(local["ledger"]["open_intents"]))
-            print("G8_LOCAL_FILLS_COUNT="+str(local["ledger"]["fills"]))
-            print("G8_LOCAL_CONFIG_FILES_PRIVATE="+str(local["configuration"]["private"]).upper())
-            print("G8_LOCAL_OBSERVATION_REASON_CODES="+",".join(local["errors"]))
-            print("G8_INDEPENDENT_BROKER_ATTESTED=FALSE")
-            print("G8_LIVE_CUTOVER_ALLOWED=FALSE")
+            from fintual_executor.client import FintualClient
+            from fintual_executor.g8_history import audit_history_against_ledger
+            config=json.loads(Path("/etc/fintual-executor/config.json").read_text())
+            symbols=config.get("symbols")
+            broker=FintualClient(execution_enabled=False)
+            try:
+                broker.connect()
+                result=audit_history_against_ledger(
+                    broker,
+                    Path("/var/lib/fintual-executor/state.sqlite3"),
+                    symbols,
+                    page_size=20,
+                    max_pages=25,
+                )
+            except Exception:
+                result={
+                    "status":"INCOMPLETE_NO_G7_G8_AUTHORIZATION",
+                    "error":"READONLY_AUDIT_UNVERIFIED",
+                }
+            finally:
+                broker.close()
+            for key in (
+                "status","error","pages_read","local_fills_checked",
+                "local_fills_unmatched","broker_fulfilled_without_local_fill",
+                "broker_legacy_fills_before_bot","local_open_intents",
+                "offset_traversal_complete","all_known_fills_match",
+                "broker_history_independently_attested",
+                "real_orders_authorized","chrome_retirement_authorized",
+            ):
+                val=result.get(key)
+                if isinstance(val,(str,int,float,bool)) or val is None:
+                    print("G8_"+key.upper()+"="+str(val))
+            assert result.get("real_orders_authorized") is False
+            assert result.get("broker_history_independently_attested") is False
+            assert result.get("chrome_retirement_authorized") is False
             PY
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo ORIGINAL_OR_G5_CHANGED; exit 22; }
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo POSTCHECK_SERVICE_NOT_ACTIVE; exit 22; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G8_READONLY_AUDIT_NO_MUTATION=TRUE
             echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
-            echo G5_UNIT_STILL_ACTIVE=TRUE
+            echo G5_SHADOW_SERVICE_ACTIVE=TRUE
