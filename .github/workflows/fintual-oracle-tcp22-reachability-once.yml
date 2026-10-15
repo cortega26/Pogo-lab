@@ -1,4 +1,4 @@
-name: Fintual Oracle TCP22 reachability hosted check (no SSH auth)
+name: Fintual Oracle TCP22 and SSH banner hosted check (no auth)
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -36,6 +36,18 @@ jobs:
               try:
                   sock.connect(item[4])
                   status = "OPEN"
+                  sock.settimeout(5)
+                  try:
+                      banner = sock.recv(256)
+                  except OSError as error:
+                      print("OCI_SSH_BANNER=TIMEOUT_OR_ERROR")
+                      print("OCI_SSH_BANNER_ERROR_TYPE="+type(error).__name__)
+                      sys.exit(6)
+                  if banner.startswith(b"SSH-2.0-"):
+                      print("OCI_SSH_BANNER=VALID_SSH2")
+                  else:
+                      print("OCI_SSH_BANNER=MISSING_OR_UNEXPECTED")
+                      sys.exit(7)
                   break
               except OSError as e:
                   errors.add(type(e).__name__)
