@@ -1,4 +1,4 @@
-name: Fintual G8 synthetic staged cutover and code-only rollback acceptance
+name: Fintual G8 reviewed source artifact immutable staging (no cutover)
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,11 +6,11 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
+  stage:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Run toy G8 Git and SQLite release rehearsal at pinned SHA; no production effects
+      - name: Stage and attest exact main source SHA outside financial production
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -20,49 +20,66 @@ jobs:
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=ee3c493774fc752459917dc4f4552c025ed35252
-            UV=/home/fintual/.uv-bootstrap/bin/uv
+            TARGET=040e378bb636cc91375b550b9a5c900690e2145c
+            STAGEDIR=/var/lib/fintual-g8-stage
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(systemctl is-active "$unit")" = active || { echo BLOCKED_SHADOW_OR_PRODUCTION_INACTIVE; exit 21; }
+              test "$(systemctl is-active "$unit")" = active || { echo BLOCKED_PRODUCTION_OR_G5_NOT_ACTIVE; exit 21; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            STAGE="$(mktemp -d /tmp/fintual-g8-rehearsal-ci.XXXXXXXX)"
-            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            WORK="$(mktemp -d /tmp/fintual-g8-reviewed-stage.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$WORK"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              git clone --quiet --depth 1 --single-branch --branch feat/g8-synthetic-cutover-rollback-rehearsal-20261015 \
-              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
-            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
-            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
-              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
-              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
-              --python "$PY" --quiet
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
-              timeout 180s "$STAGE/venv/bin/python" -m pytest -q -x \
-                "$STAGE/repo/tests/test_g8_rehearsal.py" \
-                "$STAGE/repo/tests/test_g8_stage.py" \
-                "$STAGE/repo/tests/test_g8_dryrun.py" \
-                "$STAGE/repo/tests/test_g8_observe.py"
-            sudo -n "$STAGE/venv/bin/ruff" check \
-              "$STAGE/repo/src/fintual_executor/g8_rehearsal.py" \
-              "$STAGE/repo/tests/test_g8_rehearsal.py"
-            sudo -n "$STAGE/venv/bin/python" -m compileall -q \
-              "$STAGE/repo/src/fintual_executor/g8_rehearsal.py"
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" \
-              "$STAGE/venv/bin/python" -m fintual_executor.g8_rehearsal
-            if sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" \
-              "$STAGE/venv/bin/python" -m fintual_executor.g8_rehearsal --fault new_fill; then
-              echo BLOCKED_EXPECTED_FOR_SYNTHETIC_NEW_FILL; exit 22
+              git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$WORK/repo"
+            test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$TARGET"
+            if ! sudo -n test -e "$STAGEDIR"; then
+              sudo -n install -d -m 0700 -o root -g root "$STAGEDIR"
             fi
+            if sudo -n test -e "$STAGEDIR/$TARGET.tar" || sudo -n test -e "$STAGEDIR/$TARGET.manifest.json"; then
+              echo STAGING_REJECTED_EXISTING_SOURCE_ID; exit 22
+            fi
+            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$WORK/repo/src" "$PY" -m fintual_executor.g8_stage \
+              --checkout "$WORK/repo" --stage-directory "$STAGEDIR" --expected-sha "$TARGET"
+            sudo -n env TARGET="$TARGET" STAGEDIR="$STAGEDIR" /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,stat,tarfile
+            from pathlib import Path
+            root=Path(os.environ['STAGEDIR'])
+            sha=os.environ['TARGET']
+            manifest=root/(sha+'.manifest.json')
+            artifact=root/(sha+'.tar')
+            assert root.is_dir() and stat.S_IMODE(root.lstat().st_mode)==0o700
+            assert stat.S_IMODE(manifest.lstat().st_mode)==0o600
+            assert stat.S_IMODE(artifact.lstat().st_mode)==0o600
+            assert not manifest.is_symlink() and not artifact.is_symlink()
+            data=json.loads(manifest.read_text())
+            assert data['git_sha']==sha
+            assert data['production_modified'] is False
+            assert data['real_orders_enabled'] is False
+            digest=hashlib.sha256()
+            with artifact.open('rb') as f:
+                for block in iter(lambda:f.read(131072),b''):
+                    digest.update(block)
+            assert digest.hexdigest()==data['archive_sha256']
+            assert artifact.stat().st_size==data['archive_bytes']>0
+            with tarfile.open(artifact) as f:
+                members=f.getmembers()
+                assert members
+                for item in members:
+                    path=Path(item.name)
+                    assert not path.is_absolute() and '..' not in path.parts
+            print('G8_STAGED_SHA='+sha)
+            print('G8_STAGED_BYTES='+str(data['archive_bytes']))
+            print('G8_ARTIFACT_SHA256='+data['archive_sha256'])
+            print('G8_STAGE_INTEGRITY_VERIFIED=TRUE')
+            print('G8_SOURCE_ONLY_NOT_EXECUTABLE_RELEASE=TRUE')
+            PY
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(systemctl is-active "$unit")" = active || { echo BLOCKED_SHADOW_OR_PRODUCTION_CHANGED; exit 23; }
+              test "$(systemctl is-active "$unit")" = active || { echo BLOCKED_PRODUCTION_OR_G5_CHANGED; exit 23; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G8_SYNTHETIC_STAGE_ROLLBACK_TESTS=PASS
-            echo G5_24H_WITNESS_STILL_ACTIVE=TRUE
+            echo G5_STILL_RUNNING=TRUE
             echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
