@@ -1,4 +1,5 @@
-name: Fintual G7 focused offline financial safety acceptance
+
+name: Fintual G5 failure forensics read-only
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,63 +7,43 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 6
     steps:
-      - name: G7 mutation-revocation and order-reconciliation safety regression
+      - name: Sanitize and report real G5 shadow journal terminal failure
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          command_timeout: 10m
+          command_timeout: 4m
           script: |
-            set -euo pipefail
-            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=9ddad141520856394cd59f6a40c876c688114067
-            UV=/home/fintual/.uv-bootstrap/bin/uv
-            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
-            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
-            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
-            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
-              test "$(systemctl is-active "$unit")" = active || { echo "STOP: PRODUCTION_SERVICE_UNHEALTHY"; exit 11; }
-            done
-            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            STAGE="$(mktemp -d /tmp/fintual-g6-recovery.XXXXXXXX)"
-            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
-            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              git clone --quiet --depth 1 --single-branch --branch feat/g7-revoke-mutation-auth-20261015 \
-              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
-            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
-            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
-              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
-              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
-              --python "$PY" --quiet
-            sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
-              timeout 300s "$STAGE/venv/bin/python" -m pytest -q -x \
-                "$STAGE/repo/tests/test_http_g7_session_freeze.py" \
-                "$STAGE/repo/tests/test_http_broker.py" \
-                "$STAGE/repo/tests/test_http_broker_end_to_end_mock.py" \
-                "$STAGE/repo/tests/test_http_order_ambiguous_recovery.py" \
-                "$STAGE/repo/tests/test_http_order_runner_integration.py" \
-                "$STAGE/repo/tests/test_http_order_session_owner.py" \
-                "$STAGE/repo/tests/test_execution.py" \
-                "$STAGE/repo/tests/test_reconcile.py" \
-                "$STAGE/repo/tests/test_g8_dryrun.py"
-            sudo -n "$STAGE/venv/bin/ruff" check \
-              "$STAGE/repo/src/fintual_executor/session_ipc.py" \
-              "$STAGE/repo/tests/test_http_ipc_recovery.py" \
-              "$STAGE/repo/tests/test_http_session_ipc.py" \
-              "$STAGE/repo/src/fintual_executor/http_broker.py" \
-              "$STAGE/repo/tests/test_http_g7_session_freeze.py"
-            sudo -n "$STAGE/venv/bin/python" -m compileall -q \
-              "$STAGE/repo/src/fintual_executor/session_ipc.py" \
-              "$STAGE/repo/tests/test_http_ipc_recovery.py"
-            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
-              test "$(systemctl is-active "$unit")" = active || { echo "STOP: PRODUCTION_CHANGED"; exit 12; }
-            done
-            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo 'G7_AUTH_REVOCATION_TESTS_AND_LINT=PASS'
-            echo 'ORIGINAL_PRODUCTION_UNMODIFIED=TRUE'
+            /usr/bin/python3 - <<'PY'
+            import json, datetime as dt, subprocess
+            u='fintual-g5-shadow-20261014.service'
+            for service in ('fintual-executor.service','fintual-browser.service','fintual-xvfb.service',u):
+                r=subprocess.run(['systemctl','is-active',service],capture_output=True,text=True,timeout=10)
+                print('UNIT_'+service.split('.')[0].replace('-','_').upper()+'='+r.stdout.strip().upper())
+            r=subprocess.run(['journalctl','-u',u,'--no-pager','-o','json','--since=2026-10-14 20:51:00 UTC'],capture_output=True,text=True,timeout=45)
+            rows=[]
+            for line in r.stdout.splitlines():
+                try:
+                    x=json.loads(line); v=json.loads(x['MESSAGE'])
+                    if isinstance(v,dict) and v.get('phase') in ('BOOTSTRAP','HTTP_READS','AUTH_REQUIRED','END','CONFIG'):
+                        ts=dt.datetime.fromtimestamp(int(x['__REALTIME_TIMESTAMP'])/1e6,dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                        rows.append({'time':ts,'phase':v.get('phase'),'ok':v.get('ok'),
+                                    'checkpoint':v.get('checkpoint'),'elapsed_seconds':v.get('elapsed_seconds'),
+                                    'error_type':v.get('error_type'),'reason':v.get('reason'),
+                                    'state':v.get('state')})
+                except (KeyError,ValueError,TypeError,OverflowError):
+                    pass
+            success=[v for v in rows if v['phase']=='HTTP_READS' and v['ok'] is True]
+            failures=[v for v in rows if v['ok'] is False]
+            print('TOTAL_SUCCESSFUL_CHECKPOINTS='+str(len(success)))
+            print('SUCCESS_LAST_3='+json.dumps(success[-3:]))
+            print('FAILURES='+json.dumps(failures[-6:]))
+            print('END_EVENTS='+json.dumps([v for v in rows if v['phase']=='END'][-3:]))
+            print('BOOTSTRAP_COUNT='+str(sum(v['phase']=='BOOTSTRAP' for v in rows)))
+            assert r.returncode==0
+            PY
