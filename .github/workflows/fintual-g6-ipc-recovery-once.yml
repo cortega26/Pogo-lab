@@ -1,5 +1,4 @@
-
-name: Fintual G5 failure forensics read-only
+name: Fintual G5 isolated restart feasibility read-only
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -7,11 +6,11 @@ on:
 permissions:
   contents: read
 jobs:
-  diagnose:
+  inspect:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Sanitize and report real G5 shadow journal terminal failure
+      - name: Verify isolated shadow service template without reading secrets
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -20,30 +19,20 @@ jobs:
           command_timeout: 4m
           script: |
             /usr/bin/python3 - <<'PY'
-            import json, datetime as dt, subprocess
-            u='fintual-g5-shadow-20261014.service'
-            for service in ('fintual-executor.service','fintual-browser.service','fintual-xvfb.service',u):
-                r=subprocess.run(['systemctl','is-active',service],capture_output=True,text=True,timeout=10)
-                print('UNIT_'+service.split('.')[0].replace('-','_').upper()+'='+r.stdout.strip().upper())
-            r=subprocess.run(['journalctl','-u',u,'--no-pager','-o','json','--since=2026-10-14 20:51:00 UTC'],capture_output=True,text=True,timeout=45)
-            rows=[]
-            for line in r.stdout.splitlines():
-                try:
-                    x=json.loads(line); v=json.loads(x['MESSAGE'])
-                    if isinstance(v,dict) and v.get('phase') in ('BOOTSTRAP','HTTP_READS','AUTH_REQUIRED','END','CONFIG'):
-                        ts=dt.datetime.fromtimestamp(int(x['__REALTIME_TIMESTAMP'])/1e6,dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-                        rows.append({'time':ts,'phase':v.get('phase'),'ok':v.get('ok'),
-                                    'checkpoint':v.get('checkpoint'),'elapsed_seconds':v.get('elapsed_seconds'),
-                                    'error_type':v.get('error_type'),'reason':v.get('reason'),
-                                    'state':v.get('state')})
-                except (KeyError,ValueError,TypeError,OverflowError):
-                    pass
-            success=[v for v in rows if v['phase']=='HTTP_READS' and v['ok'] is True]
-            failures=[v for v in rows if v['ok'] is False]
-            print('TOTAL_SUCCESSFUL_CHECKPOINTS='+str(len(success)))
-            print('SUCCESS_LAST_3='+json.dumps(success[-3:]))
-            print('FAILURES='+json.dumps(failures[-6:]))
-            print('END_EVENTS='+json.dumps([v for v in rows if v['phase']=='END'][-3:]))
-            print('BOOTSTRAP_COUNT='+str(sum(v['phase']=='BOOTSTRAP' for v in rows)))
-            assert r.returncode==0
+            import os,re,subprocess
+            name='fintual-g5-shadow-20261014.service'
+            for field in ('LoadState','ActiveState','SubState','Result','ExecMainStatus','FragmentPath','User'):
+                p=subprocess.run(['systemctl','show',name,'--property='+field,'--value'],capture_output=True,text=True,timeout=10)
+                val=p.stdout.strip()
+                if field=='FragmentPath': val='PRESENT' if val and os.path.exists(val) else 'MISSING'
+                if field=='User': val='DEDICATED' if val not in ('','root') else 'ROOT_OR_DEFAULT'
+                print('G5_'+field.upper()+'='+val)
+            p=subprocess.run(['systemctl','show',name,'--property=ExecStart','--value'],capture_output=True,text=True,timeout=10)
+            line=p.stdout.strip()
+            print('G5_COMMAND_REFERENCES_SHADOW_LONGRUN='+str('shadow_longrun' in line).upper())
+            for param in ('duration-seconds','interval-seconds','min-checkpoints'):
+                m=re.search('--'+param+r'[= ]+([0-9]+)',line)
+                print('G5_'+param.upper().replace('-','_')+'='+(m.group(1) if m else 'UNKNOWN'))
+            print('G5_RESTART_ALLOWED_BY_SERVICE='+str(os.path.exists('/etc/systemd/system/'+name)).upper())
+            print('PROD_REPO_EXISTS='+str(os.path.isdir('/opt/fintual-executor')).upper())
             PY
