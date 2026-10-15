@@ -1,4 +1,4 @@
-name: Fintual identify secondary Chrome service owner read-only
+name: Fintual mirror Chrome consumer audit read-only
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Classify two Chrome process families by service and CDP ports
+      - name: Inspect CDP 9223 service dependencies and live connections, no changes
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -20,33 +20,17 @@ jobs:
           script: |
             set -euo pipefail
             /usr/bin/python3 - <<'PY'
-            import os,re,subprocess
-            for unit in ('fintual-browser.service','fintual-executor.service','fintual-xvfb.service',
-                         'fintual-novnc.service','fintual-g5-shadow-20261014.service'):
-                p=subprocess.run(['systemctl','show',unit,'--property=MainPID','--value'],
-                                  capture_output=True,text=True,timeout=10)
-                print('UNIT_MAIN_PID_'+unit.split('.')[0].replace('-','_').upper()+'='+p.stdout.strip())
-            for pid in (923992,924006,1197864,1197876,1212662,977489,995058):
-                root='/proc/'+str(pid)
-                try:
-                    def read(name,mode='r'):
-                        with open(root+'/'+name,mode) as f: return f.read()
-                    status=read('status')
-                    uid=re.search(r'^Uid:\s*([0-9]+)',status,re.M)
-                    cgroup=read('cgroup')
-                    with open(root+'/cmdline','rb') as f:
-                        args=[t.decode('utf-8','ignore') for t in f.read(16000).split(b'\0') if t]
-                    port=next((x.split('=',1)[1] for x in args if x.startswith('--remote-debugging-port=')), 'NONE')
-                    port=port if port.isdecimal() else 'NONE'
-                    profile=next((x.split('=',1)[1] for x in args if x.startswith('--user-data-dir=')), '')
-                    profile_family='PRODUCTION' if '/var/lib/fintual' in profile else (
-                        'TMP' if profile.startswith('/tmp/') else 'OTHER_OR_UNSET')
-                    found=re.findall(r'([a-z0-9_-]+\.service)',cgroup)
-                    service=found[-1] if found else ('USER_SESSION' if 'user.slice' in cgroup else 'UNKNOWN')
-                    print('PID='+str(pid)+' UID='+(uid.group(1) if uid else '?')+
-                          ' SERVICE='+service+' CDP_PORT='+port+' PROFILE_FAMILY='+profile_family)
-                except (OSError,TypeError):
-                    print('PID='+str(pid)+'=GONE')
+            import subprocess,json
+            for unit in ('fintual-gf-mirror-browser.service','fintual-executor.service','fintual-browser.service'):
+                for prop in ('Description','ActiveState','RequiredBy','Requires','Wants','WantedBy','PartOf'):
+                    p=subprocess.run(['systemctl','show',unit,'--property='+prop,'--value'],
+                                     capture_output=True,text=True,timeout=10)
+                    print(unit.split('.')[0].upper().replace('-','_')+'_'+prop.upper()+'='+p.stdout.strip()[:150])
+            p=subprocess.run(['ss','-Htnp'],capture_output=True,text=True,timeout=20)
+            peers=[line for line in p.stdout.splitlines() if ':9223' in line]
+            print('CDP_9223_TCP_CONNECTIONS='+str(len(peers)))
+            print('CDP_9223_ESTABLISHED='+str(sum(line.startswith('ESTAB') for line in peers)))
+            print('CDP_9223_PYTHON_CLIENTS='+str(sum('python' in line for line in peers)))
             PY
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
-            echo ORIGINAL_PRODUCTION_REPO_UNMODIFIED=TRUE
+            echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
