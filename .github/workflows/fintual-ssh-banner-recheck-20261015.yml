@@ -1,35 +1,70 @@
-name: Fintual Oracle SSH recovered unit and resource read-only check
+name: Fintual G7 global SQLite unknown/order crash regression isolated CI
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
-    paths:
-      - .github/workflows/fintual-ssh-banner-recheck-20261015.yml
+    paths: [.github/workflows/fintual-ssh-banner-recheck-20261015.yml]
 permissions:
   contents: read
 jobs:
-  probe:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Bounded SSH read-only original and G5 checks after banner recovery
+      - name: Pinned private G7 branch, isolated clone and suite; no real brokerage
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 60s
+          command_timeout: 3m
           script: |
-            set -eu
-            echo SSH_REMOTE_EXECUTION=PASS
+            set -euo pipefail
+            echo REMOTE_SHELL_READY=TRUE
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            SOURCE_SHA=f3a638fdb6e7c130fceabba94436e6bd7a863efa
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              printf 'UNIT_%s=' "$unit"
-              timeout 8s systemctl is-active "$unit" || true
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo PRECHECK_ORIGINAL_OR_G5_FAILED; exit 21; }
             done
-            printf 'ORIGINAL_SHA='
-            timeout 8s sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD || true
-            free -m | awk 'NR==2 {print "MEMORY_AVAILABLE_MIB="$7}'
-            free -m | awk 'NR==3 {print "SWAP_USED_MIB="$3}'
-            cat /proc/pressure/cpu | head -1
-            cat /proc/pressure/memory | head -1
-            echo READ_ONLY_HEALTH_COMPLETE=TRUE
+            test "$(timeout 8s sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            STAGE="$(mktemp -d /tmp/fintual-g7-cross-process.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
+              timeout 45s git clone --quiet --depth 1 --single-branch --branch fix/g7-global-unknown-restart-fence-20261015 \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
+            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
+              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
+              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
+              --python "$PY" --quiet
+            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 120s "$STAGE/venv/bin/python" -m pytest -q -x \
+              "$STAGE/repo/tests/test_g7_global_unknown_fence.py" \
+              "$STAGE/repo/tests/test_state.py" \
+              "$STAGE/repo/tests/test_orchestrator.py" \
+              "$STAGE/repo/tests/test_reconcile.py" \
+              "$STAGE/repo/tests/test_reconcile_history_bounds.py" \
+              "$STAGE/repo/tests/test_execution.py" \
+              "$STAGE/repo/tests/test_http_broker_end_to_end_mock.py" \
+              "$STAGE/repo/tests/test_http_order_runner_integration.py" \
+              "$STAGE/repo/tests/test_http_broker.py" \
+              "$STAGE/repo/tests/test_http_g7_session_freeze.py"
+            sudo -n "$STAGE/venv/bin/ruff" check \
+              "$STAGE/repo/src/fintual_executor/state.py" \
+              "$STAGE/repo/src/fintual_executor/orchestrator.py" \
+              "$STAGE/repo/tests/test_g7_global_unknown_fence.py"
+            sudo -n "$STAGE/venv/bin/python" -m compileall -q \
+              "$STAGE/repo/src/fintual_executor/state.py" \
+              "$STAGE/repo/src/fintual_executor/orchestrator.py"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo POSTCHECK_ORIGINAL_OR_G5_FAILED; exit 22; }
+            done
+            test "$(timeout 8s sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G7_GLOBAL_ATOMIC_CRASH_AND_ORDER_TESTS=PASS
+            echo G5_SERVICE_ACTIVE_AT_POSTCHECK=TRUE
+            echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
