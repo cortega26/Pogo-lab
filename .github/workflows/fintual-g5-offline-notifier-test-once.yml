@@ -1,0 +1,67 @@
+name: Test G5 notifier failure vs unreachable classifications (offline)
+on:
+  push:
+    branches: [fix/g5-unverified-ssh-watchdog-20261015]
+    paths: [.github/workflows/fintual-g5-offline-notifier-test-once.yml]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute notifier inline script with mocked gh API and no secrets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os, subprocess, types
+          from unittest.mock import patch
+          yaml = Path(".github/workflows/fintual-g5-watchdog.yml").read_text()
+          piece = yaml.split("      - name: Notify owner only on failure or final result", 1)[1]
+          inline = piece.split("        run: |", 1)[1].strip("\n").splitlines()
+          lines = [line[10:] if line.startswith("          ") else line for line in inline]
+          assert lines[0].strip() == "python3 - <<'PY'"
+          assert lines[-1].strip() == "PY"
+          code = "\n".join(lines[1:-1]) + "\n"
+          compile(code, "fintual-g5-notifier-inline", "exec")
+          cases = [
+              ("failure", "", "NO VERIFICABLE", 1),
+              ("success", "G5_STATUS=FAIL\nG5_REASON=SHADOW_SERVICE_NOT_ACTIVE\n", "ALERTA", 1),
+              ("success", "G5_STATUS=PASS\nG5_REASON=REAL_24H_G5_CONFIRMED\n", "PASS", 0),
+              ("success", "G5_STATUS=RUNNING\nG5_REASON=HEALTHY\n", None, 0),
+          ]
+          for outcome, stdout, expected_title, expected_exit in cases:
+              calls = []
+              def fake_run(args, **kwargs):
+                  assert args[:2] == ["gh", "api"], args
+                  calls.append(args)
+                  if any("issues?state=all" in part for part in args):
+                      return types.SimpleNamespace(returncode=0, stdout="[]")
+                  if "-X" in args and "POST" in args:
+                      return types.SimpleNamespace(returncode=0, stdout=json.dumps({"html_url": "https://github.com/placeholder"}))
+                  raise AssertionError(args)
+              environ = {
+                  "PROBE_STDOUT": stdout,
+                  "PROBE_OUTCOME": outcome,
+                  "GH_TOKEN": "TEST_ONLY_FAKE_TOKEN",
+                  "GH_REPO": "cortega26/Pogo-lab",
+                  "GH_RUN": "https://github.com/placeholder/run",
+              }
+              with patch.dict(os.environ, environ), patch.object(subprocess, "run", fake_run):
+                  try:
+                      exec(compile(code, "fintual-g5-notifier-inline", "exec"), {"__name__": "__main__"})
+                      exit_code = 0
+                  except SystemExit as error:
+                      exit_code = int(error.code or 0)
+              assert exit_code == expected_exit, (outcome, exit_code)
+              titles = [arg.split("title=", 1)[1] for call in calls for arg in call if arg.startswith("title=")]
+              if expected_title is None:
+                  assert not titles, (outcome, titles)
+              else:
+                  assert len(titles) == 1 and expected_title in titles[0], (outcome, titles)
+              if outcome == "failure":
+                  assert "NO VERIFICABLE" in titles[0] and "ALERTA" not in titles[0]
+              print("CASE_"+outcome.upper()+"_"+(expected_title or "RUNNING")+"_PASS")
+          print("G5_NOTIFICATION_CLASSIFICATION_TESTS=PASS")
+          PY
