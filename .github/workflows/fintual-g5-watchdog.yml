@@ -73,6 +73,16 @@ jobs:
                     except (ValueError, TypeError, KeyError, OverflowError):
                         continue
 
+            # Systemd transient units disappear after a failed run, but their
+            # historical journal entries remain. A new shadow launch must be
+            # evaluated independently; a past failure cannot contaminate it.
+            latest_boot = next(
+                (t for t, row in reversed(entries) if row.get("phase") == "BOOTSTRAP"),
+                None,
+            )
+            if latest_boot is not None:
+                entries = [(t, row) for t, row in entries if t >= latest_boot]
+
             boot = [row for _, row in entries if row.get("phase") == "BOOTSTRAP" and row.get("ok") is True]
             samples = [
                 (time, row) for time, row in entries
