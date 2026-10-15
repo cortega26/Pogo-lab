@@ -1,0 +1,71 @@
+name: Fintual G8 broker history classification offline and real audit
+on:
+  push:
+    branches: [ci/fintual-g8-history-scope-20261015]
+    paths: [.github/workflows/fintual-g8-history-scope-once.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Offline tests then sanitized real read-only broker history with no orders
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 12m
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            REVIEWED=0aa439a983b37f6926b4b11dd908b77acc6768cb
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active || {
+                echo 'STOP: ORIGINAL_SERVICE_UNAVAILABLE'; exit 11;
+              }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            STAGE="$(mktemp -d /tmp/fintual-history-scope.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY"               git clone --quiet --depth 1 --single-branch --branch main               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$REVIEWED"
+            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache"               UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync               --directory "$STAGE/repo" --frozen --extra dev --extra shadow               --python "$PY" --quiet
+            sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS               PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1               timeout 210s "$STAGE/venv/bin/python" -m pytest -q               "$STAGE/repo/tests/test_g8_history_scope.py"               "$STAGE/repo/tests/test_g8_history.py"               "$STAGE/repo/tests/test_reconcile.py"               "$STAGE/repo/tests/test_reconcile_history_bounds.py"               "$STAGE/repo/tests/test_http_order_ambiguous_recovery.py"
+            sudo -n "$STAGE/venv/bin/ruff" check               "$STAGE/repo/src/fintual_executor/g8_history.py"               "$STAGE/repo/src/fintual_executor/client.py"               "$STAGE/repo/tests/test_g8_history_scope.py"               "$STAGE/repo/tests/test_g8_history.py"
+            sudo -n "$STAGE/venv/bin/python" -m compileall -q               "$STAGE/repo/src/fintual_executor/g8_history.py"               "$STAGE/repo/tests/test_g8_history_scope.py"
+            echo 'HISTORY_CLASSIFICATION_UNIT_TESTS_AND_LINT=PASS'
+            sudo -n chgrp -R fintual "$STAGE"
+            sudo -n chmod 0750 "$STAGE"
+            sudo -n chmod -R g+rX "$STAGE/repo"
+            set +e
+            REPORT="$(sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS               PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1               timeout 90s /opt/fintual-executor/.venv/bin/python -m fintual_executor.g8_history               --config /etc/fintual-executor/config.json               --ledger /var/lib/fintual-executor/state.sqlite3               --page-size 20 --max-pages 15)"
+            CODE=$?
+            set -e
+            test "$CODE" -eq 3 || { echo 'STOP: UNEXPECTED_HISTORY_AUDIT_EXIT'; exit 12; }
+            sudo -n env HISTORY_REPORT="$REPORT" /usr/bin/python3 - <<'PY'
+            import json,os
+            s=json.loads(os.environ["HISTORY_REPORT"])
+            assert s["real_orders_authorized"] is False
+            assert s["broker_history_independently_attested"] is False
+            assert s["chrome_retirement_authorized"] is False
+            print("HISTORY_AUDIT_EXECUTED=TRUE")
+            print("HISTORY_SCAN_COMPLETE=" + str(s.get("offset_traversal_complete")).upper())
+            print("HISTORY_LOCAL_PARITY=" + str(s.get("status")=="BOUNDED_READ_ONLY_LEDGER_PARITY_PASS").upper())
+            print("HISTORY_REASON_CODE=" + str(s.get("error") or "NONE"))
+            print("HISTORY_LEGACY_FILL_EXCEPTION_COUNT=" + str(s.get("broker_legacy_fills_before_bot")))
+            print("HISTORY_IN_PERIOD_MISSING_LOCAL_COUNT=" + str(s.get("broker_fulfilled_without_local_fill")))
+            print("HISTORY_LOCAL_FILL_UNMATCHED_COUNT=" + str(s.get("local_fills_unmatched")))
+            print("HISTORY_OPEN_OR_UNKNOWN_INTENTS_COUNT=" + str(s.get("local_open_intents")))
+            print("G8_INDEPENDENT_SNAPSHOT_ATTESTED=FALSE")
+            PY
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active
+            done
+            echo 'ORIGINAL_PRODUCTION_UNMODIFIED=TRUE'
