@@ -1,4 +1,4 @@
-name: Fintual G7 global SQLite unknown/order crash regression isolated CI
+name: Fintual G5 journal checkpoint and current main immutable source stage
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,11 +6,11 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  stage:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Pinned private G7 branch, isolated clone and suite; no real brokerage
+      - name: Read G5 sanitized journal and stage latest reviewed main; no live cutover
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -20,51 +20,93 @@ jobs:
           command_timeout: 3m
           script: |
             set -euo pipefail
-            echo REMOTE_SHELL_READY=TRUE
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=f3a638fdb6e7c130fceabba94436e6bd7a863efa
-            UV=/home/fintual/.uv-bootstrap/bin/uv
+            TARGET=b2d58bead1a0c77e18888c809d076a4a005c6a0d
+            STAGEDIR=/var/lib/fintual-g8-stage
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo PRECHECK_ORIGINAL_OR_G5_FAILED; exit 21; }
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo PRECHECK_SERVICE_DOWN; exit 21; }
             done
-            test "$(timeout 8s sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            STAGE="$(mktemp -d /tmp/fintual-g7-cross-process.XXXXXXXX)"
-            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            sudo -n timeout 15s /usr/bin/python3 - <<'PY'
+            import json,subprocess,datetime
+            unit="fintual-g5-shadow-20261014.service"
+            result=subprocess.run(["journalctl","-u",unit,"--no-pager","-o","json","--since=2026-10-15 15:00:00 UTC"],capture_output=True,text=True,timeout=12)
+            if result.returncode:
+                print("G5_JOURNAL_READ=FAILED")
+                raise SystemExit(3)
+            records=[]
+            for line in result.stdout.splitlines():
+                try:
+                    row=json.loads(line)
+                    msg=json.loads(row.get("MESSAGE",""))
+                    stamp=int(row["__REALTIME_TIMESTAMP"])/1000000
+                    if isinstance(msg,dict) and msg.get("phase") in {"BOOTSTRAP","HTTP_READS","AUTH_REQUIRED","END"}:
+                        records.append((stamp,msg))
+                except (ValueError,KeyError,TypeError):
+                    continue
+            boots=[i for i,(_,x) in enumerate(records) if x.get("phase")=="BOOTSTRAP"]
+            if not boots:
+                print("G5_NEW_BOOTSTRAP_FOUND=FALSE")
+                raise SystemExit(4)
+            records=records[boots[-1]:]
+            boot_utc=datetime.datetime.fromtimestamp(records[0][0],datetime.timezone.utc)
+            samples=[(t,x) for t,x in records if x.get("phase")=="HTTP_READS" and x.get("ok") is True]
+            failures=[(t,x) for t,x in records if x.get("ok") is False]
+            ended=[(t,x) for t,x in records if x.get("phase")=="END"]
+            age=int(datetime.datetime.now(datetime.timezone.utc).timestamp()-samples[-1][0]) if samples else -1
+            print("G5_NEW_BOOTSTRAP_FOUND=TRUE")
+            print("G5_BOOTSTRAP_UTC="+boot_utc.isoformat())
+            print("G5_SUCCESSFUL_READ_CHECKPOINTS="+str(len(samples)))
+            print("G5_FAILURE_EVENTS="+str(len(failures)))
+            print("G5_LAST_SUCCESS_AGE_SECONDS="+str(age))
+            print("G5_END_OBSERVED="+str(bool(ended)).upper())
+            print("G5_VERDICT="+("RUNNING" if samples and not failures and not ended and 0<=age<2100 else "REVIEW_REQUIRED"))
+            PY
+            WORK="$(mktemp -d /tmp/fintual-g8-main-b2d58-stage.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$WORK"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              timeout 45s git clone --quiet --depth 1 --single-branch --branch fix/g7-global-unknown-restart-fence-20261015 \
-              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
-            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
-            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
-              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
-              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
-              --python "$PY" --quiet
+              timeout 45s git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$WORK/repo"
+            test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$TARGET"
+            sudo -n test -d "$STAGEDIR"
+            if sudo -n test -e "$STAGEDIR/$TARGET.tar" || sudo -n test -e "$STAGEDIR/$TARGET.manifest.json"; then
+              echo IMMUTABLE_SOURCE_ALREADY_STAGED; exit 22
+            fi
             sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
-              timeout 120s "$STAGE/venv/bin/python" -m pytest -q -x \
-              "$STAGE/repo/tests/test_g7_global_unknown_fence.py" \
-              "$STAGE/repo/tests/test_state.py" \
-              "$STAGE/repo/tests/test_orchestrator.py" \
-              "$STAGE/repo/tests/test_reconcile.py" \
-              "$STAGE/repo/tests/test_reconcile_history_bounds.py" \
-              "$STAGE/repo/tests/test_execution.py" \
-              "$STAGE/repo/tests/test_http_broker_end_to_end_mock.py" \
-              "$STAGE/repo/tests/test_http_order_runner_integration.py" \
-              "$STAGE/repo/tests/test_http_broker.py" \
-              "$STAGE/repo/tests/test_http_g7_session_freeze.py"
-            sudo -n "$STAGE/venv/bin/ruff" check \
-              "$STAGE/repo/src/fintual_executor/state.py" \
-              "$STAGE/repo/src/fintual_executor/orchestrator.py" \
-              "$STAGE/repo/tests/test_g7_global_unknown_fence.py"
-            sudo -n "$STAGE/venv/bin/python" -m compileall -q \
-              "$STAGE/repo/src/fintual_executor/state.py" \
-              "$STAGE/repo/src/fintual_executor/orchestrator.py"
+              PYTHONPATH="$WORK/repo/src" "$PY" -m fintual_executor.g8_stage \
+              --checkout "$WORK/repo" --stage-directory "$STAGEDIR" --expected-sha "$TARGET"
+            sudo -n env TARGET="$TARGET" STAGEDIR="$STAGEDIR" /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,stat,tarfile
+            from pathlib import Path
+            sha=os.environ["TARGET"]
+            dir=Path(os.environ["STAGEDIR"])
+            artifact=dir/(sha+".tar")
+            manifest=dir/(sha+".manifest.json")
+            assert stat.S_IMODE(dir.lstat().st_mode)==0o700
+            assert stat.S_IMODE(artifact.lstat().st_mode)==0o600 and not artifact.is_symlink()
+            assert stat.S_IMODE(manifest.lstat().st_mode)==0o600 and not manifest.is_symlink()
+            data=json.loads(manifest.read_text())
+            assert data["git_sha"]==sha and data["production_modified"] is False and data["real_orders_enabled"] is False
+            h=hashlib.sha256()
+            with artifact.open("rb") as file:
+                for b in iter(lambda:file.read(131072),b""):
+                    h.update(b)
+            assert h.hexdigest()==data["archive_sha256"] and artifact.stat().st_size==data["archive_bytes"]>0
+            with tarfile.open(artifact) as file:
+                assert len(file.getmembers())>0
+                for item in file.getmembers():
+                    p=Path(item.name)
+                    assert not p.is_absolute() and ".." not in p.parts
+            print("G8_NEW_MAIN_STAGED_SHA="+sha)
+            print("G8_NEW_MAIN_STAGED_ARCHIVE_SHA256="+h.hexdigest())
+            print("G8_ARCHIVE_CHECKED=TRUE")
+            PY
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo POSTCHECK_ORIGINAL_OR_G5_FAILED; exit 22; }
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo POSTCHECK_SERVICE_DOWN; exit 23; }
             done
-            test "$(timeout 8s sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G7_GLOBAL_ATOMIC_CRASH_AND_ORDER_TESTS=PASS
-            echo G5_SERVICE_ACTIVE_AT_POSTCHECK=TRUE
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G5_READONLY_WITNESS_UNIT_STILL_ACTIVE=TRUE
             echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
