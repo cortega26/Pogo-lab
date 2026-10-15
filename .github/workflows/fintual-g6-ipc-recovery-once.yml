@@ -1,4 +1,4 @@
-name: Fintual G6 crash recovery isolation proof one-shot
+name: Fintual G7 auth revocation safety regression one-shot
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -20,7 +20,7 @@ jobs:
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=27c566b67cc6ac795d8bec1252dfbd6d67d0930b
+            SOURCE_SHA=121d5a7e94334ccde72a27d2e0e181726846fab9
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
@@ -32,7 +32,7 @@ jobs:
             STAGE="$(mktemp -d /tmp/fintual-g6-recovery.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$STAGE"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              git clone --quiet --depth 1 --single-branch --branch feat/g6-ipc-crash-recovery-20261015 \
+              git clone --quiet --depth 1 --single-branch --branch feat/g7-revoke-mutation-auth-20261015 \
               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
             test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
             sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
@@ -45,7 +45,9 @@ jobs:
             sudo -n "$STAGE/venv/bin/ruff" check \
               "$STAGE/repo/src/fintual_executor/session_ipc.py" \
               "$STAGE/repo/tests/test_http_ipc_recovery.py" \
-              "$STAGE/repo/tests/test_http_session_ipc.py"
+              "$STAGE/repo/tests/test_http_session_ipc.py" \
+              "$STAGE/repo/src/fintual_executor/http_broker.py" \
+              "$STAGE/repo/tests/test_http_g7_session_freeze.py"
             sudo -n "$STAGE/venv/bin/python" -m compileall -q \
               "$STAGE/repo/src/fintual_executor/session_ipc.py" \
               "$STAGE/repo/tests/test_http_ipc_recovery.py"
@@ -53,5 +55,5 @@ jobs:
               test "$(systemctl is-active "$unit")" = active || { echo "STOP: PRODUCTION_CHANGED"; exit 12; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo 'G6_CRASH_RECOVERY_TESTS_AND_LINT=PASS'
+            echo 'G7_AUTH_REVOCATION_TESTS_AND_LINT=PASS'
             echo 'ORIGINAL_PRODUCTION_UNMODIFIED=TRUE'
