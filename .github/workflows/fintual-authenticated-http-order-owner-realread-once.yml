@@ -1,0 +1,100 @@
+name: Fintual G6 G7 real authenticated HTTPX owner read-only acceptance
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-authenticated-http-order-owner-realread-once.yml]
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Pinned HTTPX owner real read authenticated, strict mutations disabled; private stage
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 3m
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            SOURCE_SHA=ef50e244f51c3f9c40cb936ed051e61857c20c62
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
+            STAGEDIR=/var/lib/fintual-g8-stage
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$unit")" = active || exit 21
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            STAGE="$(mktemp -d /tmp/fintual-http-order-real-read.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
+              timeout 45s git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
+            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$STAGE/repo/src" "$PY" -m fintual_executor.g8_stage \
+              --checkout "$STAGE/repo" --stage-directory "$STAGEDIR" --expected-sha "$SOURCE_SHA"
+            sudo -n chmod 0700 "$STAGE"
+            sudo -n chown -R fintual:fintual "$STAGE"
+            sudo -n -u fintual nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 "$PY" - <<'PY'
+            from pathlib import Path
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.client import MARKET_INFO_QUERY, ExecutionDisabled
+            from fintual_executor.transient_auth import _preflight, TransientProfileUnavailable
+            # Production browser must be left undisturbed. Test ONLY the fail
+            # closed guard against the presently active profile; never launch it.
+            try:
+                _preflight(Path("/var/lib/fintual-browser/profile"),
+                           Path("/var/lib/fintual-browser/chrome"))
+            except TransientProfileUnavailable:
+                print("G6_LIVE_PROFILE_BUSY_REFUSED=TRUE")
+            else:
+                raise AssertionError("Existing production profile must remain owned by Chrome")
+            with HttpOrderSessionOwner(
+                requested_execution=False, config_execution_enabled=False
+            ) as owner:
+                owner.bootstrap_once()  # one borrowed read-only CDP handoff
+                assert owner._client is not None
+                assert owner._client.execution_enabled is False
+                market=owner.borrow(armed=False).gql("StocksAssetsMarketInfo", MARKET_INFO_QUERY)
+                assert isinstance(market.get("stocksAssetsMarketInfo"), dict)
+                price,timestamp=owner.borrow(armed=False).current_price("NVDA")
+                assert price.is_finite() and price>0 and isinstance(timestamp,str)
+                try:
+                    owner.borrow(armed=True)
+                except ExecutionDisabled:
+                    print("G7_REAL_OWNER_MUTATION_PERMISSION_DISABLED=TRUE")
+                else:
+                    raise AssertionError("Live read-only owner could not enable brokerage mutations")
+                print("G7_REAL_HTTPX_OWNER_GQL_READ=PASS")
+                print("G7_REAL_HTTPX_OWNER_PRICE_READ=PASS")
+                print("G7_REAL_OWNER_COOKIE_DURABLE_STORAGE=FALSE")
+            print("G7_REAL_OWNER_CLOSED=TRUE")
+            PY
+            sudo -n env SOURCE_SHA="$SOURCE_SHA" STAGEDIR="$STAGEDIR" /usr/bin/python3 - <<'PY'
+            import os,json,hashlib,stat
+            from pathlib import Path
+            sha=os.environ["SOURCE_SHA"]
+            root=Path(os.environ["STAGEDIR"])
+            p=root/(sha+".tar")
+            m=root/(sha+".manifest.json")
+            assert stat.S_IMODE(p.stat().st_mode)==0o600
+            obj=json.loads(m.read_text())
+            assert obj["git_sha"]==sha and obj["production_modified"] is False
+            h=hashlib.sha256(p.read_bytes()).hexdigest()
+            assert h==obj["archive_sha256"]
+            print("G8_MAIN_STAGED_SHA="+sha)
+            print("G8_ARCHIVE_SHA256="+h)
+            print("G8_ARCHIVE_VERIFIED=TRUE")
+            PY
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$unit")" = active || exit 22
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G5_ACTIVE_AND_FINANCIAL_PRODUCTION_UNMODIFIED=TRUE
