@@ -149,27 +149,32 @@ jobs:
               return matches[-1] if matches else "UNKNOWN"
 
           outcome = os.environ.get("PROBE_OUTCOME")
-          status = marker("G5_STATUS") if outcome == "success" else "FAIL"
+          # Failure to reach Oracle cannot establish that G5 actually failed.
+          status = marker("G5_STATUS") if outcome == "success" else "UNVERIFIED"
           if status == "RUNNING":
               print("Watch active. No alert necessary.")
               raise SystemExit(0)
-          if status not in ("PASS", "FAIL"):
-              status = "FAIL"
+          if status not in ("PASS", "FAIL", "UNVERIFIED"):
+              status = "UNVERIFIED"
 
           if status == "PASS":
               title = "Fintual G5 PASS — G7/G8 pendientes antes de migrar"
+          elif status == "UNVERIFIED":
+              title = "Fintual G5 NO VERIFICABLE — SSH o monitor inaccesible"
           else:
               title = "Fintual G5 ALERTA — revisar sesión o servicio"
 
           body = (
               f"**Estado:** {status}\n"
-              f"**Causa:** {marker('G5_REASON')}\n"
+              f"**Causa:** {marker('G5_REASON') if outcome == 'success' else 'MONITOR_REMOTE_PROBE_UNAVAILABLE'}\n"
               f"**Checkpoints:** {marker('G5_CHECKPOINTS')}\n"
               f"**Producción original saludable:** {marker('ORIGINAL_PRODUCTION_HEALTHY')}\n"
               f"**Evidencia:** {os.environ['GH_RUN']}\n\n"
               "Esta automatización NO inicia/detiene Chrome, NO cambia órdenes "
               "ni activa HTTPX para dinero real. Si G5 pasó, G7 y G8 permanecen "
-              "pendientes y no se autoriza cutover automático."
+              "pendientes y no se autoriza cutover automático. Si el "
+              "monitor no pudo conectar, eso NO demuestra una falla de "
+              "G5 ni de la producción financiera."
           )
           repo = os.environ["GH_REPO"]
           def gh(*args):
@@ -193,9 +198,9 @@ jobs:
               "-f", "assignees[]=cortega26",
           )
           print("Owner notification created: " + report["html_url"])
-          if status == "FAIL":
-              # One distinct failed Actions run can also trigger GitHub's
-              # workflow-failure email, if enabled in owner preferences.
-              # Later hourly checks see the issue and exit 0 (no alert storm).
+          if status in ("FAIL", "UNVERIFIED"):
+              # A watch failure or blind remote probe can trigger the
+              # workflow-failure email. Never modify financial operations.
+              # Existing issues prevent duplicate notification storms.
               raise SystemExit(1)
           PY
