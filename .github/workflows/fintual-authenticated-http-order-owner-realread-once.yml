@@ -23,6 +23,7 @@ jobs:
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
             SOURCE_SHA=ef50e244f51c3f9c40cb936ed051e61857c20c62
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            UV=/home/fintual/.uv-bootstrap/bin/uv
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             STAGEDIR=/var/lib/fintual-g8-stage
@@ -39,10 +40,16 @@ jobs:
             sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
               PYTHONPATH="$STAGE/repo/src" "$PY" -m fintual_executor.g8_stage \
               --checkout "$STAGE/repo" --stage-directory "$STAGEDIR" --expected-sha "$SOURCE_SHA"
+            # The base live Python runtime intentionally lacks optional httpx.
+            # Resolve frozen shadow dependencies exclusively in disposable /tmp.
+            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
+              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
+              --directory "$STAGE/repo" --frozen --extra shadow \
+              --python "$PY" --quiet
             sudo -n chmod 0700 "$STAGE"
             sudo -n chown -R fintual:fintual "$STAGE"
             sudo -n -u fintual nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 "$PY" - <<'PY'
+              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 "$STAGE/venv/bin/python" - <<'PY'
             from pathlib import Path
             from fintual_executor.order_session import HttpOrderSessionOwner
             from fintual_executor.client import MARKET_INFO_QUERY, ExecutionDisabled
