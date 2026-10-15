@@ -1,0 +1,46 @@
+name: Fintual Oracle SSH banner check one-shot (no authentication)
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths:
+      - .github/workflows/fintual-ssh-banner-recheck-20261015.yml
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Test only TCP and SSH banner, no login and no service changes
+        env:
+          TARGET: ${{ secrets.OCI_HOST }}
+        run: |
+          python3 - <<'PY'
+          import os, socket, time, sys
+          target=os.environ.get("TARGET","")
+          if not target:
+              print("OCI_HOST=UNSET");sys.exit(3)
+          try:
+              entries=socket.getaddrinfo(target,22,type=socket.SOCK_STREAM)
+              print("DNS=PASS")
+          except OSError as error:
+              print("DNS=FAIL",type(error).__name__);sys.exit(4)
+          for timeout in (5,20):
+              family,kind,proto,_,addr=entries[0]
+              started=time.monotonic()
+              try:
+                  with socket.socket(family,kind,proto) as s:
+                      s.settimeout(timeout)
+                      s.connect(addr)
+                      print("TCP22=OPEN;BANNER_TIMEOUT_SECONDS="+str(timeout),flush=True)
+                      msg=s.recv(256)
+                      if msg.startswith(b"SSH-2.0-"):
+                          print("SSH_BANNER=PASS")
+                          print("SSH_BANNER_RESPONSE_SECONDS="+str(round(time.monotonic()-started,2)))
+                          sys.exit(0)
+                      print("SSH_BANNER=NON_SSH_PAYLOAD")
+              except OSError as e:
+                  print("SSH_BANNER=ERROR;TIMEOUT_SECONDS="+str(timeout)+";ERROR="+type(e).__name__)
+          print("NO_REMOTE_COMMANDS_EXECUTED=TRUE")
+          sys.exit(5)
+          PY
