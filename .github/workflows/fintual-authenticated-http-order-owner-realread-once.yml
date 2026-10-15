@@ -37,9 +37,13 @@ jobs:
               timeout 45s git clone --quiet --depth 1 --single-branch --branch main \
               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
             test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" "$PY" -m fintual_executor.g8_stage \
-              --checkout "$STAGE/repo" --stage-directory "$STAGEDIR" --expected-sha "$SOURCE_SHA"
+            if sudo -n test -e "$STAGEDIR/$SOURCE_SHA.tar"; then
+              echo IMMUTABLE_SOURCE_ALREADY_STAGED=TRUE
+            else
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$STAGE/repo/src" "$PY" -m fintual_executor.g8_stage \
+                --checkout "$STAGE/repo" --stage-directory "$STAGEDIR" --expected-sha "$SOURCE_SHA"
+            fi
             # The base live Python runtime intentionally lacks optional httpx.
             # Resolve frozen shadow dependencies exclusively in disposable /tmp.
             sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
