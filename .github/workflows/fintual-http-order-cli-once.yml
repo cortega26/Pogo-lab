@@ -1,4 +1,4 @@
-name: Fintual G7 opt-in HTTP order runner offline integration tests
+name: Fintual G6 transient Chrome bootstrap offline integration tests
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Pinned G7 integration, order mock, auth latches and 24h G5 health
+      - name: Pinned G6 transient profile checks and G7 order mocks with original G5 health
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -21,7 +21,7 @@ jobs:
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=4466e748212b224ba94073000a345120dbfd01cf
+            SOURCE_SHA=86f0b20b1226b56b6cc00a423b0d15010e2cc4fe
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
@@ -33,7 +33,7 @@ jobs:
             STAGE="$(mktemp -d /tmp/fintual-http-order-cli.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$STAGE"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              timeout 45s git clone --quiet --depth 1 --single-branch --branch feat/http-order-runner-optin-20261015 \
+              timeout 45s git clone --quiet --depth 1 --single-branch --branch feat/g6-transient-chrome-profile-bootstrap-20261015 \
               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
             test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
             sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
@@ -43,6 +43,7 @@ jobs:
             sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
               PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
               timeout 135s "$STAGE/venv/bin/python" -m pytest -q -x \
+              "$STAGE/repo/tests/test_g6_transient_auth.py" \
               "$STAGE/repo/tests/test_http_order_runner_cli.py" \
               "$STAGE/repo/tests/test_http_order_runner_integration.py" \
               "$STAGE/repo/tests/test_http_order_session_owner.py" \
@@ -57,6 +58,8 @@ jobs:
               "$STAGE/repo/tests/test_orchestrator.py" \
               "$STAGE/repo/tests/test_reconcile.py"
             sudo -n "$STAGE/venv/bin/ruff" check \
+              "$STAGE/repo/src/fintual_executor/transient_auth.py" \
+              "$STAGE/repo/tests/test_g6_transient_auth.py" \
               "$STAGE/repo/src/fintual_executor/runner.py" \
               "$STAGE/repo/tests/test_http_order_runner_cli.py"
             sudo -n "$STAGE/venv/bin/python" -m compileall -q \
@@ -66,5 +69,5 @@ jobs:
               test "$(timeout 8s systemctl is-active "$unit")" = active || exit 22
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G7_HTTP_ORDER_RUNNER_CLI=PASS
+            echo G6_TRANSIENT_AUTH_PROFILE_OFFLINE=PASS
             echo G5_PRODUCTION_UNCHANGED=TRUE
