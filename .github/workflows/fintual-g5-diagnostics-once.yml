@@ -1,0 +1,56 @@
+name: Fintual G5 sanitized transport classification tests
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g5-diagnostics-once.yml]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Unit-test G5 fail-closed transport classification offline
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 7m
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            STAGE="$(mktemp -d /tmp/fintual-g5-fail-closed.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
+              git clone --quiet --depth 1 --single-branch --branch fix/g5-transport-failure-diagnostics-20261015 \
+              git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "bc004dd585aaa3f9fa2439e4811774f73cfd49be"
+            sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
+              UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
+              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
+              --python "$PY" --quiet
+            sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 180s "$STAGE/venv/bin/python" -m pytest -q -x \
+              "$STAGE/repo/tests/test_shadow_longrun_certification.py" \
+              "$STAGE/repo/tests/test_shadow_http.py" \
+              "$STAGE/repo/tests/test_shadow_cookie_expiry.py"
+            sudo -n "$STAGE/venv/bin/ruff" check \
+              "$STAGE/repo/src/fintual_executor/shadow_longrun.py" \
+              "$STAGE/repo/tests/test_shadow_longrun_certification.py"
+            sudo -n "$STAGE/venv/bin/python" -m compileall -q "$STAGE/repo/src/fintual_executor/shadow_longrun.py"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G5_SAFE_DIAGNOSTIC_TESTS=PASS
+            echo ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
