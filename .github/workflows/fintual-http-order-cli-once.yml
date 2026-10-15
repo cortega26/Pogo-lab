@@ -21,7 +21,7 @@ jobs:
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=86f0b20b1226b56b6cc00a423b0d15010e2cc4fe
+            SOURCE_SHA=9ec6a9323dbb5981e234009c2102920a1eeb7ad3
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
@@ -69,5 +69,5 @@ jobs:
               test "$(timeout 8s systemctl is-active "$unit")" = active || exit 22
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G6_TRANSIENT_AUTH_PROFILE_OFFLINE=PASS
+            echo G6_TRANSIENT_AUTH_PROFILE_POSTCHECK_AND_CLI=PASS
             echo G5_PRODUCTION_UNCHANGED=TRUE
