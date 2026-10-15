@@ -1,4 +1,4 @@
-name: Fintual Oracle read-only swap and process pressure inventory
+name: Fintual identify secondary Chrome service owner read-only
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Inventory process RAM and potential stale CI workers only
+      - name: Classify two Chrome process families by service and CDP ports
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -19,29 +19,34 @@ jobs:
           command_timeout: 4m
           script: |
             set -euo pipefail
-            echo PROCESSES_TOP_BY_RSS_KB
-            ps -eo pid,ppid,rss,etimes,comm --sort=-rss | head -n 30 || true
-            echo CPU_COUNT
-            nproc
-            echo SWAP_DEVICE
-            cat /proc/swaps
-            echo ROOT_FS
-            df -h / | tail -n 1
-            echo STALE_CI_PROCESS_MATCHES
             /usr/bin/python3 - <<'PY'
-            import os
-            for pid in sorted((x for x in os.listdir('/proc') if x.isdecimal()),key=int):
+            import os,re,subprocess
+            for unit in ('fintual-browser.service','fintual-executor.service','fintual-xvfb.service',
+                         'fintual-novnc.service','fintual-g5-shadow-20261014.service'):
+                p=subprocess.run(['systemctl','show',unit,'--property=MainPID','--value'],
+                                  capture_output=True,text=True,timeout=10)
+                print('UNIT_MAIN_PID_'+unit.split('.')[0].replace('-','_').upper()+'='+p.stdout.strip())
+            for pid in (923992,924006,1197864,1197876,1212662,977489,995058):
+                root='/proc/'+str(pid)
                 try:
-                    with open('/proc/'+pid+'/cmdline','rb') as f:
-                        cmd=f.read(4000).replace(b'\\x00',b' ').decode('utf-8','ignore')
-                    if any(tag in cmd for tag in ('fintual-g6-recovery.', 'fintual-g5-fail-closed.', '/tmp/fintual-')):
-                        with open('/proc/'+pid+'/status') as f:
-                            vals={k:v for k,v in (line.split(':',1) for line in f if ':' in line)}
-                        print('CI_PID='+pid+' UID='+vals.get('Uid','').split()[0]+
-                              ' RSS='+vals.get('VmRSS','unknown').strip()+
-                              ' PPID='+vals.get('PPid','').strip())
-                except (FileNotFoundError,PermissionError,OSError,ValueError):
-                    continue
+                    def read(name,mode='r'):
+                        with open(root+'/'+name,mode) as f: return f.read()
+                    status=read('status')
+                    uid=re.search(r'^Uid:\s*([0-9]+)',status,re.M)
+                    cgroup=read('cgroup')
+                    with open(root+'/cmdline','rb') as f:
+                        args=[t.decode('utf-8','ignore') for t in f.read(16000).split(b'\0') if t]
+                    port=next((x.split('=',1)[1] for x in args if x.startswith('--remote-debugging-port=')), 'NONE')
+                    port=port if port.isdecimal() else 'NONE'
+                    profile=next((x.split('=',1)[1] for x in args if x.startswith('--user-data-dir=')), '')
+                    profile_family='PRODUCTION' if '/var/lib/fintual' in profile else (
+                        'TMP' if profile.startswith('/tmp/') else 'OTHER_OR_UNSET')
+                    found=re.findall(r'([a-z0-9_-]+\.service)',cgroup)
+                    service=found[-1] if found else ('USER_SESSION' if 'user.slice' in cgroup else 'UNKNOWN')
+                    print('PID='+str(pid)+' UID='+(uid.group(1) if uid else '?')+
+                          ' SERVICE='+service+' CDP_PORT='+port+' PROFILE_FAMILY='+profile_family)
+                except (OSError,TypeError):
+                    print('PID='+str(pid)+'=GONE')
             PY
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
-            echo PRODUCTION_ORIGINAL_SHA_UNMODIFIED=TRUE
+            echo ORIGINAL_PRODUCTION_REPO_UNMODIFIED=TRUE
