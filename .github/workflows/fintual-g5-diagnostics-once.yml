@@ -1,4 +1,4 @@
-name: Fintual G5 active witness and Oracle resource read-only verification
+name: Fintual Oracle read-only swap and process pressure inventory
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,54 +6,42 @@ on:
 permissions:
   contents: read
 jobs:
-  probe:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
-      - name: Verify original and new G5 process without modifying services
+      - name: Inventory process RAM and potential stale CI workers only
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          command_timeout: 6m
+          command_timeout: 4m
           script: |
             set -euo pipefail
-            for x in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              printf 'ACTIVE_%s=' "$x"
-              timeout 35s systemctl is-active "$x" || true
-            done
-            echo UPTIME_AND_LOAD
-            timeout 20s uptime || true
-            echo MEMORY
-            timeout 20s free -m || true
-            echo CPU_PRESSURE
-            timeout 20s cat /proc/pressure/cpu || true
-            echo MEMORY_PRESSURE
-            timeout 20s cat /proc/pressure/memory || true
-            echo IO_PRESSURE
-            timeout 20s cat /proc/pressure/io || true
-            echo NEW_SHADOW_LAST_EVENTS
+            echo PROCESSES_TOP_BY_RSS_KB
+            ps -eo pid,ppid,rss,etimes,comm --sort=-rss | head -n 30 || true
+            echo CPU_COUNT
+            nproc
+            echo SWAP_DEVICE
+            cat /proc/swaps
+            echo ROOT_FS
+            df -h / | tail -n 1
+            echo STALE_CI_PROCESS_MATCHES
             /usr/bin/python3 - <<'PY'
-            import subprocess,json
-            try:
-                p=subprocess.run(
-                    ['journalctl','-u','fintual-g5-shadow-20261014.service','-n','20',
-                     '--since=2026-10-15 15:15:00 UTC','-o','cat','--no-pager'],
-                    capture_output=True,text=True,timeout=55
-                )
-                rows=[]
-                for line in p.stdout.splitlines():
-                    try:
-                        x=json.loads(line)
-                        if x.get('phase') in ('BOOTSTRAP','HTTP_READS','AUTH_REQUIRED','END'):
-                            rows.append({k:x.get(k) for k in ('phase','ok','checkpoint','state','failure_kind')})
-                    except (ValueError,TypeError):
-                        pass
-                print('JOURNAL_RC='+str(p.returncode))
-                print('SAFE_EVENTS='+json.dumps(rows[-6:]))
-            except subprocess.TimeoutExpired:
-                print('JOURNAL_TIMEOUT=TRUE')
+            import os
+            for pid in sorted((x for x in os.listdir('/proc') if x.isdecimal()),key=int):
+                try:
+                    with open('/proc/'+pid+'/cmdline','rb') as f:
+                        cmd=f.read(4000).replace(b'\\x00',b' ').decode('utf-8','ignore')
+                    if any(tag in cmd for tag in ('fintual-g6-recovery.', 'fintual-g5-fail-closed.', '/tmp/fintual-')):
+                        with open('/proc/'+pid+'/status') as f:
+                            vals={k:v for k,v in (line.split(':',1) for line in f if ':' in line)}
+                        print('CI_PID='+pid+' UID='+vals.get('Uid','').split()[0]+
+                              ' RSS='+vals.get('VmRSS','unknown').strip()+
+                              ' PPID='+vals.get('PPid','').strip())
+                except (FileNotFoundError,PermissionError,OSError,ValueError):
+                    continue
             PY
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
-            echo ORIGINAL_PRODUCTION_REPO_UNMODIFIED=TRUE
+            echo PRODUCTION_ORIGINAL_SHA_UNMODIFIED=TRUE
