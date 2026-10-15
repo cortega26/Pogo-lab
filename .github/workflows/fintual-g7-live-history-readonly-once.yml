@@ -37,7 +37,7 @@ jobs:
             sudo -n chmod 0750 "$STAGE"
             sudo -n chmod -R g+rX "$STAGE/repo"
             set +e
-            REPORT="$(sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS               PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1               timeout 90s /opt/fintual-executor/.venv/bin/python -m fintual_executor.g8_history               --config /etc/fintual-executor/config.json               --ledger /var/lib/fintual-executor/state.sqlite3               --page-size 10 --max-pages 8)"
+            REPORT="$(sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS               PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1               timeout 90s /opt/fintual-executor/.venv/bin/python -m fintual_executor.g8_history               --config /etc/fintual-executor/config.json               --ledger /var/lib/fintual-executor/state.sqlite3               --page-size 20 --max-pages 15)"
             RETURN_CODE=$?
             set -e
             test "$RETURN_CODE" = 3 || {
