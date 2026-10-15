@@ -33,7 +33,7 @@ jobs:
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
               git clone --quiet --depth 1 --single-branch --branch fix/g5-transport-failure-diagnostics-20261015 \
               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
-            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "bc004dd585aaa3f9fa2439e4811774f73cfd49be"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "d80ce8563d95ab5166dbc2cfd414b5deb8a47bd5"
             sudo -n env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/cache" \
               UV_PROJECT_ENVIRONMENT="$STAGE/venv" "$UV" sync \
               --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
