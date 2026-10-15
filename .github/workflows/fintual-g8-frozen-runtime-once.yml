@@ -1,4 +1,4 @@
-name: Fintual G8 frozen HTTPX runtime acceptance (isolated)
+name: Fintual G8 canonical independent HTTPX runtime production pre-stage (NO CUTOVER)
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -8,72 +8,83 @@ permissions:
 jobs:
   stage:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: Test immutable real frozen HTTPX runtime in throwaway Oracle path
+      - name: Build root-owned SHA-pinned HTTPX shadow runtime separately, check service user
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 3m
+          command_timeout: 4m
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SOURCE_SHA=fef679064af04ca7ed858d27ae6b785ce3f3f6e9
+            SOURCE_SHA=dfc0a9827a17a66ca4c8e8b1fecc658ce603676d
             UV=/home/fintual/.uv-bootstrap/bin/uv
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
+            STAGEDIR=/var/lib/fintual-g8-stage
+            RELEASES=/opt/fintual-httpx-releases
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo G5_ORIGINAL_PRECHECK_FAILED; exit 21; }
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo PRODUCTION_OR_G5_NOT_ACTIVE; exit 21; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            STAGE="$(mktemp -d /tmp/fintual-g8-frozen-release.XXXXXXXX)"
+            test "$(df -Pk /opt | awk 'NR==2 {print $4}')" -gt 524288 || { echo INSUFFICIENT_FREE_DISK_FOR_STAGING; exit 23; }
+            ALIAS_BEFORE="$(sudo -n readlink /opt/fintual-httpx-current || true)"
+            STAGE="$(mktemp -d /tmp/fintual-g8-canonical-runtime.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$STAGE"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              timeout 40s git clone --quiet --depth 1 --single-branch --branch fix/g8-independent-frozen-httpx-runtime-20261015 \
+              timeout 40s git clone --quiet --depth 1 --single-branch --branch main \
               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
             test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$SOURCE_SHA"
-            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$STAGE/test-cache" \
-              UV_PROJECT_ENVIRONMENT="$STAGE/testvenv" "$UV" sync \
-              --directory "$STAGE/repo" --frozen --extra dev --extra shadow \
-              --python "$PY" --quiet
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1 \
-              timeout 70s "$STAGE/testvenv/bin/python" -m pytest -q -x \
-              "$STAGE/repo/tests/test_g8_httpx_runtime.py" \
-              "$STAGE/repo/tests/test_g8_stage.py" \
-              "$STAGE/repo/tests/test_g8_rehearsal.py" \
-              "$STAGE/repo/tests/test_http_order_runner_cli.py" \
-              "$STAGE/repo/tests/test_g6_transient_auth.py"
-            sudo -n "$STAGE/testvenv/bin/ruff" check \
-              "$STAGE/repo/src/fintual_executor/g8_httpx_runtime.py" \
-              "$STAGE/repo/tests/test_g8_httpx_runtime.py"
-            sudo -n env STAGE="$STAGE" /usr/bin/python3 - <<'PY'
-            import os
+            sudo -n test -d "$STAGEDIR"
+            if sudo -n test -e "$STAGEDIR/$SOURCE_SHA.tar"; then
+              echo EXISTING_CANONICAL_SOURCE_ARCHIVE=TRUE
+            else
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$STAGE/repo/src" "$PY" -m fintual_executor.g8_stage \
+                --checkout "$STAGE/repo" --stage-directory "$STAGEDIR" --expected-sha "$SOURCE_SHA"
+            fi
+            sudo -n install -d -m 0755 -o root -g root "$RELEASES"
+            if sudo -n test -e "$RELEASES/$SOURCE_SHA/HTTPX_RUNTIME_READY.json"; then
+              echo EXISTING_CANONICAL_RUNTIME_READY=TRUE
+            else
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$STAGE/repo/src" timeout 150s "$PY" -m fintual_executor.g8_httpx_runtime \
+                --stage-dir "$STAGEDIR" --release-root "$RELEASES" \
+                --source-sha "$SOURCE_SHA" --uv "$UV" --base-python "$PY"
+            fi
+            sudo -n env SOURCE_SHA="$SOURCE_SHA" STAGEDIR="$STAGEDIR" RELEASES="$RELEASES" /usr/bin/python3 - <<'PY'
+            import json,os,hashlib,stat
             from pathlib import Path
-            root=Path(os.environ["STAGE"])
-            private=root/"private-artifacts"
-            private.mkdir(mode=0o700)
-            private.chmod(0o700)
-            release=root/"release-root"
-            release.mkdir(mode=0o755)
-            release.chmod(0o755)
+            sha=os.environ["SOURCE_SHA"]
+            root=Path(os.environ["STAGEDIR"])
+            rel=Path(os.environ["RELEASES"])/sha
+            manifest=json.loads((root/(sha+".manifest.json")).read_text())
+            ready=json.loads((rel/"HTTPX_RUNTIME_READY.json").read_text())
+            h=hashlib.sha256()
+            with (root/(sha+".tar")).open("rb") as input:
+                for block in iter(lambda:input.read(131072),b""):
+                    h.update(block)
+            assert h.hexdigest()==ready["source_archive_sha256"]==manifest["archive_sha256"]
+            assert ready["source_sha"]==sha and ready["runtime_imports_verified"] is True
+            assert ready["production_modified"] is False and ready["services_modified"] is False
+            assert ready["current_alias_modified"] is False
+            assert stat.S_IMODE(rel.stat().st_mode)==0o755 and rel.stat().st_uid==0
+            print("G8_CANONICAL_RUNTIME_SHA="+sha)
+            print("G8_CANONICAL_RUNTIME_ARCHIVE_SHA256="+h.hexdigest())
+            print("G8_FROZEN_RUNTIME_MANIFEST_INTEGRITY=PASS")
             PY
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" "$PY" -m fintual_executor.g8_stage \
-              --checkout "$STAGE/repo" --stage-directory "$STAGE/private-artifacts" --expected-sha "$SOURCE_SHA"
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$STAGE/repo/src" timeout 95s "$PY" -m fintual_executor.g8_httpx_runtime \
-              --stage-dir "$STAGE/private-artifacts" --release-root "$STAGE/release-root" \
-              --source-sha "$SOURCE_SHA" --uv "$UV" --base-python "$PY"
-            sudo -n test -x "$STAGE/release-root/$SOURCE_SHA/.venv/bin/python"
-            sudo -n test -f "$STAGE/release-root/$SOURCE_SHA/HTTPX_RUNTIME_READY.json"
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$RELEASES/$SOURCE_SHA/src" "$RELEASES/$SOURCE_SHA/.venv/bin/python" -c \
+              'import httpx,playwright.sync_api;from fintual_executor import runner,order_session,transient_auth;print("G8_FINTUAL_USER_IMPORT_AND_HTTPX_RUNTIME=PASS")'
+            test "$(sudo -n readlink /opt/fintual-httpx-current || true)" = "$ALIAS_BEFORE"
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo G5_ORIGINAL_POSTCHECK_FAILED; exit 22; }
+              test "$(timeout 8s systemctl is-active "$unit")" = active || { echo G5_OR_PRODUCTION_CHANGED; exit 22; }
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G8_FROZEN_SHADOW_RUNTIME_BUILD=PASS
-            echo ORIGINAL_AND_G5_UNMODIFIED=TRUE
+            echo G8_CANONICAL_RUNTIME_STAGED_NO_CUTOVER=PASS
+            echo PRODUCTION_AND_G5_UNMODIFIED=TRUE
