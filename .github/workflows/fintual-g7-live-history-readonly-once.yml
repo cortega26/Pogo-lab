@@ -1,0 +1,65 @@
+name: Fintual G7 paginated broker history authentic read-only inspection
+on:
+  push:
+    branches: [ci/fintual-g7-history-audit-20261015]
+    paths: [.github/workflows/fintual-g7-live-history-readonly-once.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Broker historical pagination audit, credentials unchanged and NO order capability
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            REVIEWED=ab1c86711cc660c66723de991863da54d464e874
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active || {
+                echo 'STOP: ORIGINAL_SERVICE_UNAVAILABLE'; exit 11;
+              }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            STAGE="$(mktemp -d /tmp/fintual-g7-realhistory.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$STAGE"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY"               git clone --quiet --depth 1 --single-branch --branch main               git@github.com:cortega26/fintual-executor.git "$STAGE/repo"
+            test "$(sudo -n git -C "$STAGE/repo" rev-parse HEAD)" = "$REVIEWED"
+            sudo -n chgrp -R fintual "$STAGE"
+            sudo -n chmod 0750 "$STAGE"
+            sudo -n chmod -R g+rX "$STAGE/repo"
+            set +e
+            REPORT="$(sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS               PYTHONPATH="$STAGE/repo/src" PYTHONDONTWRITEBYTECODE=1               timeout 90s /opt/fintual-executor/.venv/bin/python -m fintual_executor.g8_history               --config /etc/fintual-executor/config.json               --ledger /var/lib/fintual-executor/state.sqlite3               --page-size 10 --max-pages 8)"
+            RETURN_CODE=$?
+            set -e
+            test "$RETURN_CODE" = 3 || {
+              echo 'STOP: HISTORY_AUDIT_UNEXPECTED_EXIT'; exit 12;
+            }
+            sudo -n env HISTORY_REPORT="$REPORT" python3 - <<'PY'
+            import json,os
+            data=json.loads(os.environ['HISTORY_REPORT'])
+            if data.get('real_orders_authorized') is not False:
+                raise SystemExit('STOP: REAL_ORDERS_GATE_BROKEN')
+            if data.get('broker_history_independently_attested') is not False:
+                raise SystemExit('STOP: NON_ATOMIC_HISTORY_FALSE_CERTIFICATION')
+            print('READ_ONLY_HISTORY_AUDIT_VALIDATED=TRUE')
+            print('HISTORY_LEDGER_LOCAL_PARITY=' + str(data.get('status') == 'BOUNDED_READ_ONLY_LEDGER_PARITY_PASS').upper())
+            print('HISTORY_OFFSET_TRAVERSAL_COMPLETE=' + str(data.get('offset_traversal_complete')).upper())
+            # Error is an audited neutral reason code only, never broker details.
+            print('HISTORY_REASON_CODE=' + str(data.get('error') or 'NONE'))
+            print('INDEPENDENT_BROKER_SNAPSHOT_CERTIFIED=FALSE')
+            print('G7_REAL_HTTP_ORDERS_ENABLED=FALSE')
+            PY
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(systemctl is-active "$unit")" = active
+            done
+            echo 'ORIGINAL_EXECUTOR_BROWSER_AND_LEDGER_UNMODIFIED_BY_AUDIT=TRUE'
