@@ -39,7 +39,11 @@ jobs:
             }
             assert_old
             test ! -e "$ACK"
-            test ! -e "$ALIAS" && test ! -L "$ALIAS"
+            if test -L "$ALIAS"; then
+              test "$(sudo -n readlink "$ALIAS")" = "$ROOT"
+            else
+              test ! -e "$ALIAS"
+            fi
             sudo -n test -f "$ROOT/HTTPX_RUNTIME_READY.json"
             sudo -n cmp -s "$UNITFILE" "$UNITS/original-fintual-executor.service"
             sudo -n env SOURCE="$SOURCE" ROOT="$ROOT" /usr/bin/python3 - <<'PY'
@@ -161,7 +165,10 @@ jobs:
             sudo -n timeout 25s systemctl disable --now fintual-browser.service
             test "$(timeout 8s systemctl is-active fintual-browser.service)" = inactive
             test "$(systemctl is-enabled fintual-browser.service)" = disabled
-            sudo -n ln -s "$ROOT" "$ALIAS"
+            if ! test -L "$ALIAS"; then
+              sudo -n ln -s "$ROOT" "$ALIAS"
+            fi
+            test "$(sudo -n readlink "$ALIAS")" = "$ROOT"
             sudo -n install -o root -g root -m 0600 \
               "$ROOT/deploy/oracle/fintual-httpx-order.env.example" "$ACK"
             sudo -n install -o root -g root -m 0644 \
@@ -187,7 +194,7 @@ jobs:
                 if not pid.name.isdigit():continue
                 try:raw=(pid/"cmdline").read_bytes()
                 except (PermissionError,OSError):continue
-                parts=raw.split(b"\\0")
+                parts=raw.split(bytes([0]))
                 if parts and (b"chrome" in parts[0].lower() or b"chromium" in parts[0].lower()):
                     assert b"--user-data-dir=/var/lib/fintual-browser/profile" not in raw, "Resident Fintual Chrome still alive"
             profile=Path("/var/lib/fintual-browser/profile")
