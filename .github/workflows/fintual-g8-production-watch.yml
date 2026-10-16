@@ -1,0 +1,156 @@
+name: Fintual G8 live HTTPX production watch (hourly)
+on:
+  schedule:
+    - cron: "12 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: fintual-g8-production-watch
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify active single-writer HTTPX, retired Chrome and ledger, read only
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 100s
+          capture_stdout: true
+          script: |
+            /usr/bin/python3 - <<'PY'
+            import json,os,sqlite3,stat,subprocess
+            from pathlib import Path
+            SHA="e922e0d153f32c8319bc4ec8b9165f39c7dfeac8"
+            def run(*cmd):
+                p=subprocess.run(cmd,capture_output=True,text=True,timeout=12)
+                return p.stdout.strip() if p.returncode==0 else ""
+            units={
+                "executor_active":run("systemctl","is-active","fintual-executor.service")=="active",
+                "executor_enabled":run("systemctl","is-enabled","fintual-executor.service")=="enabled",
+                "browser_inactive":run("systemctl","is-active","fintual-browser.service")=="inactive",
+                "browser_disabled":run("systemctl","is-enabled","fintual-browser.service")=="disabled",
+                "xvfb_active":run("systemctl","is-active","fintual-xvfb.service")=="active",
+            }
+            pid_text=run("systemctl","show","-P","MainPID","fintual-executor.service")
+            try:pid=int(pid_text)
+            except ValueError:pid=0
+            proc=Path("/proc")/str(pid)
+            argv=[]
+            if pid>0 and proc.exists():
+                try:argv=(proc/"cmdline").read_bytes().split(bytes([0]))
+                except OSError:pass
+            is_httpx=(
+                b"fintual_executor.runner" in argv
+                and b"--broker-transport" in argv
+                and b"http-order" in argv
+                and b"--auth-bootstrap" in argv
+                and b"transient-profile" in argv
+            )
+            alias=Path("/opt/fintual-httpx-current")
+            release_ok=False
+            try:
+                ready=json.loads((alias/"HTTPX_RUNTIME_READY.json").read_text())
+                release_ok=alias.is_symlink() and alias.resolve()==Path("/opt/fintual-httpx-releases")/SHA and ready.get("source_sha")==SHA and ready.get("runtime_imports_verified") is True
+            except (OSError,ValueError,KeyError):pass
+            chrome=0
+            for task in Path("/proc").iterdir():
+                if not task.name.isdecimal():continue
+                try:raw=(task/"cmdline").read_bytes()
+                except (OSError,PermissionError):continue
+                parts=raw.split(bytes([0]))
+                if not parts or not parts[0]:continue
+                name=Path(os.fsdecode(parts[0])).name.lower()
+                if ("chrome" in name or "chromium" in name) and b"--user-data-dir=/var/lib/fintual-browser/profile" in parts:
+                    chrome+=1
+            # Do not accidentally classify the few seconds of expected
+            # transient browser bootstrap as a permanently resident Chrome.
+            if chrome:
+                import time
+                time.sleep(6)
+                chrome=0
+                for task in Path("/proc").iterdir():
+                    if not task.name.isdecimal():continue
+                    try:raw=(task/"cmdline").read_bytes()
+                    except (OSError,PermissionError):continue
+                    parts=raw.split(bytes([0]))
+                    if parts and parts[0] and (b"chrome" in parts[0].lower() or b"chromium" in parts[0].lower()) and b"--user-data-dir=/var/lib/fintual-browser/profile" in parts:
+                        chrome+=1
+            fills=0
+            unknown=-1
+            integrity=False
+            try:
+                db=Path("/var/lib/fintual-executor/state.sqlite3")
+                conn=sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=6)
+                try:
+                    conn.execute("PRAGMA query_only=ON")
+                    integrity=conn.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                    unknown=conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]
+                    fills=conn.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                finally:conn.close()
+            except sqlite3.Error:pass
+            mem=int(next(row.split()[1] for row in Path("/proc/meminfo").read_text().splitlines() if row.startswith("MemAvailable:")))
+            signals={
+                **units,"httpx_process":is_httpx,"release_exact":release_ok,
+                "no_resident_chrome":chrome==0,"ledger_integrity":integrity,
+                "no_uncertain_orders":unknown==0,
+            }
+            print("G8_STATUS="+("HEALTHY" if all(signals.values()) else "ALERT"),flush=True)
+            print("G8_CHECKS="+",".join(k for k,v in signals.items() if not v) if not all(signals.values()) else "PASS",flush=True)
+            print("G8_RESIDENT_CHROME_COUNT="+str(chrome),flush=True)
+            print("G8_UNKNOWN_SUBMISSIONS="+str(unknown),flush=True)
+            print("G8_NEW_HTTPX_FILLS="+("TRUE" if fills>10 else "FALSE"),flush=True)
+            print("G8_TOTAL_LOCAL_FILLS="+str(fills),flush=True)
+            print("G8_MEM_AVAILABLE_KIB="+str(mem),flush=True)
+            raise SystemExit(0 if all(signals.values()) else 3)
+            PY
+      - name: Notify owner on failed production observation or first HTTPX fill
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROBE: ${{ steps.probe.outputs.stdout }}
+          RESULT: ${{ steps.probe.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          text=os.environ.get("PROBE","")
+          def value(key):
+              matches=re.findall(r"(?m)^"+re.escape(key)+r"=([A-Za-z0-9_,]+)$",text)
+              return matches[-1] if matches else "UNKNOWN"
+          bad=os.environ["RESULT"]!="success" or value("G8_STATUS")!="HEALTHY"
+          first_fill=not bad and value("G8_NEW_HTTPX_FILLS")=="TRUE"
+          if not bad and not first_fill:
+              print("G8_STATUS_HEALTHY_NO_NEW_FINANCIAL_FILLS")
+              raise SystemExit(0)
+          title=("Fintual G8 ALERTA — ejecución HTTPX o Chrome residente" if bad
+                 else "Fintual G8 — primera operación HTTPX: revisar paridad financiera")
+          description=("Revisar estado de Oracle, sistema y ledger; NO restaurar una copia histórica sobre fills recientes."
+              if bad else "Una operación nueva fue registrada por el ejecutor HTTPX. Confirmar paridad con el historial real de Fintual mediante consulta autenticada de solo lectura; NO colocar una orden de prueba.")
+          def gh(*args):
+              p=subprocess.run(["gh","api",*args],capture_output=True,text=True,timeout=30)
+              if p.returncode:raise RuntimeError("Could not publish owner alert")
+              return json.loads(p.stdout)
+          repo=os.environ["GH_REPO"]
+          issues=gh(f"repos/{repo}/issues?state=all&per_page=100")
+          if any(i.get("title")==title for i in issues):
+              print("Existing owner notification, avoiding duplicates")
+              raise SystemExit(1 if bad else 0)
+          msg=(f"**Estado:** {value('G8_STATUS')}\n**Comprobaciones:** {value('G8_CHECKS')}"
+               f"\n**Chrome residente:** {value('G8_RESIDENT_CHROME_COUNT')}"
+               f"\n**Órdenes inciertas:** {value('G8_UNKNOWN_SUBMISSIONS')}"
+               f"\n**Total fills locales:** {value('G8_TOTAL_LOCAL_FILLS')}"
+               f"\n**Evidencia:** {os.environ['GH_RUN']}\n\n{description}")
+          report=gh("-X","POST",f"repos/{repo}/issues","-f","title="+title,
+                    "-f","body="+msg,"-f","assignees[]=cortega26")
+          print("Owner notification created:",report["html_url"])
+          if bad:raise SystemExit(1)
+          PY
