@@ -1,0 +1,79 @@
+name: Fintual G6 actual Chrome launch close with isolated temporary profile
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g6-actual-chrome-sandbox-smoke-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Launch real Oracle Chrome with new disposable empty profile; do not touch resident login
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 120s
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            SHA=a21078ec309938db70f3f9e37ac9b3d55a162e0c
+            RUNTIME=/opt/fintual-httpx-releases/$SHA
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 6s systemctl is-active "$unit")" = active || { echo G5_OR_PRODUCTION_NOT_ACTIVE; exit 21; }
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            sudo -n test -f "$RUNTIME/HTTPX_RUNTIME_READY.json"
+            test -L /var/lib/fintual-browser/profile/SingletonLock
+            echo SANDBOX_CANARY_ATTEMPT=TRUE
+            BEFORE=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              HOME=/home/fintual DISPLAY=:99 PYTHONPATH="$RUNTIME/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 68s "$RUNTIME/.venv/bin/python" -u - <<'PY'
+            import os, tempfile
+            from pathlib import Path
+            from playwright.sync_api import sync_playwright
+            chrome="/var/lib/fintual-browser/chrome"
+            with tempfile.TemporaryDirectory(prefix="g6-empty-profile-canary-") as base:
+                profile=Path(base)/"profile"
+                profile.mkdir(mode=0o700)
+                print("CANARY_PROFILE_IS_NOT_LIVE=TRUE",flush=True)
+                with sync_playwright() as p:
+                    context=p.chromium.launch_persistent_context(
+                        user_data_dir=str(profile),
+                        executable_path=chrome,
+                        headless=False,
+                        args=[
+                            "--disable-extensions", "--disable-sync",
+                            "--disable-gpu", "--no-first-run",
+                            "--no-default-browser-check",
+                        ],
+                        timeout=25000,
+                    )
+                    try:
+                        page=context.new_page()
+                        page.goto("about:blank",wait_until="domcontentloaded",timeout=10000)
+                        agent=page.evaluate("navigator.userAgent")
+                        assert isinstance(agent,str) and "Chrome" in agent
+                        print("ACTUAL_ORACLE_CHROME_TRANSIENT_LAUNCH=PASS",flush=True)
+                    finally:
+                        context.close()
+                assert not os.path.lexists(profile/"SingletonLock")
+                print("ACTUAL_ORACLE_CHROME_PROFILE_RELEASE=PASS",flush=True)
+                assert "/var/lib/fintual-browser/profile" != str(profile)
+            print("ACTUAL_CHROME_CANARY_DISPOSABLE_PROFILE_CLEANUP=PASS",flush=True)
+            PY
+            AFTER=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+            echo MEM_AVAILABLE_BEFORE_KB=$BEFORE
+            echo MEM_AVAILABLE_AFTER_KB=$AFTER
+            test -L /var/lib/fintual-browser/profile/SingletonLock
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 6s systemctl is-active "$unit")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G6_REAL_CHROME_ISOLATED_LIFECYCLE=PASS
+            echo G5_AND_ORIGINAL_LOGIN_UNTOUCHED=TRUE
