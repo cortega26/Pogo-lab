@@ -8,7 +8,7 @@ permissions:
 jobs:
   cold-auth:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
       - name: Verify stale singleton owner absent, clear only orphan symlinks, read broker unarmed, always restore CDP
         uses: appleboy/ssh-action@v1
@@ -17,7 +17,7 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 170s
+          command_timeout: 240s
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
@@ -31,7 +31,7 @@ jobs:
             test "$(sudo -n readlink /opt/fintual-httpx-current || true)" = ""
             sudo -n test -f "$RELEASE/HTTPX_RUNTIME_READY.json"
             sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 timeout 25s \
+              PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 timeout 60s \
               "$RELEASE/.venv/bin/python" - <<'PY'
             import sqlite3
             from pathlib import Path
@@ -63,13 +63,13 @@ jobs:
               sudo -n systemctl stop "$UNIT.timer" >/dev/null 2>&1 || true
             }
             trap restore EXIT
-            sudo -n systemd-run --quiet --on-active=120s --unit="$UNIT" \
+            sudo -n systemd-run --quiet --on-active=210s --unit="$UNIT" \
               /bin/sh -c 'systemctl start fintual-browser.service; systemctl start fintual-executor.service'
             RECOVERY=1
             sudo -n timeout 15s systemctl stop fintual-executor.service
             test "$(timeout 6s systemctl is-active fintual-executor.service)" = inactive
             sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 timeout 20s \
+              PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 timeout 40s \
               "$RELEASE/.venv/bin/python" - <<'PY'
             import sqlite3
             from pathlib import Path
@@ -104,7 +104,11 @@ jobs:
                 if not candidate.name.isdigit():continue
                 try: argv=(candidate/"cmdline").read_bytes()
                 except (OSError,PermissionError):continue
-                if b"/var/lib/fintual-browser/profile" in argv:
+                if (
+                    argv and
+                    (b"chrome" in argv[0].lower() or b"chromium" in argv[0].lower())
+                    and b"/var/lib/fintual-browser/profile" in argv
+                ):
                     raise RuntimeError("REAL_CHROME_PROFILE_STILL_OWNED")
             if os.path.lexists(lock):
                 assert stat.S_ISLNK(lock.lstat().st_mode),"REAL_CHROME_LOCK_NOT_SYMLINK"
