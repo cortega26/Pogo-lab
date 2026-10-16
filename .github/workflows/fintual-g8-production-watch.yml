@@ -1,8 +1,5 @@
 name: Fintual G8 live HTTPX production watch (hourly)
 on:
-  push:
-    branches: [fix/fintual-g8-status-20261016]
-    paths: [.github/workflows/fintual-g8-production-watch.yml]
   schedule:
     - cron: "12 * * * *"
   workflow_dispatch:
