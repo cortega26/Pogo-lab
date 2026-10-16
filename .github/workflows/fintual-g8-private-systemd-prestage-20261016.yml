@@ -1,0 +1,81 @@
+name: Fintual G8 private original unit rollback and HTTPX replacement pre-stage
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g8-private-systemd-prestage-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  prestage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Save original service unit and pin candidate replacement offline, without touching /etc/systemd
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            set -euo pipefail
+            SOURCE=a21078ec309938db70f3f9e37ac9b3d55a162e0c
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            ROOT=/var/lib/fintual-g8-unit-prestage
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 7s systemctl is-active "$unit")" = active
+            done
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-enabled fintual-browser.service)" = enabled
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            test "$(sudo -n readlink /opt/fintual-httpx-current || true)" = ""
+            sudo -n env SOURCE="$SOURCE" ROOT="$ROOT" /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,stat
+            from pathlib import Path
+            src=Path("/etc/systemd/system/fintual-executor.service")
+            sha=os.environ["SOURCE"]
+            release=Path("/opt/fintual-httpx-releases")/sha
+            ready=json.loads((release/"HTTPX_RUNTIME_READY.json").read_text())
+            assert ready["source_sha"]==sha and ready["runtime_imports_verified"] is True
+            approved=(release/"deploy/oracle/fintual-httpx-order.service.example").read_bytes()
+            assert b"[Install]" in approved
+            assert b"WantedBy=multi-user.target" in approved
+            assert b"Requires=fintual-browser.service" not in approved
+            assert b"Requires=fintual-xvfb.service" in approved
+            actual=src.read_bytes()
+            assert b"Requires=fintual-browser.service" in actual
+            root=Path(os.environ["ROOT"])
+            if not root.exists():
+                root.mkdir(mode=0o700)
+            info=root.lstat()
+            assert stat.S_ISDIR(info.st_mode) and info.st_uid==0 and stat.S_IMODE(info.st_mode)==0o700
+            rollback=root/"original-fintual-executor.service"
+            candidate=root/("httpx-"+sha+"-fintual-executor.service")
+            for target,data in ((rollback,actual),(candidate,approved)):
+                if target.exists():
+                    assert target.read_bytes()==data, "Refuse to overwrite altered staged systemd unit"
+                else:
+                    fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                    with os.fdopen(fd,"wb") as output:
+                        output.write(data)
+                        output.flush()
+                        os.fsync(output.fileno())
+                info=target.lstat()
+                assert stat.S_ISREG(info.st_mode) and info.st_uid==0
+                assert stat.S_IMODE(info.st_mode)==0o600
+            digest_old=hashlib.sha256(actual).hexdigest()
+            digest_new=hashlib.sha256(approved).hexdigest()
+            print("G8_ORIGINAL_SYSTEMD_UNIT_BACKUP_SHA256="+digest_old)
+            print("G8_HTTPX_CANDIDATE_UNIT_SHA256="+digest_new)
+            print("G8_UNIT_PRIVATE_ROLLBACK_COPY_VERIFIED=TRUE")
+            print("G8_UNIT_CANDIDATE_STAGED_WITHOUT_ACTIVATION=TRUE")
+            PY
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 7s systemctl is-active "$unit")" = active
+            done
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-enabled fintual-browser.service)" = enabled
+            test "$(sudo -n readlink /opt/fintual-httpx-current || true)" = ""
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G8_ROLLBACK_UNITS_READY_PRODUCTION_UNCHANGED=PASS
