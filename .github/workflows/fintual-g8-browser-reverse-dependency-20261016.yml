@@ -1,0 +1,36 @@
+name: Fintual G8 browser autoactivation cause read-only
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/fintual-g8-browser-reverse-dependency-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Classify browser reactivation unit and reverse dependencies after reboot
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import subprocess
+            def run(*cmd):
+                p=subprocess.run(cmd,text=True,capture_output=True,timeout=15)
+                return p.stdout.strip()
+            u="fintual-browser.service"
+            for k in ("FragmentPath","DropInPaths","Requires","RequiredBy","Wants","WantedBy","BindsTo","BoundBy","PartOf","ConsistsOf","TriggeredBy","Triggers","UnitFileState","ActiveState","SubState","Restart"):
+                print("BROWSER_"+k+"="+run("systemctl","show","-P",k,u),flush=True)
+            print("REVERSE_BROWSER_DEPENDENCIES="+run("systemctl","list-dependencies","--reverse","--all","--plain",u).replace("\n"," | "),flush=True)
+            for unit in run("systemctl","list-units","--all","--type=service","--plain","--no-legend").splitlines():
+                name=unit.split(maxsplit=1)[0] if unit.split() else ""
+                if any(token in name.lower() for token in ("fintual","finance","stocks","google","market","pogo")):
+                    print("RELATED_UNIT="+name+":" + run("systemctl","is-active",name)+":"+run("systemctl","is-enabled",name),flush=True)
+            print("G8_DEPENDENCY_FORENSICS_READ_ONLY=TRUE",flush=True)
+            PY
