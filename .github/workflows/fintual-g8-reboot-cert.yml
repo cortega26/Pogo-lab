@@ -1,0 +1,107 @@
+name: Fintual G8 reboot certification (one-time guarded)
+# A push to the operator branch is read-only preflight only. Actual reboot
+# deliberately requires the separately gated after-market one-time schedule.
+on:
+  push:
+    branches:
+      - ops/g8-oracle-reboot-gate-20261016
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fintual-g8-oracle-reboot-cert
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read-only inspect G8 financial topology and host reboot readiness
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 100s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json
+            import os
+            import sqlite3
+            import stat
+            import subprocess
+            from pathlib import Path
+
+            SHA = "e922e0d153f32c8319bc4ec8b9165f39c7dfeac8"
+            def cmd(*args):
+                p = subprocess.run(args, capture_output=True, text=True, timeout=12)
+                return p.stdout.strip()
+
+            checks = {
+                "executor_active": cmd("systemctl","is-active","fintual-executor.service") == "active",
+                "executor_enabled": cmd("systemctl","is-enabled","fintual-executor.service") == "enabled",
+                "browser_inactive": cmd("systemctl","is-active","fintual-browser.service") == "inactive",
+                "browser_disabled": cmd("systemctl","is-enabled","fintual-browser.service") == "disabled",
+                "xvfb_active": cmd("systemctl","is-active","fintual-xvfb.service") == "active",
+                "xvfb_enabled": cmd("systemctl","is-enabled","fintual-xvfb.service") == "enabled",
+            }
+            pid = int(cmd("systemctl","show","-P","MainPID","fintual-executor.service") or "0")
+            argv = (Path("/proc")/str(pid)/"cmdline").read_bytes().split(b"\0") if pid else []
+            checks["real_httpx_pid"] = all(x in argv for x in (b"fintual_executor.runner",b"http-order",b"transient-profile"))
+            root = Path("/opt/fintual-httpx-current")
+            try:
+                ready = json.loads((root/"HTTPX_RUNTIME_READY.json").read_text())
+                checks["immutable_release"] = root.is_symlink() and root.resolve() == Path("/opt/fintual-httpx-releases")/SHA and ready["source_sha"] == SHA and ready["runtime_imports_verified"] is True
+            except (OSError,ValueError,KeyError):
+                checks["immutable_release"] = False
+            for name in ("config.json","market-data.env","httpx-order.env"):
+                path = Path("/etc/fintual-executor")/name
+                try:
+                    mode = stat.S_IMODE(path.stat().st_mode)
+                    checks["private_"+name] = path.is_file() and mode & 0o007 == 0
+                except OSError:
+                    checks["private_"+name] = False
+            db = Path("/var/lib/fintual-executor/state.sqlite3")
+            try:
+                con = sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10)
+                try:
+                    con.execute("PRAGMA query_only=ON")
+                    checks["sqlite_integrity"] = con.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+                    open_count = con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                    fills = con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                    checks["no_open_intents"] = open_count == 0
+                finally:
+                    con.close()
+            except sqlite3.Error:
+                checks["sqlite_integrity"] = checks["no_open_intents"] = False
+                open_count = -1
+                fills = -1
+            profile = Path("/var/lib/fintual-browser/profile")
+            chrome = 0
+            for p in Path("/proc").iterdir():
+                if not p.name.isdecimal():
+                    continue
+                try:
+                    parts=(p/"cmdline").read_bytes().split(b"\0")
+                except (OSError,PermissionError):
+                    continue
+                if parts and (b"chrome" in parts[0].lower() or b"chromium" in parts[0].lower()) and b"--user-data-dir=/var/lib/fintual-browser/profile" in parts:
+                    chrome += 1
+            checks["chrome_not_resident"] = chrome == 0
+            mem_kib = int(next(line.split()[1] for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:")))
+            checks["memory_headroom"] = mem_kib >= 1024*1024
+            # Only metadata / boolean facts; no credentials, balances or orders.
+            print("G8_REBOOT_PREFLIGHT="+("PASS" if all(checks.values()) else "NO_GO"),flush=True)
+            print("G8_FAILED_CHECKS="+(",".join(k for k,v in checks.items() if not v) or "NONE"),flush=True)
+            print("G8_OPEN_INTENTS="+str(open_count),flush=True)
+            print("G8_FILLS_BASELINE="+str(fills),flush=True)
+            print("G8_BOOT_ID="+Path("/proc/sys/kernel/random/boot_id").read_text().strip(),flush=True)
+            print("G8_MEM_AVAILABLE_KIB="+str(mem_kib),flush=True)
+            print("G8_POGO_LAB_ACTIVE="+str(cmd("systemctl","is-active","pogo-lab.service")=="active").upper(),flush=True)
+            raise SystemExit(0 if all(checks.values()) else 3)
+            PY
