@@ -20,7 +20,7 @@ jobs:
           command_timeout: 135s
           script: |
             set -euo pipefail
-            SHA=f2be56b5bd405ff269033b17bc8fcdb741add075
+            SHA=9a54488eee2dc088b5ebafe73da432000380de9d
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
