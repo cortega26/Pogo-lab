@@ -1,4 +1,4 @@
-name: Fintual G8 online private WAL recovery point acceptance
+name: Fintual G8 one-time real financial WAL backup while G5 running
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,55 +6,70 @@ on:
 permissions:
   contents: read
 jobs:
-  verify:
+  interim-backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     steps:
-      - name: Synthetic WAL backup and private release preflight; G5 unchanged
+      - name: Create SHA-verified root-private SQLite recovery point without orders or service changes
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 155s
+          command_timeout: 115s
           script: |
             set -euo pipefail
+            SHA=03f282a16288c0a0c161415a6334347bb8b353b5
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SHA=51e8b71acff91ceb233254f09f1c095dcdfd5fb2
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
-            UV=/home/fintual/.uv-bootstrap/bin/uv
-            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            LEDGER=/var/lib/fintual-executor/state.sqlite3
+            BACKUPS=/var/lib/fintual-g8-backups
             for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
               test "$(timeout 8s systemctl is-active "$service")" = active
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            WORK="$(mktemp -d /tmp/fintual-g8-online-backup-tests.XXXXXXXX)"
+            WORK="$(mktemp -d /tmp/fintual-g8-backup-command.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$WORK"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
-              timeout 35s git clone --quiet --depth 1 --single-branch --branch feat/g8-online-sqlite-recovery-point-20261015 \
+              timeout 40s git clone --quiet --depth 1 --single-branch --branch main \
               git@github.com:cortega26/fintual-executor.git "$WORK/repo"
             test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$SHA"
-            sudo -n nice -n 15 ionice -c 3 env UV_NO_CONFIG=1 UV_CACHE_DIR="$WORK/cache" \
-              UV_PROJECT_ENVIRONMENT="$WORK/venv" "$UV" sync \
-              --directory "$WORK/repo" --frozen --extra dev --extra shadow --python "$PY" --quiet
+            sudo -n install -d -m 0700 -o root -g root "$BACKUPS"
             sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$WORK/repo/src" PYTHONDONTWRITEBYTECODE=1 timeout 75s \
-              "$WORK/venv/bin/python" -m pytest -q -x \
-              "$WORK/repo/tests/test_g8_ledger_backup.py" \
-              "$WORK/repo/tests/test_g8_observe.py" \
-              "$WORK/repo/tests/test_g8_rehearsal.py" \
-              "$WORK/repo/tests/test_g8_stage.py" \
-              "$WORK/repo/tests/test_g8_httpx_runtime.py"
-            sudo -n "$WORK/venv/bin/ruff" check \
-              "$WORK/repo/src/fintual_executor/g8_ledger_backup.py" \
-              "$WORK/repo/tests/test_g8_ledger_backup.py"
-            sudo -n "$WORK/venv/bin/python" -m compileall -q \
-              "$WORK/repo/src/fintual_executor/g8_ledger_backup.py"
+              PYTHONPATH="$WORK/repo/src" timeout 40s "$PY" \
+              -m fintual_executor.g8_ledger_backup \
+              --source "$LEDGER" --backup-root "$BACKUPS"
+            sudo -n env BACKUPS="$BACKUPS" /usr/bin/python3 - <<'PY'
+            import json,hashlib,os,stat
+            from pathlib import Path
+            root=Path(os.environ["BACKUPS"])
+            assert root.stat().st_uid==0 and stat.S_IMODE(root.stat().st_mode)==0o700
+            files=sorted(root.glob("g8-financial-*.manifest.json"),key=lambda x:x.stat().st_mtime)
+            assert files
+            mf=files[-1]
+            report=json.loads(mf.read_text())
+            artifact=root/report["backup_filename"]
+            assert artifact.is_file() and artifact.stat().st_size>0
+            assert artifact.stat().st_nlink==1
+            assert artifact.stat().st_uid==0 and stat.S_IMODE(artifact.stat().st_mode)==0o600
+            assert stat.S_IMODE(mf.stat().st_mode)==0o600
+            assert hashlib.sha256(artifact.read_bytes()).hexdigest()==report["backup_sha256"]
+            assert report["sqlite_integrity"]=="ok"
+            assert report["restore_performed"] is False and report["financial_orders_sent"] is False
+            assert report["source_modified"] is False and report["production_services_changed"] is False
+            print("G8_PRIVATE_ONLINE_BACKUP_MANIFEST_INTEGRITY=PASS")
+            print("G8_PRIVATE_ONLINE_BACKUP_UTC="+report["created_at_utc"])
+            print("G8_PRIVATE_ONLINE_BACKUP_TOTAL_FILLS="+str(report["snapshot_fills"]))
+            print("G8_PRIVATE_ONLINE_BACKUP_OPEN_INTENTS="+str(report["snapshot_open_intents"]))
+            print("G8_PRIVATE_ONLINE_BACKUP_UNCERTAIN="+str(report["snapshot_uncertain_submissions"]))
+            print("G8_FINANCIAL_BACKUP_IS_INTERIM_NOT_CURRENT_CUTOVER_COPY=TRUE")
+            PY
             for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
               test "$(timeout 8s systemctl is-active "$service")" = active
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G8_ONLINE_PRIVATE_BACKUP_SYNTHETIC_TESTS=PASS
-            echo G5_ORIGINAL_PRODUCTION_UNMODIFIED=TRUE
+            echo G8_LIVE_FINANCIAL_SNAPSHOT_CREATED_WITHOUT_CUTOVER=TRUE
+            echo G5_AND_FINANCIAL_EXECUTOR_UNCHANGED=TRUE
