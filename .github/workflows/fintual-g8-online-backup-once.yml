@@ -1,4 +1,4 @@
-name: Fintual G8 one-time real financial WAL backup while G5 running
+name: Fintual G8 immutable updated canonical release after financial backup
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,70 +6,76 @@ on:
 permissions:
   contents: read
 jobs:
-  interim-backup:
+  stage:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Create SHA-verified root-private SQLite recovery point without orders or service changes
+      - name: Stage new main immutable HTTPX runtime with G8 verified financial checkpoint
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 115s
+          command_timeout: 145s
           script: |
             set -euo pipefail
             SHA=03f282a16288c0a0c161415a6334347bb8b353b5
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            ROOT=/opt/fintual-httpx-releases
+            STAGEDIR=/var/lib/fintual-g8-stage
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
-            LEDGER=/var/lib/fintual-executor/state.sqlite3
-            BACKUPS=/var/lib/fintual-g8-backups
-            for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$service")" = active
+            for svc in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$svc")" = active
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            WORK="$(mktemp -d /tmp/fintual-g8-backup-command.XXXXXXXX)"
+            ALIAS_BEFORE="$(sudo -n readlink /opt/fintual-httpx-current || true)"
+            WORK="$(mktemp -d /tmp/fintual-g8-latest-with-backup.XXXXXXXX)"
             trap 'sudo -n rm -rf -- "$WORK"' EXIT
             sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
               timeout 40s git clone --quiet --depth 1 --single-branch --branch main \
               git@github.com:cortega26/fintual-executor.git "$WORK/repo"
             test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$SHA"
-            sudo -n install -d -m 0700 -o root -g root "$BACKUPS"
-            sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$WORK/repo/src" timeout 40s "$PY" \
-              -m fintual_executor.g8_ledger_backup \
-              --source "$LEDGER" --backup-root "$BACKUPS"
-            sudo -n env BACKUPS="$BACKUPS" /usr/bin/python3 - <<'PY'
-            import json,hashlib,os,stat
+            if ! sudo -n test -f "$STAGEDIR/$SHA.tar"; then
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$WORK/repo/src" "$PY" -m fintual_executor.g8_stage \
+                --checkout "$WORK/repo" --stage-directory "$STAGEDIR" --expected-sha "$SHA"
+            fi
+            if ! sudo -n test -f "$ROOT/$SHA/HTTPX_RUNTIME_READY.json"; then
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$WORK/repo/src" timeout 125s "$PY" \
+                -m fintual_executor.g8_httpx_runtime \
+                --stage-dir "$STAGEDIR" --release-root "$ROOT" \
+                --source-sha "$SHA" --uv "$UV" --base-python "$PY"
+            fi
+            sudo -n env SHA="$SHA" ROOT="$ROOT" STAGEDIR="$STAGEDIR" /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,stat
             from pathlib import Path
-            root=Path(os.environ["BACKUPS"])
-            assert root.stat().st_uid==0 and stat.S_IMODE(root.stat().st_mode)==0o700
-            files=sorted(root.glob("g8-financial-*.manifest.json"),key=lambda x:x.stat().st_mtime)
-            assert files
-            mf=files[-1]
-            report=json.loads(mf.read_text())
-            artifact=root/report["backup_filename"]
-            assert artifact.is_file() and artifact.stat().st_size>0
-            assert artifact.stat().st_nlink==1
-            assert artifact.stat().st_uid==0 and stat.S_IMODE(artifact.stat().st_mode)==0o600
-            assert stat.S_IMODE(mf.stat().st_mode)==0o600
-            assert hashlib.sha256(artifact.read_bytes()).hexdigest()==report["backup_sha256"]
-            assert report["sqlite_integrity"]=="ok"
-            assert report["restore_performed"] is False and report["financial_orders_sent"] is False
-            assert report["source_modified"] is False and report["production_services_changed"] is False
-            print("G8_PRIVATE_ONLINE_BACKUP_MANIFEST_INTEGRITY=PASS")
-            print("G8_PRIVATE_ONLINE_BACKUP_UTC="+report["created_at_utc"])
-            print("G8_PRIVATE_ONLINE_BACKUP_TOTAL_FILLS="+str(report["snapshot_fills"]))
-            print("G8_PRIVATE_ONLINE_BACKUP_OPEN_INTENTS="+str(report["snapshot_open_intents"]))
-            print("G8_PRIVATE_ONLINE_BACKUP_UNCERTAIN="+str(report["snapshot_uncertain_submissions"]))
-            print("G8_FINANCIAL_BACKUP_IS_INTERIM_NOT_CURRENT_CUTOVER_COPY=TRUE")
+            sha=os.environ["SHA"]
+            root=Path(os.environ["ROOT"])/sha
+            stage=Path(os.environ["STAGEDIR"])
+            manifest=json.loads((stage/(sha+".manifest.json")).read_text())
+            ready=json.loads((root/"HTTPX_RUNTIME_READY.json").read_text())
+            digest=hashlib.sha256((stage/(sha+".tar")).read_bytes()).hexdigest()
+            assert sha==manifest["git_sha"]==ready["source_sha"]
+            assert digest==manifest["archive_sha256"]==ready["source_archive_sha256"]
+            assert ready["runtime_imports_verified"] is True
+            assert ready["current_alias_modified"] is False
+            assert stat.S_IMODE(root.stat().st_mode)==0o755
+            print("CURRENT_CANONICAL_G8_RELEASE="+sha)
+            print("CURRENT_CANONICAL_G8_RELEASE_SHA256="+digest)
+            print("G8_UPDATED_RUNTIME_HASHES=PASS")
             PY
-            for service in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              test "$(timeout 8s systemctl is-active "$service")" = active
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$ROOT/$SHA/src" "$ROOT/$SHA/.venv/bin/python" -c \
+              'import httpx,playwright.sync_api;from fintual_executor import g8_ledger_backup,runner,reconcile,order_session;print("UPDATED_G8_SERVICE_USER_IMPORT=PASS")'
+            test "$(sudo -n readlink /opt/fintual-httpx-current || true)" = "$ALIAS_BEFORE"
+            for svc in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 8s systemctl is-active "$svc")" = active
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
-            echo G8_LIVE_FINANCIAL_SNAPSHOT_CREATED_WITHOUT_CUTOVER=TRUE
-            echo G5_AND_FINANCIAL_EXECUTOR_UNCHANGED=TRUE
+            echo UPDATED_G8_IMMUTABLE_RELEASE_PRESTAGED=PASS
+            echo ORIGINAL_PRODUCTION_AND_G5_UNTOUCHED=TRUE
