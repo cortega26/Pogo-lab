@@ -28,7 +28,7 @@ jobs:
             done
             test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
             sudo -n test -f "$RUNTIME/HTTPX_RUNTIME_READY.json"
-            test -L /var/lib/fintual-browser/profile/SingletonLock
+            sudo -n test -L /var/lib/fintual-browser/profile/SingletonLock
             echo SANDBOX_CANARY_ATTEMPT=TRUE
             BEFORE=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
             sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
@@ -70,7 +70,7 @@ jobs:
             AFTER=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
             echo MEM_AVAILABLE_BEFORE_KB=$BEFORE
             echo MEM_AVAILABLE_AFTER_KB=$AFTER
-            test -L /var/lib/fintual-browser/profile/SingletonLock
+            sudo -n test -L /var/lib/fintual-browser/profile/SingletonLock
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
               test "$(timeout 6s systemctl is-active "$unit")" = active
             done
