@@ -1,0 +1,189 @@
+name: Fintual G8 guarded Oracle whole-VM reboot 2026-10-16
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/fintual-g8-verified-one-time-vm-reboot-20261016.yml]
+permissions:
+  contents: read
+concurrency:
+  group: fintual-g8-reboot-cert-and-financial-read
+  cancel-in-progress: false
+jobs:
+  guarded-reboot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Recheck Fintual market, broker pending, financial backup and arrange one-time VM reboot
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 190s
+          script: |
+            set -euo pipefail
+            SHA=e922e0d153f32c8319bc4ec8b9165f39c7dfeac8
+            ROOT=/opt/fintual-httpx-releases/$SHA
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service || true)" = disabled
+            test "$(systemctl is-active fintual-xvfb.service)" = active
+            test "$(systemctl is-enabled fintual-xvfb.service)" = enabled
+            test "$(systemctl is-active pogo-lab.service)" = active
+            test "$(systemctl is-enabled pogo-lab.service)" = enabled
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = "$ROOT"
+            test "$(cat /proc/sys/kernel/random/boot_id)" = 749cee02-5e9a-4ed3-a3ce-39bdfd442a5b
+            # Authenticate independently using short-lived Chrome (no broker mutations).
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              DISPLAY=:99 HOME=/home/fintual PYTHONPATH="$ROOT/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 125s "$ROOT/.venv/bin/python" -u - <<'PY'
+            import datetime as dt,sqlite3
+            from pathlib import Path
+            from zoneinfo import ZoneInfo
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_market_info,get_pending
+            eastern=dt.datetime.now(tz=ZoneInfo("America/New_York"))
+            assert eastern.weekday()<5 and eastern.hour>=16, "MARKET_TIME_UNVERIFIED"
+            db=Path("/var/lib/fintual-executor/state.sqlite3")
+            def ledger():
+                with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10) as con:
+                    con.execute("PRAGMA query_only=ON")
+                    assert con.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                    active=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                    fills=con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                    return int(active),int(fills)
+            a,n=ledger()
+            assert a==0 and n>=10,"FINANCIAL_PREBOOT_NO_GO"
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(owner,profile=Path("/var/lib/fintual-browser/profile"),chrome_binary=Path("/var/lib/fintual-browser/chrome"))
+                client=owner.borrow(armed=False)
+                assert not client.execution_enabled
+                assert get_market_info(client).get("isMarketOpen") is False,"FINTUAL_MARKET_OPEN"
+                pending=get_pending(client)
+                assert pending.get("stocksPendingAssetMarketBuys")==[],"BROKER_BUY_PENDING"
+                assert pending.get("stocksPendingAssetMarketSells")==[],"BROKER_SELL_PENDING"
+            assert ledger()==(a,n),"FINANCIAL_STATE_CHANGED_DURING_CHECK"
+            print("G8_REBOOT_LIVE_AUTH_AND_BROKER_PENDING_GATE=PASS",flush=True)
+            print("G8_PREBOOT_FILLS="+str(n),flush=True)
+            PY
+            sudo -n /usr/bin/python3 - <<'PY'
+            import datetime as dt,hashlib,json,sqlite3,stat
+            from pathlib import Path
+            root=Path("/var/lib/fintual-g8-backups")
+            assert root.is_dir() and root.stat().st_uid==0 and stat.S_IMODE(root.stat().st_mode)==0o700
+            manifests=sorted(root.glob("g8-financial-*.manifest.json"),key=lambda p:p.stat().st_mtime,reverse=True)
+            assert manifests,"FINANCIAL_BACKUP_MISSING"
+            path=manifests[0]
+            record=json.loads(path.read_text())
+            stamp=dt.datetime.fromisoformat(record["created_at_utc"])
+            age=dt.datetime.now(dt.timezone.utc)-stamp
+            assert dt.timedelta(seconds=0)<=age<dt.timedelta(minutes=20),"FINANCIAL_BACKUP_NOT_FRESH"
+            assert record["status"]=="G8_ONLINE_RECOVERY_POINT_VERIFIED"
+            assert record["snapshot_open_intents"]==0 and record["snapshot_uncertain_submissions"]==0
+            assert record["sqlite_integrity"]=="ok"
+            file=root/record["backup_filename"]
+            assert file.parent==root and file.is_file() and file.stat().st_uid==0
+            assert stat.S_IMODE(file.stat().st_mode)==0o600
+            assert hashlib.sha256(file.read_bytes()).hexdigest()==record["backup_sha256"]
+            with sqlite3.connect(file.as_uri()+"?mode=ro&immutable=1",uri=True) as con:
+                assert con.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                backup_fills=con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+            with sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True) as con:
+                con.execute("PRAGMA query_only=ON")
+                now_fills=con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                open_intents=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+            assert backup_fills==now_fills==record["snapshot_fills"] and open_intents==0
+            print("G8_PREBOOT_FRESH_RECOVERY_POINT_MATCHES_LIVE_LEDGER=PASS",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            sudo -n systemd-run --quiet --on-active=12s \
+              --unit=fintual-g8-reboot-cert-20261016 /usr/bin/systemctl reboot
+            echo G8_VERIFIED_ONE_TIME_VM_REBOOT_QUEUED=TRUE
+            echo G8_PREBOOT_ID=749cee02-5e9a-4ed3-a3ce-39bdfd442a5b
+      - name: Permit shutdown, firmware cycle and systemd cold service initialization
+        run: sleep 140
+      - name: Certify changed boot ID, autonomously authenticated HTTPX and no resident Chrome
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 20s
+          command_timeout: 115s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import datetime as dt,json,os,sqlite3,subprocess,time
+            from pathlib import Path
+            EXPECTED="e922e0d153f32c8319bc4ec8b9165f39c7dfeac8"
+            OLD_BOOT="749cee02-5e9a-4ed3-a3ce-39bdfd442a5b"
+            def check(*args):
+                q=subprocess.run(args,text=True,capture_output=True,timeout=9)
+                return q.stdout.strip()
+            current=Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+            assert current and current!=OLD_BOOT,"REBOOT_NOT_OBSERVED"
+            # The runner runs bootstrap_transient_profile before run_stream;
+            # this audit event on THIS boot proves bootstrap got past broker auth.
+            boot_epoch=float(next(line.split()[1] for line in Path("/proc/stat").read_text().splitlines() if line.startswith("btime ")))
+            db=Path("/var/lib/fintual-executor/state.sqlite3")
+            verified=False
+            for attempt in range(10):
+                if check("systemctl","is-active","fintual-executor.service")=="active":
+                    try:
+                        with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=7) as conn:
+                            conn.execute("PRAGMA query_only=ON")
+                            checkrow=conn.execute("SELECT created_at FROM audit_events WHERE event_type='MARKET_DATA_RUNTIME_STARTED' ORDER BY event_id DESC LIMIT 1").fetchone()
+                        if checkrow:
+                            mark=dt.datetime.fromisoformat(checkrow[0].replace("Z","+00:00"))
+                            if mark.tzinfo is None:mark=mark.replace(tzinfo=dt.timezone.utc)
+                            verified=mark.timestamp()>=boot_epoch-2
+                        if verified:break
+                    except (sqlite3.Error,ValueError,OSError):pass
+                time.sleep(6)
+            assert verified,"POSTREBOOT_AUTH_BOOTSTRAP_NOT_CONFIRMED"
+            states={
+                "executor_active":check("systemctl","is-active","fintual-executor.service")=="active",
+                "executor_enabled":check("systemctl","is-enabled","fintual-executor.service")=="enabled",
+                "browser_inactive":check("systemctl","is-active","fintual-browser.service")=="inactive",
+                "browser_disabled":check("systemctl","is-enabled","fintual-browser.service")=="disabled",
+                "xvfb_active":check("systemctl","is-active","fintual-xvfb.service")=="active",
+                "pogo_lab_active":check("systemctl","is-active","pogo-lab.service")=="active"
+            }
+            alias=Path("/opt/fintual-httpx-current")
+            ready=json.loads((alias/"HTTPX_RUNTIME_READY.json").read_text())
+            states["exact_httpx_release"]=alias.is_symlink() and alias.resolve()==Path("/opt/fintual-httpx-releases")/EXPECTED and ready["source_sha"]==EXPECTED
+            pid=int(check("systemctl","show","-P","MainPID","fintual-executor.service") or "0")
+            argv=(Path("/proc")/str(pid)/"cmdline").read_bytes().split(b"\0") if pid else []
+            states["httpx_process"]=all(q in argv for q in (b"fintual_executor.runner",b"http-order",b"transient-profile"))
+            chrome=0
+            for proc in Path("/proc").iterdir():
+                if not proc.name.isdecimal():continue
+                try:parts=(proc/"cmdline").read_bytes().split(b"\0")
+                except (PermissionError,OSError):continue
+                if parts and parts[0] and (b"chrome" in parts[0].lower() or b"chromium" in parts[0].lower()) and b"--user-data-dir=/var/lib/fintual-browser/profile" in parts:chrome+=1
+            states["chrome_not_resident"]=chrome==0
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10) as conn:
+                conn.execute("PRAGMA query_only=ON")
+                states["sqlite_integrity"]=conn.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                fills=int(conn.execute("SELECT COUNT(*) FROM fills").fetchone()[0])
+                uncertain=int(conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0])
+                open_intents=int(conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0])
+            states["fills_preserved"]=fills>=10
+            states["no_ambiguous_orders"]=uncertain==0
+            states["no_open_intents"]=open_intents==0
+            states["bootstrap_completed_this_boot"]=verified
+            mem=int(next(line.split()[1] for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:")))
+            print("G8_POSTBOOT_ID="+current,flush=True)
+            print("G8_POSTBOOT_CHECKS="+(",".join(k for k,v in states.items() if not v) or "PASS"),flush=True)
+            print("G8_POSTBOOT_FILLS="+str(fills),flush=True)
+            print("G8_POSTBOOT_RESIDENT_CHROME="+str(chrome),flush=True)
+            print("G8_POSTBOOT_AVAILABLE_MEM_KIB="+str(mem),flush=True)
+            print("G8_POSTBOOT_AUTHENTICATED_STREAM_STARTED="+str(verified).upper(),flush=True)
+            print("G8_POSTBOOT_POGO_LAB_ACTIVE="+str(states["pogo_lab_active"]).upper(),flush=True)
+            assert all(states.values()),"G8_POSTBOOT_CERTIFICATION_FAILED"
+            print("G8_WHOLE_VM_REBOOT_HTTPX_RECOVERY_CERTIFIED=PASS",flush=True)
+            PY
