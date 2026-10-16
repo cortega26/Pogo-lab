@@ -1,0 +1,35 @@
+name: Fintual G8 systemd reboot persistence read-only audit
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g8-boot-audit-once.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect actual live service identity and boot graph without changing units
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            set -euo pipefail
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              echo "UNIT=$unit"
+              echo "UNIT_ACTIVE=$(timeout 6s systemctl is-active "$unit" || true)"
+              echo "UNIT_ENABLED=$(timeout 6s systemctl is-enabled "$unit" || true)"
+              timeout 6s systemctl show --no-pager "$unit" -p FragmentPath -p DropInPaths -p UnitFileState -p Requires -p Wants -p After -p Restart -p RestartPreventExitStatus -p User -p Group | sed -E 's#(/[^ ]*/private/[^ ]+)#<redacted>#g'
+            done
+            sudo -n test -f /var/lib/fintual-g8-backups/g8-financial-20261016T015528Z-2c3796ef0b7e.sqlite3
+            sudo -n test -f /opt/fintual-httpx-releases/03f282a16288c0a0c161415a6334347bb8b353b5/HTTPX_RUNTIME_READY.json
+            echo G8_ALIAS_PRESENT=$(sudo -n test -e /opt/fintual-httpx-current && echo TRUE || echo FALSE)
+            echo MEM_AVAILABLE_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+            echo ROOT_FS_AVAILABLE_KB=$(df -Pk /opt | awk 'NR==2 {print $4}')
+            echo G5_AND_PRODUCTION_AUDIT_READ_ONLY=TRUE
