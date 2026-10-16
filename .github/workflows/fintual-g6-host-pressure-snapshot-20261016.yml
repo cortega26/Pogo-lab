@@ -1,0 +1,56 @@
+name: Fintual G6 Oracle post-abort services and resource pressure snapshot
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g6-host-pressure-snapshot-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm production restored, workload pressure and browser locks without broker requests
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 55s
+          script: |
+            set -euo pipefail
+            echo DIAGNOSTIC_TIMESTAMP_UTC="$(date -u +%FT%TZ)"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              echo "UNIT_STATUS=$unit:$(timeout 8s systemctl is-active "$unit" || true)"
+            done
+            echo "PRODUCTION_SOURCE=$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse --short=12 HEAD)"
+            echo "MEM_AVAILABLE_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
+            echo "SWAP_FREE_KB=$(awk '/^SwapFree:/ {print $2}' /proc/meminfo)"
+            echo "LOAD_1M=$(awk '{print $1}' /proc/loadavg)"
+            echo "CPU_PRESSURE=$(cat /proc/pressure/cpu | head -1)"
+            echo "MEM_PRESSURE=$(cat /proc/pressure/memory | head -1)"
+            sudo -n env /usr/bin/python3 - <<'PY'
+            import os,sqlite3
+            from pathlib import Path
+            p=Path("/var/lib/fintual-browser/profile")
+            print("PROFILE_SINGLETON_LOCK_PRESENT="+str(os.path.lexists(p/"SingletonLock")).upper())
+            count=0
+            for child in Path("/proc").iterdir():
+                if not child.name.isdigit():continue
+                try:raw=(child/"cmdline").read_bytes()
+                except (PermissionError,OSError):continue
+                argv=raw.split(b"\0")
+                if argv and (b"chrome" in argv[0].lower() or b"chromium" in argv[0].lower()) and b"/var/lib/fintual-browser/profile" in raw:
+                    count+=1
+            print("CHROME_PROCESSES_WITH_LIVE_PROFILE="+str(count))
+            uri=Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro"
+            conn=sqlite3.connect(uri,uri=True,timeout=6)
+            try:
+                conn.execute("PRAGMA query_only=ON")
+                print("LEDGER_SQLITE_INTEGRITY="+str(conn.execute("PRAGMA integrity_check").fetchone()[0]))
+                count=conn.execute("SELECT count(*) FROM order_intents WHERE state IN ('SUBMITTING','UNKNOWN')").fetchone()[0]
+                print("LEDGER_AMBIGUOUS_INTENTS="+str(count))
+            finally:conn.close()
+            PY
+            echo DIAGNOSTIC_FINISHED=TRUE
