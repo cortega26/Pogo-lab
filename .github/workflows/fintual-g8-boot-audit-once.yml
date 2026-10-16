@@ -1,4 +1,4 @@
-name: Fintual G8 systemd reboot persistence read-only audit
+name: Fintual G8 final reboot-safe main immutable HTTPX release pre-stage
 on:
   push:
     branches: [ci/fintual-g6-ipc-recovery-20261015]
@@ -6,30 +6,82 @@ on:
 permissions:
   contents: read
 jobs:
-  audit:
+  prestage:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Inspect actual live service identity and boot graph without changing units
+      - name: Pre-stage exact merged G8 source as independent tested runtime, no activation
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 90s
+          command_timeout: 155s
           script: |
             set -euo pipefail
-            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            SOURCE=a21078ec309938db70f3f9e37ac9b3d55a162e0c
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            STAGEDIR=/var/lib/fintual-g8-stage
+            ROOT=/opt/fintual-httpx-releases
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
+            KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
-              echo "UNIT=$unit"
-              echo "UNIT_ACTIVE=$(timeout 6s systemctl is-active "$unit" || true)"
-              echo "UNIT_ENABLED=$(timeout 6s systemctl is-enabled "$unit" || true)"
-              timeout 6s systemctl show --no-pager "$unit" -p FragmentPath -p DropInPaths -p UnitFileState -p Requires -p Wants -p After -p Restart -p RestartPreventExitStatus -p User -p Group | sed -E 's#(/[^ ]*/private/[^ ]+)#<redacted>#g'
+              test "$(timeout 7s systemctl is-active "$unit")" = active
             done
-            sudo -n test -f /var/lib/fintual-g8-backups/g8-financial-20261016T015528Z-2c3796ef0b7e.sqlite3
-            sudo -n test -f /opt/fintual-httpx-releases/03f282a16288c0a0c161415a6334347bb8b353b5/HTTPX_RUNTIME_READY.json
-            echo G8_ALIAS_PRESENT=$(sudo -n test -e /opt/fintual-httpx-current && echo TRUE || echo FALSE)
-            echo MEM_AVAILABLE_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
-            echo ROOT_FS_AVAILABLE_KB=$(df -Pk /opt | awk 'NR==2 {print $4}')
-            echo G5_AND_PRODUCTION_AUDIT_READ_ONLY=TRUE
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            test "$(systemctl is-enabled fintual-browser.service)" = enabled
+            BEFORE="$(sudo -n readlink /opt/fintual-httpx-current || true)"
+            WORK="$(mktemp -d /tmp/fintual-g8-reboot-prestage.XXXXXXXX)"
+            trap 'sudo -n rm -rf -- "$WORK"' EXIT
+            sudo -n env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN -i $KEY" \
+              timeout 40s git clone --quiet --depth 1 --single-branch --branch main \
+              git@github.com:cortega26/fintual-executor.git "$WORK/repo"
+            test "$(sudo -n git -C "$WORK/repo" rev-parse HEAD)" = "$SOURCE"
+            sudo -n test -d "$STAGEDIR"
+            sudo -n test -d "$ROOT"
+            if ! sudo -n test -f "$STAGEDIR/$SOURCE.tar"; then
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$WORK/repo/src" "$PY" -m fintual_executor.g8_stage \
+                --checkout "$WORK/repo" --stage-directory "$STAGEDIR" --expected-sha "$SOURCE"
+            fi
+            if ! sudo -n test -f "$ROOT/$SOURCE/HTTPX_RUNTIME_READY.json"; then
+              sudo -n nice -n 15 ionice -c 3 env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+                PYTHONPATH="$WORK/repo/src" timeout 115s "$PY" -m fintual_executor.g8_httpx_runtime \
+                --stage-dir "$STAGEDIR" --release-root "$ROOT" \
+                --source-sha "$SOURCE" --uv "$UV" --base-python "$PY"
+            fi
+            sudo -n env SOURCE="$SOURCE" ROOT="$ROOT" STAGEDIR="$STAGEDIR" /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,stat
+            from pathlib import Path
+            sha=os.environ["SOURCE"]
+            root=Path(os.environ["ROOT"])/sha
+            stagedir=Path(os.environ["STAGEDIR"])
+            ready=json.loads((root/"HTTPX_RUNTIME_READY.json").read_text())
+            manifest=json.loads((stagedir/(sha+".manifest.json")).read_text())
+            checksum=hashlib.sha256((stagedir/(sha+".tar")).read_bytes()).hexdigest()
+            assert sha==ready["source_sha"]==manifest["git_sha"]
+            assert checksum==ready["source_archive_sha256"]==manifest["archive_sha256"]
+            assert ready["runtime_imports_verified"] is True
+            assert ready["current_alias_modified"] is False
+            assert stat.S_IMODE(root.stat().st_mode)==0o755
+            print("G8_FINAL_MAIN_SHA="+sha)
+            print("G8_FINAL_TAR_SHA256="+checksum)
+            print("G8_FINAL_RELEASE_INTEGRITY=PASS")
+            PY
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$ROOT/$SOURCE/src" "$ROOT/$SOURCE/.venv/bin/python" -c \
+              'import httpx,playwright.sync_api;from fintual_executor import runner,transient_auth,g8_ledger_backup;print("G8_FINAL_SERVICE_USER_IMPORT=PASS")'
+            sudo -n sed "s#/opt/fintual-httpx-current#$ROOT/$SOURCE#g" \
+              "$WORK/repo/deploy/oracle/fintual-httpx-order.service.example" > "$WORK/fintual-executor.service"
+            sudo -n timeout 20s systemd-analyze verify "$WORK/fintual-executor.service"
+            echo G8_FINAL_SYSTEMD_PARSER=PASS
+            test "$(sudo -n readlink /opt/fintual-httpx-current || true)" = "$BEFORE"
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 7s systemctl is-active "$unit")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G8_FINAL_CANONICAL_RELEASE_PRESTAGED=TRUE
+            echo PRODUCTION_CHROME_AND_G5_UNTOUCHED=TRUE
