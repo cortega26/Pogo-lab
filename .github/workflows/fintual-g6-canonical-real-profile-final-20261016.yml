@@ -1,0 +1,124 @@
+name: Fintual G6 verified orphan cleanup real authenticated cold Chrome
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g6-canonical-real-profile-final-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  real-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify no pending real orders, test true Chrome cold auth unarmed, restore original
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 190s
+          script: |
+            set -euo pipefail
+            ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
+            SOURCE=e922e0d153f32c8319bc4ec8b9165f39c7dfeac8
+            RELEASE=/opt/fintual-httpx-releases/$SOURCE
+            for s in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(timeout 8s systemctl is-active "$s")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            sudo -n test -f "$RELEASE/HTTPX_RUNTIME_READY.json"
+            test ! -e /etc/fintual-executor/httpx-order.env
+            # Fresh broker pending read before stopping either worker; no trade.
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 45s "$RELEASE/.venv/bin/python" -u - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            from fintual_executor.client import get_pending
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            con=sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True,timeout=6)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                assert con.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                count=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                assert count==0
+            finally: con.close()
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                owner.bootstrap_once()
+                p=get_pending(owner.borrow(armed=False))
+                assert p["stocksPendingAssetMarketBuys"]==[]
+                assert p["stocksPendingAssetMarketSells"]==[]
+                print("G6_LIVE_BROKER_AND_LEDGER_PRESTOP_ZERO_PENDING=PASS",flush=True)
+            PY
+            RECOVER_UNIT="g6-rollback-real-profile-$$"
+            NEED_RESTORE=0
+            restore() {
+              if test "$NEED_RESTORE" -eq 1; then
+                sudo -n systemctl start fintual-browser.service || true
+                sudo -n systemctl start fintual-executor.service || true
+                echo ORIGINAL_BROWSER_POST_RESTORE="$(timeout 10s systemctl is-active fintual-browser.service || true)"
+                echo ORIGINAL_EXECUTOR_POST_RESTORE="$(timeout 10s systemctl is-active fintual-executor.service || true)"
+              fi
+              sudo -n systemctl stop "$RECOVER_UNIT.timer" >/dev/null 2>&1 || true
+            }
+            trap restore EXIT
+            sudo -n systemd-run --quiet --on-active=140s --unit="$RECOVER_UNIT" \
+              /bin/sh -c 'systemctl start fintual-browser.service; systemctl start fintual-executor.service'
+            echo G6_INDEPENDENT_RECOVERY_TIMER_SET=TRUE
+            NEED_RESTORE=1
+            sudo -n timeout 18s systemctl stop fintual-executor.service
+            test "$(timeout 7s systemctl is-active fintual-executor.service)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            conn=sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True,timeout=6)
+            try:
+                conn.execute("PRAGMA query_only=ON")
+                assert conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]==0
+            finally:conn.close()
+            print("G6_FINANCIAL_LOCK_QUIESCENT_AND_NO_OUTSTANDING_INTENTS=TRUE",flush=True)
+            PY
+            sudo -n timeout 18s systemctl stop fintual-browser.service
+            test "$(timeout 7s systemctl is-active fintual-browser.service)" = inactive
+            echo G6_RESIDENT_CHROME_STOPPED_FOR_COLD_TEST=TRUE
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              DISPLAY=:99 HOME=/home/fintual PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 84s "$RELEASE/.venv/bin/python" -u - <<'PY'
+            import json
+            from pathlib import Path
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_market_info,get_pending
+            symbols=json.loads(Path("/etc/fintual-executor/config.json").read_text())["symbols"]
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(
+                    owner,
+                    profile=Path("/var/lib/fintual-browser/profile"),
+                    chrome_binary=Path("/var/lib/fintual-browser/chrome"),
+                )
+                print("G6_AUTHENTICATED_REAL_PROFILE_COLD_BOOT=PASS",flush=True)
+                client=owner.borrow(armed=False)
+                assert isinstance(get_market_info(client).get("isMarketOpen"),bool)
+                pending=get_pending(client)
+                assert not pending["stocksPendingAssetMarketBuys"]
+                assert not pending["stocksPendingAssetMarketSells"]
+                for symbol in symbols:
+                    price,stamp=client.current_price(symbol)
+                    assert price.is_finite() and price>0 and bool(stamp)
+                assert not client.execution_enabled
+                print("G6_AFTER_CHROME_EXIT_HTTPX_AUTH_ALL_BROKER_READS=PASS",flush=True)
+            print("G6_REAL_CHROME_DISCONNECTED_AND_OWNER_CLOSED=PASS",flush=True)
+            PY
+            test "$(timeout 7s systemctl is-active fintual-browser.service)" = inactive
+            sudo -n test ! -L /var/lib/fintual-browser/profile/SingletonLock
+            sudo -n timeout 22s systemctl start fintual-browser.service
+            sudo -n timeout 22s systemctl start fintual-executor.service
+            test "$(timeout 8s systemctl is-active fintual-browser.service)" = active
+            test "$(timeout 8s systemctl is-active fintual-executor.service)" = active
+            NEED_RESTORE=0
+            sudo -n systemctl stop "$RECOVER_UNIT.timer" >/dev/null 2>&1 || true
+            trap - EXIT
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$ORIGINAL"
+            echo G6_ORIGINAL_EXECUTOR_AND_BROWSER_RESTORED=TRUE
+            echo G6_VERIFIED_ZERO_REAL_ORDERS_SENT=TRUE
