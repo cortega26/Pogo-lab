@@ -1,0 +1,106 @@
+name: Fintual G8 repair post-boot Chrome dependency and restore HTTPX
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/fintual-g8-fix-sheet-sync-browser-boot-dependency-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Pause optional Sheet projection, retire Chrome and recover one G8 financial executor
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 200s
+          script: |
+            set -euo pipefail
+            test "$(cat /proc/sys/kernel/random/boot_id)" != 749cee02-5e9a-4ed3-a3ce-39bdf442a5b
+            test "$(systemctl is-active fintual-executor.service || true)" = failed
+            test "$(systemctl show -P ExecMainStatus fintual-executor.service)" = 2
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-enabled fintual-sheet-sync.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(systemctl show -P RequiredBy fintual-browser.service)" = fintual-sheet-sync.service
+            test "$(systemctl show -P Requires fintual-sheet-sync.service)" != ""
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = /opt/fintual-httpx-releases/e922e0d153f32c8319bc4ec8b9165f39c7dfeac8
+            sudo -n /usr/bin/python3 - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            conn=sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True,timeout=8)
+            try:
+                conn.execute("PRAGMA query_only=ON")
+                assert conn.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                assert conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]==0
+                assert conn.execute("SELECT COUNT(*) FROM fills").fetchone()[0]==10
+            finally:conn.close()
+            print("G8_FINANCIAL_LEDGER_SAFE_TO_RECOVER=TRUE",flush=True)
+            PY
+            # Sheet projection is downstream and idempotent; it will remain
+            # disabled until a no-resident-Chrome sheet sync path is validated.
+            # No configuration/credentials/ledger changes or historical restores.
+            sudo -n timeout 25s systemctl disable --now fintual-sheet-sync.service
+            test "$(systemctl is-active fintual-sheet-sync.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-sheet-sync.service)" = disabled
+            sudo -n timeout 25s systemctl stop fintual-browser.service
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            sudo -n systemctl reset-failed fintual-executor.service
+            sudo -n timeout 65s systemctl start fintual-executor.service
+            sleep 20
+            sudo -n /usr/bin/python3 - <<'PY'
+            import datetime as dt,json,os,sqlite3,subprocess
+            from pathlib import Path
+            def c(*argv):
+                return subprocess.run(argv,capture_output=True,text=True,timeout=8).stdout.strip()
+            checks={
+                "executor_active":c("systemctl","is-active","fintual-executor.service")=="active",
+                "executor_enabled":c("systemctl","is-enabled","fintual-executor.service")=="enabled",
+                "browser_inactive":c("systemctl","is-active","fintual-browser.service")=="inactive",
+                "browser_disabled":c("systemctl","is-enabled","fintual-browser.service")=="disabled",
+                "sheet_sync_inactive":c("systemctl","is-active","fintual-sheet-sync.service")=="inactive",
+                "sheet_sync_disabled":c("systemctl","is-enabled","fintual-sheet-sync.service")=="disabled",
+                "xvfb_active":c("systemctl","is-active","fintual-xvfb.service")=="active",
+                "pogo_lab_active":c("systemctl","is-active","pogo-lab.service")=="active",
+            }
+            pid=int(c("systemctl","show","-P","MainPID","fintual-executor.service") or "0")
+            argv=(Path("/proc")/str(pid)/"cmdline").read_bytes().split(b"\0") if pid else []
+            checks["httpx_process"]=all(x in argv for x in (b"fintual_executor.runner",b"--broker-transport",b"http-order",b"--auth-bootstrap",b"transient-profile"))
+            chrome=0
+            for p in Path("/proc").iterdir():
+                if not p.name.isdecimal():continue
+                try:parts=(p/"cmdline").read_bytes().split(b"\0")
+                except (OSError,PermissionError):continue
+                if parts and parts[0] and (b"chrome" in parts[0].lower() or b"chromium" in parts[0].lower()) and b"--user-data-dir=/var/lib/fintual-browser/profile" in parts:chrome+=1
+            checks["resident_chrome_absent"]=chrome==0
+            db=Path("/var/lib/fintual-executor/state.sqlite3")
+            boot=float(next(row.split()[1] for row in Path("/proc/stat").read_text().splitlines() if row.startswith("btime ")))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=8) as conn:
+                conn.execute("PRAGMA query_only=ON")
+                checks["sqlite_integrity"]=conn.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                fills=conn.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                open_count=conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                latest=conn.execute("SELECT created_at FROM audit_events WHERE event_type='MARKET_DATA_RUNTIME_STARTED' ORDER BY event_id DESC LIMIT 1").fetchone()
+            checks["fills_preserved"]=fills==10
+            checks["no_open_intents"]=open_count==0
+            boot_completed=False
+            if latest:
+                stamp=dt.datetime.fromisoformat(latest[0].replace("Z","+00:00"))
+                if stamp.tzinfo is None:stamp=stamp.replace(tzinfo=dt.timezone.utc)
+                boot_completed=stamp.timestamp()>=boot-2
+            checks["authenticated_runtime_started_post_boot"]=boot_completed
+            print("G8_RECOVERY_CHECKS="+(",".join(k for k,v in checks.items() if not v) or "PASS"),flush=True)
+            print("G8_RECOVERED_HTTPX_MAINPID="+str(pid),flush=True)
+            print("G8_RESIDENT_CHROME_COUNT="+str(chrome),flush=True)
+            print("G8_FINANCIAL_FILLS="+str(fills),flush=True)
+            print("G8_SHEET_SYNC_PAUSED_FOR_BOOT_DEPENDENCY_REPAIR=TRUE",flush=True)
+            print("G8_HTTPX_RECOVERY_STATUS="+("PASS" if all(checks.values()) else "FAIL"),flush=True)
+            assert all(checks.values()),"G8_HTTPX_POSTBOOT_REPAIR_UNVERIFIED"
+            PY
