@@ -102,12 +102,13 @@ jobs:
             proc=Path("/proc")
             for candidate in proc.iterdir():
                 if not candidate.name.isdigit():continue
-                try: argv=(candidate/"cmdline").read_bytes()
+                try: raw=(candidate/"cmdline").read_bytes()
                 except (OSError,PermissionError):continue
+                argv=raw.split(b"\\0")
                 if (
                     argv and
                     (b"chrome" in argv[0].lower() or b"chromium" in argv[0].lower())
-                    and b"/var/lib/fintual-browser/profile" in argv
+                    and b"/var/lib/fintual-browser/profile" in raw
                 ):
                     raise RuntimeError("REAL_CHROME_PROFILE_STILL_OWNED")
             if os.path.lexists(lock):
