@@ -1,0 +1,90 @@
+name: Fintual G8 authenticated after-hours reboot preflight
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/fintual-g8-reboot-preflight-afterhours-20261016.yml]
+permissions:
+  contents: read
+concurrency:
+  group: fintual-g8-reboot-cert-and-financial-read
+  cancel-in-progress: false
+jobs:
+  authenticated-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify Fintual market closed, no broker pending orders, local clean ledger and fresh private backup
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 220s
+          script: |
+            set -euo pipefail
+            SHA=e922e0d153f32c8319bc4ec8b9165f39c7dfeac8
+            ROOT=/opt/fintual-httpx-releases/$SHA
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service || true)" = disabled
+            test "$(systemctl is-active fintual-xvfb.service)" = active
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = "$ROOT"
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              DISPLAY=:99 HOME=/home/fintual PYTHONPATH="$ROOT/src" PYTHONDONTWRITEBYTECODE=1 \
+              timeout 130s "$ROOT/.venv/bin/python" -u - <<'PY'
+            import datetime as dt
+            import json
+            import sqlite3
+            from pathlib import Path
+            from zoneinfo import ZoneInfo
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_market_info, get_pending
+            now=dt.datetime.now(tz=ZoneInfo("America/New_York"))
+            assert now.weekday()<5 and now.hour >=16, "NOT_AFTER_US_REGULAR_MARKET_CLOSE"
+            db=Path("/var/lib/fintual-executor/state.sqlite3")
+            def get_ledger():
+                con=sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=8)
+                try:
+                    con.execute("PRAGMA query_only=ON")
+                    assert con.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                    open_count=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                    fills=con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                    return open_count,fills
+                finally: con.close()
+            open_count,fills=get_ledger()
+            assert open_count == 0 and fills>=10, "PREBOOT_LEDGER_UNSAFE"
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(
+                    owner,
+                    profile=Path("/var/lib/fintual-browser/profile"),
+                    chrome_binary=Path("/var/lib/fintual-browser/chrome"),
+                )
+                client=owner.borrow(armed=False)
+                assert not client.execution_enabled, "BROKER_HANDLE_ARMED"
+                info=get_market_info(client)
+                pending=get_pending(client)
+                assert info.get("isMarketOpen") is False, "FINTUAL_MARKET_NOT_CONFIRMED_CLOSED"
+                assert pending.get("stocksPendingAssetMarketBuys")==[], "BROKER_BUYS_PENDING_OR_UNVERIFIED"
+                assert pending.get("stocksPendingAssetMarketSells")==[], "BROKER_SELLS_PENDING_OR_UNVERIFIED"
+            after_open,after_fills=get_ledger()
+            assert after_open==0 and after_fills==fills, "LEDGER_CHANGED_DURING_BROKER_PREFLIGHT"
+            print("G8_BROKER_AUTHENTICATED_MARKET_CLOSED=PASS",flush=True)
+            print("G8_BROKER_PENDING_BUYS=0",flush=True)
+            print("G8_BROKER_PENDING_SELLS=0",flush=True)
+            print("G8_FINANCIAL_INTENTS_OPEN=0",flush=True)
+            print("G8_LEDGER_FILLS="+str(fills),flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            # A WAL-consistent, root-private backup for recovery, never a restore.
+            sudo -n env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$ROOT/src" timeout 35s "$ROOT/.venv/bin/python" \
+              -m fintual_executor.g8_ledger_backup \
+              --source /var/lib/fintual-executor/state.sqlite3 \
+              --backup-root /var/lib/fintual-g8-backups
+            echo G8_FINANCIAL_BACKUP_VERIFIED_WITHOUT_RESTORE=TRUE
+            echo G8_HOST_BOOT_ID_BEFORE_REBOOT="$(cat /proc/sys/kernel/random/boot_id)"
+            echo G8_PREFLIGHT_ONLY_NO_REBOOT_PERFORMED=TRUE
