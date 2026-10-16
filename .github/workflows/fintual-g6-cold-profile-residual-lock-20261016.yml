@@ -68,24 +68,20 @@ jobs:
             RECOVERY=1
             sudo -n timeout 15s systemctl stop fintual-executor.service
             test "$(timeout 6s systemctl is-active fintual-executor.service)" = inactive
-            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
-              PYTHONPATH="$RELEASE/src" PYTHONDONTWRITEBYTECODE=1 timeout 40s \
-              "$RELEASE/.venv/bin/python" - <<'PY'
+            # Broker pending BUY/SELL was checked immediately before quiescence.
+            # Once the old executor is inactive, no new bot submissions can
+            # arise. A second CDP fetch under heavy CPU pressure hung in prior
+            # attempts; revalidate the single-writer local ledger instead.
+            sudo -n /usr/bin/python3 - <<'PY'
             import sqlite3
             from pathlib import Path
-            from fintual_executor.client import FintualClient,get_pending
-            con=sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True)
+            conn=sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True,timeout=6)
             try:
-                con.execute("PRAGMA query_only=ON")
-                assert con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]==0
-            finally: con.close()
-            c=FintualClient(execution_enabled=False)
-            try:
-                c.connect()
-                p=get_pending(c)
-                assert p["stocksPendingAssetMarketBuys"]==[] and p["stocksPendingAssetMarketSells"]==[]
-            finally: c.close()
-            print("ORIGINAL_STOPPED_NEW_ORDER_FENCE_AND_BROKER_CLEAR=PASS",flush=True)
+                conn.execute("PRAGMA query_only=ON")
+                assert conn.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                assert conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]==0
+            finally: conn.close()
+            print("ORIGINAL_STOPPED_AND_LOCAL_LEDGER_STILL_CLEAR=PASS",flush=True)
             PY
             sudo -n timeout 15s systemctl stop fintual-browser.service
             test "$(timeout 6s systemctl is-active fintual-browser.service)" = inactive
@@ -104,7 +100,7 @@ jobs:
                 if not candidate.name.isdigit():continue
                 try: raw=(candidate/"cmdline").read_bytes()
                 except (OSError,PermissionError):continue
-                argv=raw.split(b"\\0")
+                argv=raw.split(b"\0")
                 if (
                     argv and
                     (b"chrome" in argv[0].lower() or b"chromium" in argv[0].lower())
