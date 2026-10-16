@@ -1,7 +1,7 @@
-name: Fintual G5 hourly safety watch (notifications only)
+name: Fintual G5 historical safety watch (manual only)
+# G5 ended at checkpoint 90 with a transient network error; this is history.
+# New live HTTPX production has its own G8 watch.
 on:
-  schedule:
-    - cron: "12 * * * *"
   workflow_dispatch:
 
 permissions:
