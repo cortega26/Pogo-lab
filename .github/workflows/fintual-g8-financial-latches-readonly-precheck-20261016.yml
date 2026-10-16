@@ -1,0 +1,48 @@
+name: Fintual G8 execution flags and service compatibility read-only precheck
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g8-financial-latches-readonly-precheck-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Read only booleans for real trading flag compatibility; do not print secrets
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 80s
+          script: |
+            set -euo pipefail
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            for unit in fintual-executor.service fintual-browser.service fintual-xvfb.service fintual-g5-shadow-20261014.service; do
+              test "$(timeout 6s systemctl is-active "$unit")" = active
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            import json
+            conf=json.loads(Path("/etc/fintual-executor/config.json").read_text())
+            enabled=conf.get("execution_enabled") is True
+            env=Path("/etc/fintual-executor/market-data.env").read_text()
+            names={}
+            for line in env.splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line: continue
+                key,value=line.split("=",1)
+                key=key.strip()
+                if key in ("FINTUAL_REAL_EXECUTION","FINTUAL_HTTP_MUTATIONS"):
+                    names[key] = bool(value.strip().strip('"').strip("'"))
+            print("CONFIG_EXECUTION_ENABLED="+str(enabled).upper())
+            print("UNIT_ENVFILE_HAS_REAL_EXECUTION_FLAG="+str(names.get("FINTUAL_REAL_EXECUTION",False)).upper())
+            print("UNIT_ENVFILE_HAS_HTTPX_MUTATION_FLAG="+str(names.get("FINTUAL_HTTP_MUTATIONS",False)).upper())
+            print("HTTPX_REQUIRES_ADDITIONAL_FLAG_FOR_REAL_ORDERS="+str(enabled and not names.get("FINTUAL_HTTP_MUTATIONS",False)).upper())
+            print("NO_FLAG_VALUES_OR_CREDENTIALS_DISCLOSED=TRUE")
+            PY
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            echo G8_EXECUTION_FLAGS_INSPECTED_WITHOUT_CHANGE=PASS
