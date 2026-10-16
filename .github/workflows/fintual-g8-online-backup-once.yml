@@ -21,7 +21,7 @@ jobs:
           script: |
             set -euo pipefail
             ORIGINAL=abf4db01082c77feef364a8925852a2633afbad2
-            SHA=8382697688918a5bc2d51d241b9d920a3b131bca
+            SHA=51e8b71acff91ceb233254f09f1c095dcdfd5fb2
             KEY=/var/lib/fintual-ci-source-readonly/github_ed25519
             KNOWN=/var/lib/fintual-ci-source-readonly/known_hosts
             UV=/home/fintual/.uv-bootstrap/bin/uv
