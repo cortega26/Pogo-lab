@@ -1,0 +1,77 @@
+name: Fintual G8 post-reboot read-only forensics
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/fintual-g8-postreboot-forensics-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Get sanitized systemd journal classification, ledger and boot state
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 105s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3,subprocess
+            from pathlib import Path
+            def run(*args):
+                p=subprocess.run(args,text=True,capture_output=True,timeout=12)
+                return p.stdout.strip()
+            print("FORENSICS_BOOT_ID="+Path("/proc/sys/kernel/random/boot_id").read_text().strip(),flush=True)
+            for s in ("fintual-executor.service","fintual-browser.service","fintual-xvfb.service","pogo-lab.service"):
+                n=s.replace(".service","").replace("-","_")
+                print(n+"_active="+run("systemctl","is-active",s),flush=True)
+                print(n+"_enabled="+run("systemctl","is-enabled",s),flush=True)
+                print(n+"_ActiveState="+run("systemctl","show","-P","ActiveState",s),flush=True)
+                print(n+"_SubState="+run("systemctl","show","-P","SubState",s),flush=True)
+                print(n+"_Result="+run("systemctl","show","-P","Result",s),flush=True)
+                print(n+"_ExecMainStatus="+run("systemctl","show","-P","ExecMainStatus",s),flush=True)
+                print(n+"_NRestarts="+run("systemctl","show","-P","NRestarts",s),flush=True)
+                print(n+"_MainPID="+run("systemctl","show","-P","MainPID",s),flush=True)
+            db=Path("/var/lib/fintual-executor/state.sqlite3")
+            try:
+                c=sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=8)
+                try:
+                    c.execute("PRAGMA query_only=ON")
+                    print("FINANCIAL_LEDGER_OK="+str(c.execute("PRAGMA integrity_check").fetchone()==("ok",)),flush=True)
+                    print("FINANCIAL_FILLS="+str(c.execute("SELECT COUNT(*) FROM fills").fetchone()[0]),flush=True)
+                    print("FINANCIAL_OPEN_INTENTS="+str(c.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]),flush=True)
+                    print("FINANCIAL_UNKNOWN="+str(c.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]),flush=True)
+                    rows=c.execute("SELECT event_type,created_at FROM audit_events ORDER BY event_id DESC LIMIT 8").fetchall()
+                    for evt,ts in rows: print("RECENT_EVENT="+str(evt)+"@"+str(ts),flush=True)
+                finally:c.close()
+            except Exception as e:print("LEDGER_READ_FAILED_CLASS="+type(e).__name__,flush=True)
+            proc=Path("/proc")
+            chrome=0
+            for p in proc.iterdir():
+                if not p.name.isdecimal():continue
+                try:argv=(p/"cmdline").read_bytes()
+                except (OSError,PermissionError):continue
+                if b"--user-data-dir=/var/lib/fintual-browser/profile" in argv and (b"chrome" in argv[:200] or b"chromium" in argv[:200]):chrome+=1
+            print("RESIDENT_PROFILE_CHROME_PROCESSES="+str(chrome),flush=True)
+            print("PROFILE_SINGLETON_LOCK_EXISTS="+str((Path("/var/lib/fintual-browser/profile")/"SingletonLock").is_symlink()),flush=True)
+            journal=run("journalctl","-b","-u","fintual-executor.service","--no-pager","-o","cat","-n","180")
+            classes=[]
+            for line in journal.splitlines():
+                if not line.strip():continue
+                try:
+                    v=json.loads(line)
+                    if isinstance(v,dict):
+                        state=v.get("state")
+                        if isinstance(state,str) and len(state)<=64:classes.append("RUNNER_STATE:"+state)
+                        continue
+                except (ValueError,TypeError):pass
+                low=line.lower()
+                for word in ("auth_required","transientprofileunavailable","singleton","exited","failed","restart","timeout","timed out","market_data_runtime_started","operation not permitted"):
+                    if word in low:classes.append("JOURNAL_CLASS:"+word)
+            print("JOURNAL_EVENT_CLASSIFICATIONS="+",".join(classes[-20:]),flush=True)
+            print("G8_FORENSICS_READ_ONLY=TRUE",flush=True)
+            PY
