@@ -1,0 +1,70 @@
+name: Fintual G5 failure current HTTPX network and orders preflight (read-only)
+on:
+  push:
+    branches: [ci/fintual-g6-ipc-recovery-20261015]
+    paths: [.github/workflows/fintual-g5-network-recovery-preflight-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Independently check actual broker transport and live pending intents unarmed
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 120s
+          script: |
+            set -euo pipefail
+            SHA=fc6803f5c2aa299f7aa4962887c68f65c0c72762
+            BASELINE=abf4db01082c77feef364a8925852a2633afbad2
+            ROOT=/opt/fintual-httpx-releases/$SHA
+            for s in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(timeout 8s systemctl is-active "$s")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$BASELINE"
+            sudo -n -u fintual env -u FINTUAL_REAL_EXECUTION -u FINTUAL_HTTP_MUTATIONS \
+              PYTHONPATH="$ROOT/src" PYTHONDONTWRITEBYTECODE=1 timeout 85s \
+              "$ROOT/.venv/bin/python" -u - <<'PY'
+            import json,sqlite3
+            from pathlib import Path
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.client import get_market_info,get_pending
+            config=json.loads(Path("/etc/fintual-executor/config.json").read_text())
+            con=sqlite3.connect(Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro",uri=True,timeout=5)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                assert con.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                unresolved=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                print("G7_LOCAL_OPEN_INTENTS="+str(unresolved),flush=True)
+                print("G7_LOCAL_LEDGER_INTEGRITY=PASS",flush=True)
+            finally: con.close()
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                owner.bootstrap_once()
+                handle=owner.borrow(armed=False)
+                info=get_market_info(handle)
+                assert isinstance(info.get("isMarketOpen"),bool)
+                print("G7_RECENT_AUTHENTICATED_HTTPX_MARKET_INFO=PASS",flush=True)
+                pending=get_pending(handle)
+                buys=pending["stocksPendingAssetMarketBuys"]
+                sells=pending["stocksPendingAssetMarketSells"]
+                assert isinstance(buys,list) and isinstance(sells,list)
+                print("G7_LIVE_PENDING_BUYS="+str(len(buys)),flush=True)
+                print("G7_LIVE_PENDING_SELLS="+str(len(sells)),flush=True)
+                for symbol in config["symbols"]:
+                    price,timestamp=handle.current_price(symbol)
+                    assert price.is_finite() and price>0 and bool(timestamp)
+                print("G7_CURRENT_HTTPX_ALL_PRICING_READS=PASS",flush=True)
+                assert handle.execution_enabled is False
+                print("G7_NEW_HTTPX_TRADING_NOT_ARMED=TRUE",flush=True)
+            print("G7_LIVE_READONLY_PREREQUISITES=PASS",flush=True)
+            PY
+            for s in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              test "$(timeout 8s systemctl is-active "$s")" = active
+            done
+            test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = "$BASELINE"
+            echo ORIGINAL_FINANCIAL_EXECUTOR_UNCHANGED=TRUE
