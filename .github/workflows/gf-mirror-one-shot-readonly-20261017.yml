@@ -79,3 +79,43 @@ jobs:
             print("GF_MIRROR_PROFILE_PROCESSES="+str(count),flush=True)
             print("GF_DIAG_END",flush=True)
             PY
+
+
+      - name: Inspect isolated Sheet Python prerequisites (read-only)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 65s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import importlib.util, subprocess, os, stat
+            from pathlib import Path
+            def show(label,p):
+                obj=Path(p)
+                print(label+"_EXISTS="+str(obj.exists()),flush=True)
+                if obj.exists():
+                    st=obj.stat()
+                    print(label+"_OWNER_UID="+str(st.st_uid),flush=True)
+                    print(label+"_PERMISSIONS="+oct(stat.S_IMODE(st.st_mode)),flush=True)
+            for name,path in (
+                ("UV_BOOTSTRAP","/home/fintual/.uv-bootstrap/bin/uv"),
+                ("SHEET_VENV_PY","/opt/fintual-sheet-sync-venv/bin/python"),
+                ("HTTPX_VENV_PY","/opt/fintual-httpx-current/.venv/bin/python"),
+                ("SHEET_SOURCE","/opt/fintual-sheet-sync-current/src/fintual_executor/sheet_sync.py"),
+                ("SHEET_CREDENTIALS","/etc/fintual-executor/google-sheet-sync.json"),
+                ("SHEET_ENV","/etc/fintual-executor/sheet-sync.env"),
+            ):
+                show(name,path)
+            source=Path("/opt/fintual-sheet-sync-current")
+            print("SHEET_RELEASE_ALIAS="+str(source.resolve()) if source.exists() else "SHEET_RELEASE_ALIAS=MISSING",flush=True)
+            interpreter=Path("/opt/fintual-httpx-current/.venv/bin/python")
+            if interpreter.is_file():
+                p=subprocess.run([str(interpreter),"-c","import sys,ensurepip,venv;print('PYTHON_VERSION='+sys.version.split()[0]);print('ENSUREPIP_AVAILABLE=TRUE')"],capture_output=True,text=True,timeout=12)
+                print("HTTPX_INTERPRETER_PROBE_EXIT="+str(p.returncode),flush=True)
+                print(p.stdout.strip(),flush=True)
+            p=subprocess.run(["systemctl","show","-p","FragmentPath","-p","Requires","fintual-sheet-sync.service"],capture_output=True,text=True,timeout=12)
+            print("SHEET_LOADED_UNIT="+p.stdout.strip().replace("\n",";"),flush=True)
+            PY
