@@ -1,0 +1,105 @@
+name: GF new sandbox assets and transaction history audit (read only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-new-sandbox-assets-and-transactions-audit-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Read assets and transactions tabs without changing a portfolio
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 365s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            UUID="$(sudo -n cat /var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z/new-empty-sandbox-uuid.private)"
+            test "$(printf %s "$UUID" | wc -c)" = 36
+            sudo -n -u fintual env GF_SANDBOX_EXPECTED_UUID="$UUID" \
+              PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,json,re
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            env={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k,v=line.split("=",1)
+                    if k.strip().isidentifier():env[k.strip()]=v.strip().strip("'").strip('"')
+            assert not env.get("GF_MIRROR_WRITES")
+            os.environ.update(env)
+            cfg=load_config()
+            assert not cfg.writes_armed
+            expected=os.environ["GF_SANDBOX_EXPECTED_UUID"]
+            old="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protected="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            assert re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",expected)
+            assert expected not in (old,protected)
+            name="Fintual Historical Replay Sandbox 2026"
+            with _browser(cfg) as b:
+                p=b.page
+                p.set_default_timeout(35000)
+                try:
+                    locator=p.get_by_role("button",name=name,exact=True)
+                    if locator.count()!=1:
+                        p.goto("https://www.google.com/finance/",wait_until="commit",timeout=65000)
+                        p.wait_for_timeout(1700)
+                        locator=p.get_by_role("button",name=name,exact=True)
+                    assert locator.count()==1
+                    locator.click(no_wait_after=True,timeout=40000)
+                    p.wait_for_timeout(1300)
+                    assert urlparse(p.url).path=="/finance/portfolio/"+expected
+                    print("GF_NEW_EMPTY_TARGET_VERIFIED=TRUE",flush=True)
+                    def inspect():
+                        return p.evaluate(r"""() => {
+                            const visible=e=>{const r=e.getBoundingClientRect();return !!(r.width&&r.height)};
+                            const body=document.body.innerText||'';
+                            const tables=[...document.querySelectorAll('table,[role=table]')].filter(visible).map(t=>({
+                                headers:[...t.querySelectorAll('th,[role=columnheader]')]
+                                  .map(c=>(c.innerText||'').trim()).slice(0,12),
+                                rowCount:t.querySelectorAll('tr,[role=row]').length
+                            }));
+                            const holdings=tables.filter(t=>t.headers.some(s=>/cantidad|quantity/i.test(s))
+                                && t.headers.some(s=>/s[íi]mbol|symbol|ticker/i.test(s)));
+                            const trades=tables.filter(t=>t.headers.some(s=>/acci[óo]n|action/i.test(s))
+                                && t.headers.some(s=>/fecha|date/i.test(s)));
+                            const hints=body.split('\n').map(s=>s.trim())
+                              .filter(s=>s.length>8&&s.length<130&&/no hay|todavía no|aún no|sin inversiones|sin transacciones|no transactions|nothing in this portfolio yet|no investments|no holdings|agregar inversiones|añadir inversiones/i.test(s)).slice(-8);
+                            return {path:location.pathname,holdings,tradeTables:trades,emptyHints:hints};
+                        }""")
+                    print("GF_NEW_EMPTY_ASSETS="+json.dumps(inspect(),sort_keys=True,ensure_ascii=False),flush=True)
+                    tab=p.get_by_role("tab",name="Transacciones",exact=True)
+                    if tab.count()==1:tab.click(no_wait_after=True,timeout=40000)
+                    else:
+                        tab=p.get_by_text("Transacciones",exact=True)
+                        assert tab.count()>=1
+                        tab.first.click(no_wait_after=True,timeout=40000)
+                    p.wait_for_timeout(1550)
+                    assert urlparse(p.url).path=="/finance/portfolio/"+expected
+                    summary=inspect()
+                    print("GF_NEW_EMPTY_TRANSACTIONS="+json.dumps(summary,sort_keys=True,ensure_ascii=False),flush=True)
+                    assert not any(t["rowCount"]>1 for t in summary["tradeTables"])
+                    print("GF_NEW_EMPTY_NO_VISIBLE_HISTORY_ROWS=TRUE",flush=True)
+                finally:
+                    old_button=p.get_by_role("button",name="New Portfolio",exact=True)
+                    if old_button.count()==1:
+                        old_button.click(no_wait_after=True,timeout=40000)
+                        p.wait_for_timeout(650)
+                        assert urlparse(p.url).path=="/finance/portfolio/"+old
+                        print("GF_NEW_EMPTY_ORIGINAL_RESTORED=TRUE",flush=True)
+            print("GF_NEW_EMPTY_NO_GOOGLE_WRITES=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            echo GF_NEW_EMPTY_FINANCIAL_PRODUCTION_UNCHANGED=PASS
