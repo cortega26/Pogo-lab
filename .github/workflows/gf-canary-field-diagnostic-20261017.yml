@@ -1,0 +1,86 @@
+name: GF canary failed input reproduction (never submit)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-canary-field-diagnostic-20261017.yml
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Read ambiguous ledger row and reproduce the purchase form with submit false
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 245s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance \
+              PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import sqlite3,os,json,re
+            from datetime import date
+            from decimal import Decimal
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.tx import LedgerTransaction
+            from gf_mirror.txwriter import TransactionWriter
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                l=line.strip()
+                if not l or l.startswith("#") or "=" not in l:continue
+                k,v=l.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert cfg.get("GF_MIRROR_WRITES","")=="" and cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO","")==""
+            target=urlparse(cfg.get("GF_MIRROR_PORTFOLIO_URL","")).path.rstrip("/").split("/")[-1]
+            assert target and target!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            path=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=15) as con:
+                con.execute("PRAGMA query_only=ON")
+                assert con.execute("PRAGMA quick_check").fetchone()==("ok",)
+                row=con.execute("SELECT source_id,payload_json FROM pushed_transactions WHERE state='SUBMITTED'").fetchall()
+                assert len(row)==1
+                p=json.loads(row[0][1])
+            print("GF_DIAGNOSTIC_ACTION="+str(p.get("action")),flush=True)
+            print("GF_DIAGNOSTIC_TICKER="+str(p.get("ticker")),flush=True)
+            print("GF_DIAGNOSTIC_DATE="+str(p.get("date")),flush=True)
+            if p.get("action")!="BUY":
+                print("GF_DIAGNOSTIC_SKIPPED=NOT_A_BUY",flush=True)
+                raise SystemExit(0)
+            values={k:v for k,v in cfg.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")}
+            os.environ.update(values)
+            config=load_config()
+            assert not config.writes_armed
+            tx=LedgerTransaction(
+                source_id=row[0][0],trade_date=date.fromisoformat(p["date"]),
+                action=p["action"],ticker=p["ticker"],
+                quantity=Decimal(p["quantity"]),price=Decimal(p["price"]),usd=Decimal(p["usd"]),
+                adjustment=p.get("adjustment","")
+            )
+            with _browser(config) as browser:
+                writer=TransactionWriter(browser,config.portfolio_url,config.portfolio_name)
+                try:
+                    r=writer.append_purchase(tx,submit=False)
+                    print("GF_DRYRUN_FORM_RESULT=PASS",flush=True)
+                    print("GF_DRYRUN_SUBMITTED="+str(r.get("submitted")),flush=True)
+                except Exception as err:
+                    msg=str(err)
+                    msg=re.sub(r"[0-9]+(?:[.,][0-9]+)?","<num>",msg)
+                    print("GF_DRYRUN_FORM_RESULT=FAILED",flush=True)
+                    print("GF_DRYRUN_ERROR_CLASS="+type(err).__name__,flush=True)
+                    print("GF_DRYRUN_ERROR_SANITIZED="+msg[:400],flush=True)
+            print("GF_DIAGNOSTIC_FINISHED_NO_SUBMISSION=TRUE",flush=True)
+            PY
