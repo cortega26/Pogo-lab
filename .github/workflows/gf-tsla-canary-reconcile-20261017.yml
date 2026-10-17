@@ -94,3 +94,5 @@ jobs:
                 if line.startswith("GF_RESTORE"):print(line,flush=True)
             assert result.returncode==0,"RESTORE_FAILED_SAFE_STOP"
             PY
+
+# 2026-10-17T13:32Z reconcile absent TSLA after one-sale canary; no portfolio writes.
