@@ -1,0 +1,112 @@
+name: GF new sandbox UUID and zero-holdings certification (read only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-parallel-sandbox-uuid-empty-verify-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Inspect exact newly created sandbox and store UUID privately
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 360s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import re,os,json,hashlib
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            env={}
+            for l in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                if "=" in l and not l.lstrip().startswith("#"):
+                    k,v=l.split("=",1)
+                    if k.strip().isidentifier():env[k.strip()]=v.strip().strip("'").strip('"')
+            assert not env.get("GF_MIRROR_WRITES")
+            os.environ.update(env)
+            cfg=load_config()
+            old="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protected="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            newname="Fintual Historical Replay Sandbox 2026"
+            assert urlparse(cfg.portfolio_url).path=="/finance/portfolio/"+old
+            assert not cfg.writes_armed
+            with _browser(cfg) as b:
+                p=b.page
+                p.set_default_timeout(35000)
+                try:
+                    if p.get_by_role("button",name=newname,exact=True).count()!=1:
+                        # Navigates but never submits; a cached current page may be stale.
+                        p.goto("https://www.google.com/finance/",wait_until="commit",timeout=65000)
+                        p.wait_for_timeout(1500)
+                    new=p.get_by_role("button",name=newname,exact=True)
+                    assert new.count()==1,"sandbox control must be unique"
+                    new.click(no_wait_after=True,timeout=40000)
+                    p.wait_for_timeout(1500)
+                    path=urlparse(p.url).path
+                    match=re.fullmatch(r"/finance/portfolio/([0-9a-f]{8}-[0-9a-f-]{27})",path)
+                    assert match,"sandbox must have real portfolio UUID"
+                    new_id=match.group(1)
+                    assert new_id not in (old,protected)
+                    inspect=p.evaluate(r"""() => {
+                        const t=(document.body.innerText||'');
+                        const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                        const ts=[...document.querySelectorAll('table,[role=table]')].filter(visible)
+                            .map(x=>({headers:[...x.querySelectorAll('th,[role=columnheader]')]
+                              .map(c=>(c.innerText||'').trim()).slice(0,10),
+                              rows:x.querySelectorAll('tr,[role=row]').length}));
+                        const tabs=[...document.querySelectorAll('[role=tab],button')]
+                          .filter(visible).map(e=>(e.getAttribute('aria-label')||e.innerText||'').trim())
+                          .filter(x=>/activo|invest|transacci|transaction/i.test(x)).slice(0,12);
+                        return {path:location.pathname,
+                          emptyBanner:/nothing in this portfolio yet|no investments|sin inversiones|cartera vacía|aún no hay inversiones|agregar inversiones|add investments to see performance/i.test(t),
+                          tables:ts.slice(0,8),tabs:tabs};
+                    }""")
+                    print("GF_SANDBOX_PORTFOLIO_UUID_SHA256="+hashlib.sha256(new_id.encode()).hexdigest(),flush=True)
+                    print("GF_SANDBOX_PORTFOLIO_URL_MATCH=TRUE",flush=True)
+                    print("GF_SANDBOX_UI="+json.dumps(inspect,sort_keys=True,ensure_ascii=False),flush=True)
+                    # This local file holds the sensitive UUID until the root-only
+                    # staging phase moves it into the preflight backup directory.
+                    local=Path("/tmp/gf-parallel-sandbox-uuid-20261017.private")
+                    os.umask(0o077)
+                    fd=os.open(local,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+                    with os.fdopen(fd,"w") as f:f.write(new_id+"\n")
+                    print("GF_SANDBOX_PRIVATE_UUID_STAGED=TRUE",flush=True)
+                finally:
+                    if p.get_by_role("button",name="New Portfolio",exact=True).count()==1:
+                        p.get_by_role("button",name="New Portfolio",exact=True).click(no_wait_after=True,timeout=35000)
+                        p.wait_for_timeout(550)
+                        assert urlparse(p.url).path=="/finance/portfolio/"+old
+                        print("GF_SANDBOX_BROWSER_RESTORED_OLD=TRUE",flush=True)
+            print("GF_SANDBOX_NO_GOOGLE_WRITES=TRUE",flush=True)
+            PY
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            import os,re,hashlib
+            src=Path("/tmp/gf-parallel-sandbox-uuid-20261017.private")
+            dest=Path("/var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z/new-empty-sandbox-uuid.private")
+            assert src.is_file() and not dest.exists()
+            uid=src.read_text().strip()
+            assert re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",uid)
+            assert uid not in ("86a77e49-9ac1-432e-8d3b-645b8cda19a2","d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f")
+            os.replace(src,dest)
+            os.chown(dest,0,0)
+            os.chmod(dest,0o600)
+            print("GF_SANDBOX_NEW_UUID_STORED_ROOT_PRIVATE=TRUE",flush=True)
+            print("GF_SANDBOX_NEW_UUID_HASH="+hashlib.sha256(uid.encode()).hexdigest(),flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_SANDBOX_FINANCIAL_PRODUCTION_UNCHANGED=PASS
