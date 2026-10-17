@@ -83,3 +83,5 @@ jobs:
             assert p.returncode==0,"DESTINATION_READ_FAILED"
             print("GF_DIAG_READ_ONLY_COMPLETE=TRUE",flush=True)
             PY
+
+# Rerun after bounded sale failed at 2026-10-17T13:30Z; no writes.
