@@ -35,7 +35,7 @@ jobs:
             ! systemctl show -P Requires "$SHEET" | grep -q fintual-browser.service
             systemctl show -P ExecStart "$SHEET" | grep -q -- '--fills-only'
             test "$(systemctl show -P WorkingDirectory "$SHEET")" = /opt/fintual-sheet-sync-current
-            test -f /etc/fintual-executor/sheet-sync.env
+            sudo -n -u fintual test -f /etc/fintual-executor/sheet-sync.env
             sudo -n grep -q '^FINTUAL_SHEET_SPREADSHEET_ID=' /etc/fintual-executor/sheet-sync.env
             sudo -n grep -q '^GOOGLE_APPLICATION_CREDENTIALS=' /etc/fintual-executor/sheet-sync.env
             sudo -n -u fintual test -r /etc/fintual-executor/sheet-sync.env
