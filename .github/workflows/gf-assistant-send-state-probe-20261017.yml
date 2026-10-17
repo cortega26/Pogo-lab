@@ -1,0 +1,56 @@
+name: GF assistant outgoing message presence (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-assistant-send-state-probe-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check if prior TSLA dry-run prompt reached the assistant, without writing
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 70s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,json
+            from pathlib import Path
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            c={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():c[k.strip()]=v.strip().strip("'").strip('"')
+            assert not c.get("GF_MIRROR_WRITES")
+            os.environ.update(c)
+            cfg=load_config()
+            with _browser(cfg) as browser:
+                x=browser.page.evaluate(r"""() => {
+                  const s=document.body.innerText||'';
+                  const markers={
+                    outgoingRequestText:/Añade una única transacción nueva a este portafolio/i.test(s),
+                    outgoingSellRequest:/una VENTA de [0-9.,]+ acciones de TSLA/i.test(s),
+                    assistantConfirmQuestion:/¿?Confirmas[^?]{0,1200}\?/i.test(s),
+                    genericHowToSell:/[Cc]ómo (?:registrar|vender)|[Pp]ara registrar una venta/i.test(s),
+                    noData:/no se encontr[oó] (?:la|las) transaccion/i.test(s),
+                    textareaDraftStillPresent:[...document.querySelectorAll('textarea,[contenteditable=true]')].some(e=>/Añade una única transacción/i.test(e.value || e.innerText || '')),
+                    newPortfolio:/new portfolio|nuevo portafolio/i.test(s),
+                  };
+                  return {markers};
+                }""")
+                print("GF_SEND_PRESENCE="+json.dumps(x,sort_keys=True),flush=True)
+            print("GF_SEND_READONLY=TRUE",flush=True)
+            PY
