@@ -76,3 +76,5 @@ jobs:
             print("GF_BROWSER_WRITES_NOT_STARTED=TRUE",flush=True)
             PY
             echo GF_BROWSER_PREPARE=PASS
+
+# Post-reboot browser-only recovery; transaction writers remain disabled.
