@@ -49,7 +49,7 @@ jobs:
             for name,want in expected.items():
                 p=base/"integrations/google-finance/gf_mirror"/name
                 data=p.read_bytes()
-                blob=hashlib.sha1(b"blob "+str(len(data)).encode()+b"\\0"+data).hexdigest()
+                blob=hashlib.sha1(b"blob "+str(len(data)).encode()+bytes([0])+data).hexdigest()
                 assert blob==want,("SOURCE_UNREVIEWED",name)
             print("GF_CANARY_REVIEWED_SOURCE_BLOBS=PASS",flush=True)
             envfile=Path("/etc/fintual-executor/gf-mirror.env")
