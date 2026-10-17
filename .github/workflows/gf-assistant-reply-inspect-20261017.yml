@@ -71,3 +71,5 @@ jobs:
                 print('GF_ASSISTANT_UI_SHAPE='+json.dumps(details,ensure_ascii=False,sort_keys=True),flush=True)
             print('GF_ASSISTANT_READONLY=PASS',flush=True)
             PY
+
+# Read-only follow-up after structured parser dry-run 39033030434
