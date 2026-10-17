@@ -1,0 +1,64 @@
+name: GF post reboot financial/mirror safety probe (read only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-post-reboot-safety-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect trading Chrome persistence, services, databases and GF CDP
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 15s
+          command_timeout: 90s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import subprocess,sqlite3,json
+            from pathlib import Path
+            from urllib.request import urlopen
+            print("GF_AFTER_REBOOT_BEGIN",flush=True)
+            services=["fintual-executor.service","fintual-sheet-sync.service",
+                "fintual-browser.service","fintual-xvfb.service",
+                "fintual-gf-mirror-browser.service","fintual-gf-xvfb.service",
+                "fintual-gf-tx-bootstrap.service","fintual-gf-tx.timer"]
+            for name in services:
+                c=subprocess.run(["systemctl","is-active",name],capture_output=True,text=True,timeout=5)
+                print("GF_SERVICE_"+name+"="+c.stdout.strip(),flush=True)
+            chrome_trading=0;chrome_gf=0
+            for p in Path("/proc").iterdir():
+                if not p.name.isdecimal():continue
+                try:cmdline=(p/"cmdline").read_bytes().lower()
+                except OSError:continue
+                if not (b"chrome" in cmdline or b"chromium" in cmdline):continue
+                if b"--user-data-dir=/var/lib/fintual-browser/profile" in cmdline:chrome_trading+=1
+                if b"--user-data-dir=/var/lib/fintual-gf-mirror/profile" in cmdline:chrome_gf+=1
+            print("GF_CHROME_TRADING_PROFILE_PROCESSES="+str(chrome_trading),flush=True)
+            print("GF_CHROME_MIRROR_PROFILE_PROCESSES="+str(chrome_gf),flush=True)
+            try:
+                with urlopen("http://127.0.0.1:9223/json/version",timeout=2) as r:
+                    print("GF_MIRROR_CDP_HEALTHY="+str(r.status==200),flush=True)
+            except Exception:print("GF_MIRROR_CDP_HEALTHY=False",flush=True)
+            data=Path("/proc/meminfo").read_text().splitlines()
+            stats={k.strip(":"):int(v.split()[0]) for l in data for k,v in [l.split(":",1)] if k in ("MemAvailable","SwapFree","SwapTotal")}
+            for k in stats:print("GF_"+k.upper()+"_KIB="+str(stats[k]),flush=True)
+            for label,db in (("MIRROR","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"),
+                             ("TRADING","/var/lib/fintual-executor/state.sqlite3")):
+                path=Path(db)
+                if not path.is_file():print("GF_"+label+"_DB=MISSING",flush=True);continue
+                with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=7) as con:
+                    con.execute("PRAGMA query_only=ON")
+                    print("GF_"+label+"_DB_INTEGRITY="+str(con.execute("PRAGMA quick_check").fetchone()[0]),flush=True)
+                    if label=="MIRROR":
+                        print("GF_MIRROR_COUNTS="+json.dumps(dict(con.execute("SELECT state,count(*) FROM pushed_transactions GROUP BY state")),sort_keys=True),flush=True)
+                    if label=="TRADING":
+                        print("GF_TRADING_UNCERTAIN_ORDERS="+str(con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]),flush=True)
+            print("GF_AFTER_REBOOT_END",flush=True)
+            PY
