@@ -106,3 +106,5 @@ jobs:
                 raise SystemExit(2)
             print("GF_DRYRUN_RESULT=PASS",flush=True)
             PY
+
+# Run against post-reboot fresh Assistant thread; never click confirmation.
