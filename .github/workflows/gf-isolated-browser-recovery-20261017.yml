@@ -1,0 +1,97 @@
+name: GF dedicated browser recovery after blocked renderer (no portfolio changes)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-isolated-browser-recovery-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Restart only isolated GF browser after independence safety checks
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 225s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import subprocess,urllib.request,json,time,os,hashlib,sqlite3
+            from pathlib import Path
+            def run(*args,timeout=15):
+                p=subprocess.run(args,text=True,capture_output=True,timeout=timeout)
+                if p.returncode:raise RuntimeError("command failed: "+args[0]+" "+str(p.returncode))
+                return p.stdout.strip()
+            def active(unit):
+                return run("systemctl","is-active",unit)
+            def pid(unit):
+                return run("systemctl","show",unit,"-p","MainPID","--value")
+            browser="fintual-gf-mirror-browser.service"
+            executor="fintual-executor.service"
+            sheets="fintual-sheet-sync.service"
+            assert active(executor)=="active"
+            assert active(sheets)=="active"
+            assert active(browser)=="active"
+            assert run("systemctl","is-active","fintual-gf-tx.timer")=="inactive"
+            old_executor=pid(executor)
+            old_sheets=pid(sheets)
+            for prop in ("Requires","BindsTo","PartOf","ConsistsOf","PropagatesStopTo"):
+                dependency=run("systemctl","show",browser,"-p",prop,"--value")
+                assert executor not in dependency and sheets not in dependency,prop
+            assert Path("/var/lib/fintual-gf-mirror/profile").is_dir()
+            chrome=None
+            for proc in Path("/proc").iterdir():
+                if not proc.name.isdecimal():continue
+                try:
+                    raw=(proc/"cmdline").read_bytes()
+                except OSError:continue
+                if b"--remote-debugging-port=9223" in raw and (
+                    b"--user-data-dir=/var/lib/fintual-gf-mirror/profile" in raw
+                ):
+                    chrome=int(proc.name)
+                    break
+            assert chrome is not None,"debug browser process identity not proved"
+            print("GF_RECOVERY_BROWSER_IDENTITY_PINNED=TRUE",flush=True)
+            print("GF_RECOVERY_SERVICE_DEPENDENCIES_INDEPENDENT=TRUE",flush=True)
+            path=Path("/var/lib/fintual-gf-mirror/parallel-replay/parallel-replay-ledger.sqlite3")
+            oldpath=Path("/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3")
+            assert path.is_file() and oldpath.is_file()
+            state_before={}
+            for name,p in (("sandbox",path),("original",oldpath)):
+                with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True) as db:
+                    assert db.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                    state_before[name]=dict(db.execute(
+                      "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+            assert state_before["sandbox"]=={"PENDING":1178}
+            assert state_before["original"]=={"PENDING":1118,"VERIFIED":60}
+            print("GF_RECOVERY_PRECHECK_LEDGER_STATES=PASS",flush=True)
+            print("GF_RECOVERY_RESTARTING_ONLY_DEDICATED_BROWSER=TRUE",flush=True)
+            run("systemctl","restart",browser,timeout=110)
+            assert active(browser)=="active"
+            assert active(executor)=="active" and pid(executor)==old_executor
+            assert active(sheets)=="active" and pid(sheets)==old_sheets
+            assert run("systemctl","is-active","fintual-gf-tx.timer")=="inactive"
+            cdp_ok=False
+            for _ in range(20):
+                try:
+                    with urllib.request.urlopen("http://127.0.0.1:9223/json/version",timeout=3) as r:
+                        cdp_ok=r.status==200
+                    if cdp_ok:break
+                except Exception:pass
+                time.sleep(1)
+            assert cdp_ok,"CDP unavailable after isolated browser restart"
+            for name,p in (("sandbox",path),("original",oldpath)):
+                with sqlite3.connect(p.as_uri()+"?mode=ro",uri=True) as db:
+                    assert db.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                    assert dict(db.execute(
+                      "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))==state_before[name]
+            print("GF_RECOVERY_CDP_HEALTH=PASS",flush=True)
+            print("GF_RECOVERY_BOTH_LEDGER_STATES_UNCHANGED=TRUE",flush=True)
+            print("GF_RECOVERY_EXECUTOR_AND_SHEETS_PIDS_UNCHANGED=TRUE",flush=True)
+            print("GF_RECOVERY_NO_FINANCE_TRADES_OR_LEDGER_WRITES=TRUE",flush=True)
+            PY
