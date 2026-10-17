@@ -1,0 +1,135 @@
+name: GF mirror deploy parser only (validated private SHA)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-private-parser-deploy-20261017.yml
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Atomic single-file mirror parser deployment; preserve trading and previous revision
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 170s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-xvfb.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /opt/fintual-gf-mirror/integrations/google-finance/deploy/oracle/gf-memory-gate.sh >/dev/null
+            RUN="$(sudo -n mktemp -d /tmp/gf-mirror-code-deploy.XXXXXXXX)"
+            sudo -n chmod 0700 "$RUN"
+            cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
+            trap cleanup EXIT
+            KEY=/var/lib/fintual-ci-source-readonly
+            sudo -n env GIT_TERMINAL_PROMPT=0 \
+              GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
+              git@github.com:cortega26/fintual-executor.git "$RUN/source"
+            SHA="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
+            test "$SHA" = c58ed27fc2b32a599bc0a98ce42cea30212e2a19 || { echo GF_DEPLOY_SOURCE=NOT_REVIEWED; exit 6; }
+            echo GF_DEPLOY_SOURCE=EXACT_VALIDATED_SHA
+            sudo -n /usr/bin/python3 - "$RUN/source" <<'PY'
+            import sys,os,hashlib,stat,shutil,tempfile,sqlite3,json
+            from datetime import datetime,timezone
+            from pathlib import Path
+            from urllib.parse import urlparse
+            root=Path(sys.argv[1])
+            base=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror")
+            name="txwriter.py"
+            dst=base/name
+            src=root/"integrations/google-finance/gf_mirror"/name
+            old="2db4313520613ca6b499e399667edc8f74690890"
+            new="46a68e72477c86e4e21abe69af8913be85694cf3"
+            def digest(p):
+                b=p.read_bytes()
+                return hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()
+            assert digest(src)==new,"SOURCE_FILE_SHA_MISMATCH"
+            assert digest(root/"integrations/google-finance/gf_mirror/txsync.py")=="24127cf958969984282be36a60eafed2155b15f0"
+            assert digest(root/"integrations/google-finance/gf_mirror/config.py")=="4e8c8c7a6a94010fad44a0f044fa3db2a5ad8d5c"
+            assert digest(base/"txsync.py")=="24127cf958969984282be36a60eafed2155b15f0"
+            assert digest(base/"config.py")=="4e8c8c7a6a94010fad44a0f044fa3db2a5ad8d5c"
+            assert digest(dst) in (old,new),"LIVE_WRITER_WAS_UNREVIEWED"
+            cfg={}
+            for l in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                l=l.strip()
+                if l.startswith("#") or "=" not in l:continue
+                k,v=l.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES") and not cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            portfolio=urlparse(cfg["GF_MIRROR_PORTFOLIO_URL"]).path.rstrip("/").split("/")[-1]
+            ledger=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(ledger.as_uri()+"?mode=ro",uri=True,timeout=9) as db:
+                db.execute("PRAGMA query_only=ON")
+                assert db.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                assert db.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==portfolio
+                counts=dict(db.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                assert counts.get("PENDING")==1120 and counts.get("VERIFIED")==58 and not counts.get("SUBMITTED") and not counts.get("FAILED"),counts
+            if digest(dst)==new:
+                print("GF_DEPLOY_ALREADY_AT_VALIDATED_SHA=TRUE",flush=True)
+                raise SystemExit(0)
+            backups=Path("/var/lib/fintual-gf-mirror/code-backups")
+            backups.mkdir(parents=True,exist_ok=True,mode=0o700)
+            os.chmod(backups,0o700)
+            stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup=backups/("txwriter-"+stamp+"-"+old+".py")
+            fd=os.open(backup,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+            try:
+                with os.fdopen(fd,"wb") as out:out.write(dst.read_bytes())
+            except BaseException:backup.unlink(missing_ok=True);raise
+            assert digest(backup)==old
+            st=dst.stat()
+            fd,temp=tempfile.mkstemp(prefix=".txwriter-next-",dir=base)
+            try:
+                os.fchmod(fd,stat.S_IMODE(st.st_mode))
+                os.fchown(fd,st.st_uid,st.st_gid)
+                with os.fdopen(fd,"wb") as out:
+                    out.write(src.read_bytes());out.flush();os.fsync(out.fileno())
+                assert digest(Path(temp))==new
+                os.replace(temp,dst)
+                assert digest(dst)==new
+                print("GF_DEPLOY_LIVE_WRITER_SHA="+new,flush=True)
+                print("GF_DEPLOY_PRIVATE_BACKUP=PASS",flush=True)
+                print("GF_DEPLOY_ONLY_TXWRITER_CHANGED=TRUE",flush=True)
+            except BaseException:
+                Path(temp).unlink(missing_ok=True)
+                fd,tmp=tempfile.mkstemp(prefix=".txwriter-rollback-",dir=base)
+                os.fchmod(fd,stat.S_IMODE(st.st_mode))
+                os.fchown(fd,st.st_uid,st.st_gid)
+                with os.fdopen(fd,"wb") as out:out.write(backup.read_bytes());out.flush();os.fsync(out.fileno())
+                os.replace(tmp,dst)
+                assert digest(dst)==old
+                print("GF_DEPLOY_ROLLBACK=PASS",flush=True)
+                raise
+            PY
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            from gf_mirror.txwriter import parse_sale_proposal,verify_sale_proposal
+            from gf_mirror.tx import LedgerTransaction
+            from datetime import date
+            from decimal import Decimal
+            tx=LedgerTransaction("gf-stage-example",date(2024,3,22),"SELL","NVDA",Decimal("0.125"),Decimal("900.25"),Decimal("112.53"))
+            text='¿Confirmas que deseas registrar esta venta de 0,125 acciones de NVIDIA (NASDAQ:NVDA) del 22/03/2024 a un precio de 900,25 USD por acción en tu portafolio "New Portfolio"?'
+            result=parse_sale_proposal(text)
+            assert verify_sale_proposal(result,tx,portfolio_name="New Portfolio")[0]
+            assert not verify_sale_proposal(result,tx,portfolio_name="Portafolio Actualizado")[0]
+            print("GF_DEPLOY_LIVE_IMPORT_AND_TARGET_GATES=PASS",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            echo GF_DEPLOY_FINANCIAL_PRODUCTION_UNCHANGED=PASS
+            echo GF_DEPLOY_OPERATIONAL_WRITES=ZERO
