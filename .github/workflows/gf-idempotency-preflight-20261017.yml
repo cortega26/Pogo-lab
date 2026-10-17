@@ -71,4 +71,9 @@ jobs:
             if command -v gh >/dev/null 2>&1; then
               if gh auth status >/dev/null 2>&1; then echo GF_CI_GH_AUTH=YES; else echo GF_CI_GH_AUTH=NO; fi
             fi
+            # Probe existing Git authentication only; no checkout or financial action.
+            echo GF_CI_GIT_HTTPS_READ=$(if GIT_TERMINAL_PROMPT=0 timeout 18 git ls-remote https://github.com/cortega26/fintual-executor.git refs/heads/feat/google-finance-mirror >/dev/null 2>&1; then echo YES; else echo NO; fi)
+            echo GF_CI_GIT_SSH_READ=$(if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10' timeout 18 git ls-remote git@github.com:cortega26/fintual-executor.git refs/heads/feat/google-finance-mirror >/dev/null 2>&1; then echo YES; else echo NO; fi)
+            echo GF_CI_FINTUAL_GIT_HTTPS_READ=$(if sudo -n -u fintual env GIT_TERMINAL_PROMPT=0 timeout 18 git ls-remote https://github.com/cortega26/fintual-executor.git refs/heads/feat/google-finance-mirror >/dev/null 2>&1; then echo YES; else echo NO; fi)
+            echo GF_CI_FINTUAL_GIT_SSH_READ=$(if sudo -n -u fintual env GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10' timeout 18 git ls-remote git@github.com:cortega26/fintual-executor.git refs/heads/feat/google-finance-mirror >/dev/null 2>&1; then echo YES; else echo NO; fi)
             echo GF_CI_NO_PRODUCTION_CHANGES=TRUE
