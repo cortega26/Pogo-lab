@@ -1,0 +1,45 @@
+name: GF mirror isolated test preflight (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-idempotency-preflight-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect isolated test availability without touching services
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 150s
+          script: |
+            set -euo pipefail
+            echo GF_CI_PREFLIGHT_BEGIN=TRUE
+            echo GF_CI_SVC_EXECUTOR=$(systemctl is-active fintual-executor.service || true)
+            echo GF_CI_SVC_BROWSER=$(systemctl is-active fintual-gf-mirror-browser.service || true)
+            echo GF_CI_WRITER_TIMER=$(systemctl is-active fintual-gf-tx.timer || true)
+            for p in /opt/fintual-gf-mirror /opt/fintual-gf-mirror-venv; do
+              if test -e "$p"; then echo GF_CI_PATH_PRESENT="$p"; else echo GF_CI_PATH_MISSING="$p"; fi
+            done
+            if test -d /opt/fintual-gf-mirror/.git; then
+              echo GF_CI_REPO_GIT=TRUE
+              echo GF_CI_REPO_HEAD=$(git -C /opt/fintual-gf-mirror rev-parse HEAD)
+              if GIT_TERMINAL_PROMPT=0 timeout 15 git -C /opt/fintual-gf-mirror ls-remote origin refs/heads/feat/google-finance-mirror > /tmp/gf-idempotency-head-20261017.txt 2>/dev/null; then
+                echo GF_CI_REMOTE_HEAD=$(awk '{print $1}' /tmp/gf-idempotency-head-20261017.txt)
+              else
+                echo GF_CI_REMOTE_HEAD=INACCESSIBLE
+              fi
+              rm -f /tmp/gf-idempotency-head-20261017.txt
+            else
+              echo GF_CI_REPO_GIT=FALSE
+            fi
+            if test -x /opt/fintual-gf-mirror-venv/bin/python; then
+              /opt/fintual-gf-mirror-venv/bin/python -c 'import importlib.util;print("GF_CI_PYTEST_INSTALLED="+str(importlib.util.find_spec("pytest") is not None));print("GF_CI_RUFF_INSTALLED="+str(importlib.util.find_spec("ruff") is not None))'
+            fi
+            echo GF_CI_NO_PRODUCTION_CHANGES=TRUE
