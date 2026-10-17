@@ -1,0 +1,45 @@
+name: Fintual main integration postflight (read-only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Read only Oracle trading runtime and Git remote reachability
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            echo '=== POST-MERGE ORACLE READ-ONLY VERIFY ==='
+            for svc in fintual-executor.service fintual-browser.service fintual-xvfb.service; do
+              printf 'service %s: ' "$svc"
+              systemctl is-active "$svc"
+            done
+            echo '--- Installed product SHA (unchanged expected) ---'
+            sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD
+            echo '--- Tracked worktree cleanliness ---'
+            if test -z "$(sudo -n -u fintual git -C /opt/fintual-executor status --porcelain --untracked-files=no)"; then
+              echo 'tracked_worktree_clean: yes'
+            else
+              echo 'tracked_worktree_clean: no'
+              exit 5
+            fi
+            echo '--- Source remote read-only reachability (no credentials or URL disclosed) ---'
+            if timeout 12s sudo -n -u fintual git -C /opt/fintual-executor ls-remote --exit-code origin refs/heads/main >/dev/null 2>&1; then
+              echo 'private_main_fetchable: yes'
+            else
+              echo 'private_main_fetchable: no'
+            fi
+            echo '--- Capacity summary ---'
+            free -m
+            echo '=== READ-ONLY POSTFLIGHT COMPLETE ==='

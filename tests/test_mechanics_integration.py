@@ -6,6 +6,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import Q
+from django.utils import translation
 
 from apps.mechanics.models import Mechanic, MechanicRuleSet, RuleParameter
 from apps.sources.models import SourceClaim, SourceReference
@@ -21,6 +22,7 @@ def trade_mechanic():
         slug="iv-en-intercambios",
         key="trade_iv",
         name="IV en intercambios",
+        description="Descripción canónica en español que no debe filtrarse.",
         status="active",
     )
 
@@ -300,13 +302,107 @@ class TestMechanicViews:
         resp = client.get("/es/mecanicas/no-existe/")
         assert resp.status_code == 404
 
-    def test_mechanic_detail_shows_ruleset(self, client, published_ruleset):
+    def test_mechanic_detail_shows_ruleset(self, client, published_ruleset, seed_content_pages):
         resp = client.get("/es/mecanicas/iv-en-intercambios/")
         assert resp.status_code == 200
         html = resp.content.decode()
         assert "Reglas vigentes" in html
         assert "v1" in html
         assert "floor.friendship.good" in html
+
+    def test_english_mechanics_list_uses_published_translation(
+        self, client, trade_mechanic, seed_content_pages
+    ):
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "IVs in Trades" in html
+        assert "English mechanics summary." in html
+        assert "IV en intercambios" not in html
+        assert "Descripción canónica en español" not in html
+
+    def test_english_mechanics_detail_does_not_leak_canonical_spanish(
+        self, client, published_ruleset, seed_content_pages
+    ):
+        source = SourceReference.objects.create(
+            title="Fuente comunitaria en español",
+            url="https://example.com/research",
+            source_type="community_research",
+            status="vigente",
+        )
+        SourceClaim.objects.create(
+            source=source,
+            ruleset=published_ruleset,
+            scope="Ámbito canónico en español",
+            quote_summary="Resumen español que no debe filtrarse.",
+            confidence_level="high",
+        )
+
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/iv-en-intercambios/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+
+        assert "IVs in Trades" in html
+        assert "English mechanics body." in html
+        assert "example.com" in html
+        assert "Community research" in html
+        assert "IV en intercambios" not in html
+        assert "Descripción canónica en español" not in html
+        assert "Fuente comunitaria en español" not in html
+        assert "Ámbito canónico en español" not in html
+        assert "Resumen español que no debe filtrarse" not in html
+
+    def test_spanish_mechanics_detail_preserves_canonical_evidence(
+        self, client, published_ruleset, seed_content_pages
+    ):
+        source = SourceReference.objects.create(
+            title="Fuente comunitaria en español",
+            url="https://example.com/research",
+            source_type="community_research",
+            status="vigente",
+        )
+        SourceClaim.objects.create(
+            source=source,
+            ruleset=published_ruleset,
+            scope="Ámbito canónico en español",
+            quote_summary="Resumen español que debe conservarse.",
+            confidence_level="high",
+        )
+
+        with translation.override("es"):
+            resp = client.get("/es/mecanicas/iv-en-intercambios/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "Resumen español que debe conservarse." in html
+        assert "Fuente comunitaria en español" in html
+
+    def test_english_mechanics_seo_title_is_not_double_branded(
+        self, client, published_ruleset, seed_content_pages
+    ):
+        from apps.content.models import ContentPageTranslation
+
+        en = ContentPageTranslation.objects.get(
+            page__slug="iv-en-intercambios",
+            locale="en",
+        )
+        en.seo_title = "How IVs Work in Trades | Pogo-lab"
+        en.save(update_fields=["seo_title", "updated_at"])
+
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/iv-en-intercambios/")
+        assert resp.status_code == 200
+        html = resp.content.decode()
+        assert "<title>How IVs Work in Trades | Pogo-lab</title>" in html
+        assert "Pogo-lab — Pogo-lab" not in html
+
+    def test_english_mechanics_detail_fails_closed_without_translation(
+        self, client, published_ruleset
+    ):
+        with translation.override("en"):
+            resp = client.get("/en/mechanics/iv-en-intercambios/")
+        assert resp.status_code == 404
 
 
 @pytest.mark.django_db
@@ -380,10 +476,24 @@ def seed_content_pages():
             defaults={"page_type": page_type, "status": "published"},
         )
         for locale, title in [("es", title_es), ("en", title_en)]:
+            if slug == "iv-en-intercambios" and locale == "en":
+                body = "<p>English mechanics body.</p>"
+                seo_description = "English mechanics summary."
+            elif slug == "iv-en-intercambios":
+                body = "<p>Contenido de mecánica en español.</p>"
+                seo_description = "Resumen de mecánica en español."
+            else:
+                body = f"<p>{title}</p>"
+                seo_description = ""
             ContentPageTranslation.objects.update_or_create(
                 page=page,
                 locale=locale,
-                defaults={"title": title, "body": f"<p>{title}</p>", "is_published": True},
+                defaults={
+                    "title": title,
+                    "body": body,
+                    "seo_description": seo_description,
+                    "is_published": True,
+                },
             )
 
 

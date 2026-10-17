@@ -40,6 +40,24 @@
 
   <link rel="icon" href="{% static 'pogo-lab.svg' %}" type="image/svg+xml">
 
+  <script nonce="{{ request.csp_nonce }}">
+    // Apply the saved/system theme before CSS paints to avoid a light-mode flash.
+    (function() {
+      try {
+        var stored = localStorage.getItem('pogo-dark-mode');
+        var dark = stored !== null
+          ? stored === '1'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (e) {
+        document.documentElement.classList.toggle(
+          'dark',
+          window.matchMedia('(prefers-color-scheme: dark)').matches
+        );
+      }
+    })();
+  </script>
+
   {% block json_ld %}{% endblock %}
 
   {% block extra_css %}{% endblock %}
@@ -62,12 +80,14 @@
         <span class="flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-accent-500 dark:border-slate-700 dark:bg-slate-950" aria-hidden="true">
           {% include "includes/_logo_icon.html" %}
         </span>
-        <span class="hidden font-display text-2xl font-semibold tracking-normal text-slate-900 dark:text-slate-50 sm:inline">Pogo-lab</span>
+        <span class="font-display text-xl font-semibold tracking-normal text-slate-900 dark:text-slate-50 sm:text-2xl">Pogo-lab</span>
       </a>
 
       <button id="menu-toggle" type="button"
               class="inline-flex items-center justify-center rounded-md border border-slate-300 p-2 text-slate-900 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 sm:hidden"
               aria-label="{% trans "Abrir menú" %}"
+              data-open-label="{% trans "Abrir menú" %}"
+              data-close-label="{% trans "Cerrar menú" %}"
               aria-expanded="false"
               aria-controls="nav-menu">
         <svg id="menu-icon" class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -79,25 +99,25 @@
       </button>
 
       <div id="nav-menu"
-           class="hidden sm:flex sm:items-center sm:gap-1 max-sm:absolute max-sm:left-0 max-sm:right-0 max-sm:top-full max-sm:z-50 max-sm:mt-0 max-sm:border-b max-sm:border-slate-200 max-sm:bg-white max-sm:p-4 dark:max-sm:border-slate-800 dark:max-sm:bg-slate-950"
+           class="hidden sm:flex sm:items-center sm:gap-1 max-sm:absolute max-sm:left-0 max-sm:right-0 max-sm:top-full max-sm:z-50 max-sm:mt-0 max-sm:flex-col max-sm:items-stretch max-sm:gap-1 max-sm:border-b max-sm:border-slate-200 max-sm:bg-white max-sm:p-4 dark:max-sm:border-slate-800 dark:max-sm:bg-slate-950"
            role="navigation" aria-label="{% trans "Navegación principal" %}">
         <a href="{% url 'calculator' %}"
-           class="nav-link min-h-11 {% if '/calculadora/' in request.path or '/calculator/' in request.path %}nav-link--active{% endif %}"
+           class="nav-link min-h-11 max-sm:justify-start {% if '/calculadora/' in request.path or '/calculator/' in request.path %}nav-link--active{% endif %}"
            {% if '/calculadora/' in request.path or '/calculator/' in request.path %}aria-current="page"{% endif %}>
           {% trans "Calculadora" %}
         </a>
         <a href="{% url 'mechanic_list' %}"
-           class="nav-link min-h-11 {% if '/mecanicas/' in request.path or '/mechanics/' in request.path %}nav-link--active{% endif %}"
+           class="nav-link min-h-11 max-sm:justify-start {% if '/mecanicas/' in request.path or '/mechanics/' in request.path %}nav-link--active{% endif %}"
            {% if '/mecanicas/' in request.path or '/mechanics/' in request.path %}aria-current="page"{% endif %}>
           {% trans "Mecánicas" %}
         </a>
         <a href="{% url 'dps_browser' %}"
-           class="nav-link min-h-11 {% if '/dps/' in request.path %}nav-link--active{% endif %}"
+           class="nav-link min-h-11 max-sm:justify-start {% if '/dps/' in request.path %}nav-link--active{% endif %}"
            {% if '/dps/' in request.path %}aria-current="page"{% endif %}>
           DPS/TDO
         </a>
 
-        <div class="ml-1 hidden sm:flex sm:items-center sm:gap-1 max-sm:mt-3 max-sm:w-full">
+        <div class="max-sm:mt-3 max-sm:block max-sm:w-full sm:ml-1 sm:flex sm:items-center sm:gap-1">
           <label for="language-selector" class="sr-only">{% trans "Idioma" %}</label>
           <select id="language-selector"
                   class="block w-full rounded-md border border-slate-300 bg-white px-2 py-2 font-sans text-base text-slate-700 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 pr-6 appearance-none select-chevron min-h-11">
@@ -115,9 +135,9 @@
           </script>
         </div>
 
-        <div class="max-sm:mt-3 max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-2">
+        <div class="max-sm:mt-2 max-sm:grid max-sm:w-full max-sm:grid-cols-2 max-sm:gap-2">
           <button id="dark-toggle" type="button"
-                  class="nav-link min-h-11"
+                  class="nav-link min-h-11 max-sm:justify-center max-sm:border max-sm:border-slate-300 dark:max-sm:border-slate-700"
                   aria-label="{% trans "Alternar modo oscuro" %}"
                   title="{% trans "Alternar modo oscuro" %}">
             <svg id="sun-icon" class="hidden h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -130,11 +150,11 @@
           </button>
 
           {% if user.is_authenticated %}
-            <a href="{% url 'account_logout' %}" class="nav-link min-h-11">
+            <a href="{% url 'account_logout' %}" class="nav-link min-h-11 max-sm:justify-center">
               {% trans "Salir" %}
             </a>
           {% else %}
-            <a href="{% url 'account_login' %}" class="btn-bracket min-h-11 bg-accent-500 text-white hover:bg-accent-600">
+            <a href="{% url 'account_login' %}" class="btn-bracket min-h-11 max-sm:w-full bg-accent-500 text-white hover:bg-accent-600">
               {% trans "Entrar" %}
             </a>
           {% endif %}
@@ -267,7 +287,10 @@
           navMenu.classList.toggle('flex');
           menuIcon.classList.toggle('hidden');
           closeIcon.classList.toggle('hidden');
-          menuToggle.setAttribute('aria-label', expanded ? 'Abrir menú' : 'Cerrar menú');
+          menuToggle.setAttribute(
+            'aria-label',
+            expanded ? menuToggle.dataset.openLabel : menuToggle.dataset.closeLabel
+          );
         });
         navMenu.querySelectorAll('a').forEach(function(link) {
           link.addEventListener('click', function() {
@@ -275,7 +298,7 @@
               navMenu.classList.add('hidden');
               navMenu.classList.remove('flex');
               menuToggle.setAttribute('aria-expanded', 'false');
-              menuToggle.setAttribute('aria-label', 'Abrir menú');
+              menuToggle.setAttribute('aria-label', menuToggle.dataset.openLabel);
               menuIcon.classList.remove('hidden');
               closeIcon.classList.add('hidden');
             }

@@ -1,0 +1,99 @@
+name: Fintual shadow — isolated pricing-token feasibility
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pricing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Attempt isolated service JWT refresh without touching browser cookies
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            echo 'ISOLATED HTTP PRICING JWT EXPERIMENT; NO BROKER ORDERS'
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-executor/src /opt/fintual-executor/.venv/bin/python - <<'PY'
+            import json
+            import http.cookiejar
+            import urllib.request
+            import urllib.error
+            import urllib.parse
+            from pathlib import Path
+            from playwright.sync_api import sync_playwright
+
+            class NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, req, fp, code, msg, headers, newurl):
+                    return None
+
+            def send(opener, url, headers, *, payload=None):
+                req = urllib.request.Request(url, data=json.dumps(payload).encode() if payload is not None else None,
+                                             headers=headers, method="POST" if payload is not None else "GET")
+                try:
+                    with opener.open(req, timeout=10) as response:
+                        data = json.load(response) if response.status == 200 else None
+                        return response.status, data
+                except urllib.error.HTTPError as error:
+                    return error.code, None
+
+            try:
+                config = json.loads(Path("/etc/fintual-executor/config.json").read_text())
+                symbol = config["symbols"][0]
+                assert isinstance(symbol, str) and symbol.isascii() and symbol.isalnum()
+                with sync_playwright() as pw:
+                    browser = pw.chromium.connect_over_cdp("http://127.0.0.1:9222")
+                    pages = [p for c in browser.contexts for p in c.pages
+                             if p.url.startswith("https://fintual.cl/") and "/sign-in" not in p.url]
+                    if not pages:
+                        raise RuntimeError("Authenticated Chrome page unavailable")
+                    page = pages[0]
+                    jar = http.cookiejar.CookieJar()
+                    for row in page.context.cookies(["https://fintual.cl"]):
+                        domain = str(row.get("domain", ""))
+                        if domain.lstrip(".") != "fintual.cl" and not domain.endswith(".fintual.cl"):
+                            continue
+                        jar.set_cookie(http.cookiejar.Cookie(
+                            version=0, name=row["name"], value=row["value"], port=None,
+                            port_specified=False, domain=domain, domain_specified=True,
+                            domain_initial_dot=domain.startswith("."), path=row.get("path", "/"),
+                            path_specified=True, secure=bool(row.get("secure", True)),
+                            expires=None, discard=True, comment=None, comment_url=None,
+                            rest={}, rfc2109=False))
+                    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), NoRedirect())
+                    headers = {"Accept": "application/json", "Content-Type": "application/json",
+                               "Origin": "https://fintual.cl", "Referer": "https://fintual.cl/app/goals",
+                               "User-Agent": page.evaluate("navigator.userAgent")}
+                    price_url = "https://fintual.cl/stocks-pricing-cl/current-prices?symbols=" + urllib.parse.quote(symbol)
+                    before_status, _ = send(opener, price_url, headers)
+                    refresh_status, _ = send(opener, "https://fintual.cl/auth/jwt", headers,
+                                             payload={"aud": "stocks-pricing"})
+                    after_status = 0
+                    quote_shape_ok = False
+                    if 200 <= refresh_status < 300:
+                        after_status, quote = send(opener, price_url, headers)
+                        rows = (quote or {}).get("prices", [])
+                        quote_shape_ok = after_status == 200 and len(rows) == 1 and rows[0].get("symbol") == symbol
+                    browser.close()
+                ok = 200 <= refresh_status < 300 and quote_shape_ok
+                print(json.dumps({"phase": "ISOLATED_SERVICE_JWT", "ok": bool(ok),
+                                  "before_status": before_status, "refresh_status": refresh_status,
+                                  "after_status": after_status, "valid_quote_shape": bool(quote_shape_ok),
+                                  "browser_cookie_jar_unchanged": True}))
+                if not ok:
+                    raise SystemExit(2)
+            except SystemExit:
+                raise
+            except Exception as error:
+                print(json.dumps({"phase": "ISOLATED_SERVICE_JWT", "ok": False,
+                                  "error_type": type(error).__name__}))
+                raise SystemExit(3)
+            PY
+            echo 'ISOLATED HTTP JWT TEST COMPLETE'

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.core.cache import cache
+from django.utils.translation import get_language
+from django.utils.translation import gettext as _
 
 from apps.mechanics.services import resolve_trade_floor
 from engine import ALGORITHM_VERSION
@@ -60,6 +62,18 @@ class CalcResult:
     assumptions: list[str] = field(default_factory=list)
     params: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def p_per_trade_percent(self) -> float:
+        return self.p_per_trade * 100
+
+    @property
+    def p_cumulative_percent(self) -> float:
+        return self.p_cumulative * 100
+
+    @property
+    def p_zero_percent(self) -> float:
+        return self.p_zero * 100
+
 
 def _validate_floor_override(value: object) -> int:
     """Valida y normaliza `floor_override`: debe ser un entero en [0, 15].
@@ -96,6 +110,7 @@ def _cache_key(inputs: CalcInput, ruleset_version: int | None) -> str:
             "inputs": asdict(inputs),
             "ruleset_version": ruleset_version,
             "algo": ALGORITHM_VERSION,
+            "language": get_language(),
         },
         sort_keys=True,
         default=str,
@@ -126,18 +141,18 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
 
     if inputs.floor_override is not None:
         assumptions = [
-            "Los IVs post-intercambio siguen una distribucion uniforme en [f, 15].",
-            "Los stats (Att/Def/HP) son independientes entre si (S3).",
-            f"Piso f={floor} definido manualmente por el usuario.",
+            _("Los IVs post-intercambio siguen una distribución uniforme en [f, 15]."),
+            _("Los stats (ATK/DEF/HP) son independientes entre sí (S3)."),
+            _("Piso f=%(floor)s definido manualmente por el usuario.") % {"floor": floor},
         ]
     else:
         assumptions = [
-            "Los IVs post-intercambio siguen una distribucion uniforme en [f, 15].",
-            "Los stats (Att/Def/HP) son independientes entre si (S3).",
-            "El piso f proviene de datos comunitarios verificados (M2).",
+            _("Los IVs post-intercambio siguen una distribución uniforme en [f, 15]."),
+            _("Los stats (ATK/DEF/HP) son independientes entre sí (S3)."),
+            _("El piso f proviene de datos comunitarios verificados (M2)."),
         ]
         if inputs.trade_type in ("lucky", "lucky_guaranteed"):
-            assumptions.append("Los intercambios Lucky usan piso 12 segun datos comunitarios.")
+            assumptions.append(_("Los intercambios Lucky usan piso 12 según datos comunitarios."))
 
     return CalcResult(
         p_per_trade=_round(p_single),
@@ -157,6 +172,7 @@ def compute_scenario(inputs: CalcInput) -> CalcResult:
             "target_kind": inputs.target_kind,
             "threshold": inputs.threshold,
             "confidence": inputs.confidence,
+            "confidence_pct": round(inputs.confidence * 100),
         },
     )
 

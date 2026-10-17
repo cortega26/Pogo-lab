@@ -1,0 +1,45 @@
+name: Fintual private main read-access verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Verify the installed read-only deploy key without checkout
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            TARGET=/var/lib/fintual-ci-source-readonly
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            sudo test -r "$TARGET/github_ed25519"
+            test "$(sudo stat -c '%a' "$TARGET/github_ed25519")" = 600
+            echo '--- Authenticate github.com against HTTPS-sourced SSH host keys ---'
+            curl -fsSL --max-time 15 https://api.github.com/meta \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); print("\n".join("github.com "+key for key in d["ssh_keys"]))' \
+              | sudo tee "$TARGET/known_hosts" >/dev/null
+            sudo chmod 600 "$TARGET/known_hosts"
+            echo '--- Read-only Git ref query (no repo clone, no secret output) ---'
+            if sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$TARGET/known_hosts -i $TARGET/github_ed25519" \
+                git ls-remote --exit-code git@github.com:cortega26/fintual-executor.git refs/heads/main 2>/dev/null \
+                | awk '$2 == "refs/heads/main" && $1 ~ /^[0-9a-f]+$/ { print "private_main_access: PASS"; found=1 } END { if (!found) exit 1 }'; then
+              echo '--- Baseline preservation ---'
+              test "$(sudo -n -u fintual git -C /opt/fintual-executor rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+              test -z "$(sudo -n -u fintual git -C /opt/fintual-executor status --porcelain --untracked-files=no)"
+              test "$(systemctl is-active fintual-executor.service)" = active
+              echo 'PRODUCTION_UNCHANGED: PASS'
+            else
+              echo 'private_main_access: FAIL'
+              exit 2
+            fi

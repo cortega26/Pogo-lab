@@ -1,0 +1,140 @@
+name: Fintual HTTP broker main — final isolated CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - name: Execute complete tests as unprivileged user with memory and network limits
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 12m
+          script: |
+            set -euo pipefail
+            RUN=/opt/fintual-broker-final-main-ci-20261014
+            KEY=/var/lib/fintual-ci-source-readonly
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            PRODUCT=/opt/fintual-executor
+            EXPECTED_MAIN=3529bb789daeadca52440df0e1223167eaa5b517
+            cleanup() {
+              sudo rm -rf -- "$RUN" || true
+            }
+            trap cleanup EXIT
+            echo 'DIAGNOSTIC: checking services'
+            for svc in fintual-executor.service fintual-browser.service; do
+              echo "$svc: $(systemctl is-active "$svc" || true)"
+            done
+            echo 'DIAGNOSTIC: checking production SHA'
+            CURRENT="$(sudo -n -u fintual git -C "$PRODUCT" rev-parse HEAD)"
+            echo "production_sha=$CURRENT"
+            test "$CURRENT" = abf4db01082c77feef364a8925852a2633afbad2
+            echo 'DIAGNOSTIC: checking key files (boolean only)'
+            sudo test -s "$KEY/github_ed25519" && echo 'private_key_present=yes'
+            sudo test -s "$KEY/known_hosts" && echo 'host_key_file_present=yes'
+            echo 'DIAGNOSTIC: checking isolated workspace'
+            sudo install -d -m 0700 -o root -g root "$RUN"
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            echo 'GATE 0: financial services active, production SHA unchanged'
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+                git clone --quiet --depth 1 --single-branch --branch main \
+                git@github.com:cortega26/fintual-executor.git "$RUN/repo" \
+                2>&1 | sudo tee "$RUN/clone.log" >/dev/null; then
+              echo 'PRIVATE_CLONE: FAIL (classified diagnostics only)'
+              sudo grep -Ei 'fatal:|error:|Permission denied|Connection|Host key|repository not found|already exists|read-only file system|No space' "$RUN/clone.log" | head -n 5 || true
+              exit 9
+            fi
+            GOT="$(sudo git -C "$RUN/repo" rev-parse HEAD)"
+            if test "$GOT" != "$EXPECTED_MAIN"; then
+              echo 'SOURCE_SHA_GATE: FAIL (main moved; no tests executed)'
+              exit 10
+            fi
+            echo 'GATE 1: exact browserless evaluation branch SHA cloned'
+            sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home" "$RUN/python"
+            echo '--- Installing isolated Python 3.13 runtime and pinned dependencies ---'
+            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" python install \
+                --install-dir "$RUN/python" 3.13 \
+                2>&1 | sudo tee "$RUN/python-install.log" >/dev/null; then
+              echo 'ISOLATED_PYTHON_INSTALL: FAIL'
+              sudo tail -n 8 "$RUN/python-install.log"
+              exit 12
+            fi
+            echo 'ISOLATED_PYTHON_INSTALL: PASS'
+            PY="$(sudo find "$RUN/python" -path "*/bin/python3.13" -print -quit)"
+            if test -z "$PY" || ! sudo test -x "$PY"; then
+              echo 'ISOLATED_PYTHON_DISCOVERY: FAIL'
+              exit 13
+            fi
+            echo "ISOLATED_PYTHON_VERSION: $(sudo "$PY" --version)"
+            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
+                --python "$PY" --target "$RUN/vendor" \
+                'pytest>=8' 'ruff>=0.13' 'httpx==0.28.1' \
+                'playwright==1.58.0' 'websockets==17.1' \
+                2>&1 | sudo tee "$RUN/install.log" >/dev/null; then
+              echo 'ISOLATED_DEPENDENCIES: FAIL'
+              sudo tail -n 7 "$RUN/install.log"
+              exit 11
+            fi
+            sudo chown -R nobody:nogroup "$RUN"
+            sudo chmod 0700 "$RUN"
+            echo 'GATE 2: dependencies available in disposable venv-equivalent target'
+            echo '--- Running lint and complete pytest suite without financial access ---'
+            sudo systemd-run --collect --wait --pipe --quiet \
+              -p User=nobody -p Group=nogroup \
+              -p "WorkingDirectory=$RUN/repo" \
+              -p "Environment=STAGE=$RUN" \
+              -p "Environment=PY_EXEC=$PY" \
+              -p "Environment=HOME=$RUN/home" \
+              -p "Environment=PYTHONPATH=$RUN/vendor:$RUN/repo/src" \
+              -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+              -p MemoryMax=512M -p CPUQuota=50% -p TasksMax=64 \
+              -p NoNewPrivileges=yes -p ProtectHome=yes -p ProtectSystem=strict \
+              -p PrivateTmp=yes -p IPAddressDeny=any \
+              -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser" \
+              -p RestrictAddressFamilies=AF_UNIX \
+              -p "ReadWritePaths=$RUN" \
+              /usr/bin/bash -c '
+                set -eu
+                if "$PY_EXEC" -m compileall -q src > "$STAGE/compile.log" 2>&1; then
+                  echo "COMPILE: PASS"
+                else
+                  echo "COMPILE: FAIL"
+                  exit 21
+                fi
+                lint_failed=0
+                if "$STAGE/vendor/bin/ruff" check src tests > "$STAGE/ruff.log" 2>&1; then
+                  echo "RUFF: PASS"
+                else
+                  lint_failed=1
+                  echo "RUFF: FAIL"
+                  grep -E "^(E[0-9]|F[0-9]|I[0-9]|Found [0-9])|--> .*\\.py:[0-9]+:" "$STAGE/ruff.log" | head -n 20 || true
+                fi
+                if "$PY_EXEC" -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1; then
+                  echo "PYTEST: PASS"
+                  grep -E "^[0-9]+ passed" "$STAGE/pytest.log" | tail -n 1 || true
+                else
+                  echo "PYTEST: FAIL"
+                  grep -E "^(FAILED|ERROR) " "$STAGE/pytest.log" | head -n 12 || true
+                  grep -E "([0-9]+ failed|[0-9]+ errors|[0-9]+ passed)" "$STAGE/pytest.log" | tail -n 1 || true
+                  exit 23
+                fi
+                if [ "$lint_failed" -ne 0 ]; then
+                  echo "GATE 3: BLOCKED BY RUFF"
+                  exit 22
+                fi
+                echo "GATE 3: ALL OFFLINE CHECKS PASS"
+              '
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service)" = active
+            test "$(sudo -u fintual git -C "$PRODUCT" rev-parse HEAD)" = abf4db01082c77feef364a8925852a2633afbad2
+            test -z "$(sudo -u fintual git -C "$PRODUCT" status --porcelain --untracked-files=no)"
+            echo 'GATE 4: financial production unchanged; disposable files removed on EXIT'
