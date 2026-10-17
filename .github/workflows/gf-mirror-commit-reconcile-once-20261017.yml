@@ -1,0 +1,106 @@
+name: GF mirror reconcile submitted transactions (SQLite only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-commit-reconcile-once-20261017.yml
+permissions:
+  contents: read
+jobs:
+  reconcile-sqlite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Backup local push ledger, re-read GF, settle only ten submitted rows
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 185s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os, sqlite3, subprocess, json, re
+            from datetime import datetime,timezone
+            from pathlib import Path
+            from urllib.parse import urlparse
+            file=Path("/etc/fintual-executor/gf-mirror.env")
+            cfg={}
+            for line in file.read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                k=k.strip()
+                if k.isidentifier():cfg[k]=v.strip().strip("'").strip('"')
+            url=cfg.get("GF_MIRROR_PORTFOLIO_URL","")
+            target=urlparse(url).path.rstrip("/").split("/")[-1]
+            db=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            assert db.is_file()
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10) as con:
+                con.execute("PRAGMA query_only=ON")
+                bound=con.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()
+                before=dict(con.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                assert con.execute("PRAGMA quick_check").fetchone()==("ok",)
+            assert bound is not None and bound[0]==target
+            assert target!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f" # protected primary
+            assert not cfg.get("GF_MIRROR_WRITES")
+            assert before.get("SUBMITTED")==10 and before.get("VERIFIED")==50 and before.get("PENDING")==1118,before
+            backup_dir=Path("/var/lib/fintual-gf-mirror/reconcile-backups")
+            backup_dir.mkdir(mode=0o700,parents=True,exist_ok=True)
+            os.chmod(backup_dir,0o700)
+            path=backup_dir/("before-reconcile-"+datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")+".sqlite3")
+            fd=os.open(str(path),os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600)
+            os.close(fd)
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True) as src:
+                with sqlite3.connect(path) as dst: src.backup(dst)
+            with sqlite3.connect(path) as verified:
+                assert verified.execute("PRAGMA integrity_check").fetchone()==("ok",)
+            print("GF_PUSH_LEDGER_PRIVATE_BACKUP=PASS",flush=True)
+            values=[f"{k}={v}" for k,v in cfg.items() if k.startswith("GF_MIRROR_") or k in ("GOOGLE_APPLICATION_CREDENTIALS","FINTUAL_SHEET_SPREADSHEET_ID")]
+            values+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            source=r'''
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            from gf_mirror.txstore import PushLedger
+            from gf_mirror.txwriter import TransactionWriter
+            import json
+            config=load_config()
+            ledger=PushLedger(config.push_ledger_path)
+            assert not config.writes_armed
+            assert len(ledger.by_state("SUBMITTED"))==10
+            with _browser(config) as browser:
+                observed=TransactionWriter(browser,config.portfolio_url,config.portfolio_name).observed_counts()
+                submitted=ledger.by_state("SUBMITTED")
+                import json as j
+                confirmed=sum(observed.get(tuple(j.loads(rec.signature)),0)>=rec.required_ordinal for rec in submitted)
+                assert confirmed==8 and len(submitted)-confirmed==2,(confirmed,len(submitted))
+                print("GF_RECONCILE_LIVE_RECHECK=PASS",flush=True)
+                counts=ledger.resolve_submitted(observed)
+                assert counts=={"verified":8,"retryable":2},counts
+            after=ledger.counts()
+            assert after.get("SUBMITTED",0)==0 and after.get("VERIFIED",0)==58 and after.get("PENDING",0)==1120,after
+            print("GF_RECONCILE_VERIFIED=8",flush=True)
+            print("GF_RECONCILE_RETURNED_TO_PENDING=2",flush=True)
+            print("GF_PUSH_LEDGER_AFTER="+json.dumps(after,sort_keys=True),flush=True)
+            print("GF_GOOGLE_FINANCE_WRITES=0",flush=True)
+            '''
+            r=subprocess.run(["sudo","-n","-u","fintual","env",*values,
+               "/opt/fintual-gf-mirror-venv/bin/python","-c",source],
+               capture_output=True,text=True,timeout=155)
+            # Print only predefined state markers, never browser/page/account contents.
+            for line in r.stdout.splitlines():
+                if line.startswith(("GF_RECONCILE_","GF_PUSH_LEDGER_AFTER=","GF_GOOGLE_FINANCE_WRITES=")):
+                    print(line,flush=True)
+            if r.returncode!=0:
+                print("GF_RECONCILE_EXIT="+str(r.returncode),flush=True)
+                print("GF_RECONCILE_ERROR_TYPE=PYTHON_FAILED_OR_RECHECK_CHANGED",flush=True)
+                raise SystemExit(2)
+            PY
