@@ -40,35 +40,35 @@ jobs:
             config=load_config()
             assert not config.writes_armed
             with _browser(config) as b:
-                details=b.page.evaluate(r"""() => {
-                  const raw=document.body?.innerText || '';
+                findings=b.page.evaluate(r"""() => {
+                  const full=document.body?.innerText||'';
                   const outgoing='Añade una única transacción nueva a este portafolio';
-                  const pos=raw.lastIndexOf(outgoing);
-                  const following=pos>=0?raw.slice(pos):raw.slice(-2200);
-                  const dialogs=[...document.querySelectorAll('[role=log],[aria-live],[role=alert]')].map(e=>({
-                    role:e.getAttribute('role')||'',
-                    aria:e.getAttribute('aria-live')||'',
-                    textLength:(e.innerText||'').length,
-                    visible:!!e.getBoundingClientRect().width
-                  })).filter(e=>e.visible).slice(-20);
-                  const boxes=[...document.querySelectorAll('textarea,[contenteditable]')].map(e=>({
-                    element:e.tagName,visible:!!e.getBoundingClientRect().width,
-                    valueLength:(e.value||e.innerText||'').length
-                  })).slice(-8);
-                  return {outgoingPresent:pos>=0, following:following.slice(-2500),dialogs,boxes,
-                    textLength:raw.length, scrollY:window.scrollY};
+                  const offset=full.lastIndexOf(outgoing);
+                  const tail=(offset>=0?full.slice(offset):full.slice(-2600)).slice(-3500);
+                  const ls=tail.toLowerCase();
+                  const present=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                  const matches=p=>(tail.match(p)||[]).length;
+                  const inputs=[...document.querySelectorAll('textarea,[contenteditable]')].filter(present);
+                  return {
+                    portfolioPage:location.pathname.includes('/finance/portfolio/'),
+                    outgoingVisible:offset>=0,
+                    trailingLength:tail.length,
+                    anyQuestion:matches(/¿[^?\n]{8,900}\?/gi),
+                    legacyConfirmation:matches(/¿?\s*Confirmas\b[^?\n]{0,1200}\?/gi),
+                    inlineConfirmation:matches(/Confirmadd\b[^?\n]{0,1200}\?/gi),
+                    structuredConfirmation:matches(/Solicito su confirmaci[oó]n para a[ñn]adir esta transacci[oó]n de venta/gi),
+                    proceedConfirmation:matches(/¿Desea proceder con el registro de esta transacci[oó]n\?/gi),
+                    yesOption:matches(/(?:^|\n)\s*(?:yes|s[íi])\s*(?:\n|$)/gi),
+                    cancelOption:matches(/(?:^|\n)\s*(?:cancel|cancelar)\s*(?:\n|$)/gi),
+                    genericInstructions:matches(/para registrar una venta|para registrar la venta|c[oó]mo registrar una venta/gi),
+                    insufficientShares:matches(/acciones suficientes|no tienes suficientes acciones|insufficient shares/gi),
+                    assistantError:matches(/algo sali[oó] mal|intenta de nuevo|try again|error al procesar|no puedo registrar|lo siento|disculpa/gi),
+                    assistantBusy:matches(/pensando|procesando|generando respuesta|cargando|loading/gi),
+                    editableInputs:inputs.length,
+                    pendingDraft:inputs.some(e=>(e.value||e.innerText||'').includes(outgoing)),
+                  };
                 }""")
-                def safe(text):
-                    text=re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', '[EMAIL]',text)
-                    text=re.sub(r'https?://\S+', '[URL]',text)
-                    text=re.sub(r'(?i)portafolio\s+["“][^"”]+["”]', 'portafolio "[REDACTED]"',text)
-                    text=re.sub(r'(?i)(?:NYSE|NASDAQ|BATS|NYSEARCA):[A-Z0-9.\-]+','[EXCHANGE_TICKER]',text)
-                    text=re.sub(r'\b(?:TSLA|NVDA|STX|DELL|AAPL)\b','[TICKER]',text)
-                    text=re.sub(r'\d+(?:[.,/:\-]\d+)*','[N]',text)
-                    text=re.sub(r'\b[a-fA-F0-9]{16,}\b','[HASH]',text)
-                    return text[:2300]
-                print('GF_ASSISTANT_REPLY_SCRUBBED='+json.dumps(safe(details.pop('following')),ensure_ascii=False),flush=True)
-                print('GF_ASSISTANT_UI_SHAPE='+json.dumps(details,ensure_ascii=False,sort_keys=True),flush=True)
+                print('GF_LAST_REPLY_CLASSIFICATION='+json.dumps(findings,sort_keys=True),flush=True)
             print('GF_ASSISTANT_READONLY=PASS',flush=True)
             PY
 
@@ -81,3 +81,5 @@ jobs:
 # Diagnose last E2E sale result after zero visible Yes chips 2026-10-17T13:34Z.
 
 # Inspect the last fresh-thread AI reply with redaction; no writes.
+
+# Single baby-step: classify latest visible assistant response, never print raw page text.
