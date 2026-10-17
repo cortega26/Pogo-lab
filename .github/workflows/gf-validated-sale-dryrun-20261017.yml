@@ -34,7 +34,7 @@ jobs:
             from urllib.parse import urlparse
             p=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror/txwriter.py")
             b=p.read_bytes()
-            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="c361e2b91073595b19817ad08bac863115b808ce"
+            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="a106f9a10fbe73a43028c059bf07cabef8197e57"
             c={}
             for s in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
                 s=s.strip()
