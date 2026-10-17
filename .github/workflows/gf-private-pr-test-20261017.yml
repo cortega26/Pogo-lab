@@ -53,13 +53,19 @@ jobs:
             sudo -n env UV_NO_CONFIG=1 "$UV" venv --python /opt/fintual-gf-mirror-venv/bin/python "$RUN/venv" --quiet
             sudo -n env UV_NO_CONFIG=1 "$UV" pip install --quiet --python "$RUN/venv/bin/python" \
                'pytest>=8' 'ruff>=0.13' 'playwright==1.58.0' 'google-auth==2.49.2' 'requests==2.32.5'
-            cd "$RUN/source/integrations/google-finance"
             echo GF_TEST_INSTALL=PASS
-            sudo -n env PYTHONDONTWRITEBYTECODE=1 "$RUN/venv/bin/python" -m compileall -q gf_mirror tests
+            sudo -n env PYTHONDONTWRITEBYTECODE=1 "$RUN/venv/bin/python" -m compileall -q \
+              "$RUN/source/integrations/google-finance/gf_mirror" \
+              "$RUN/source/integrations/google-finance/tests"
             echo GF_TEST_COMPILE=PASS
-            sudo -n "$RUN/venv/bin/ruff" check gf_mirror tests
+            sudo -n "$RUN/venv/bin/ruff" check \
+              "$RUN/source/integrations/google-finance/gf_mirror" \
+              "$RUN/source/integrations/google-finance/tests"
             echo GF_TEST_RUFF=PASS
-            sudo -n env PYTHONDONTWRITEBYTECODE=1 "$RUN/venv/bin/python" -m pytest -q tests
+            sudo -n env PYTHONDONTWRITEBYTECODE=1 \
+              PYTHONPATH="$RUN/source/integrations/google-finance" \
+              "$RUN/venv/bin/python" -m pytest -q \
+              "$RUN/source/integrations/google-finance/tests"
             echo GF_TEST_PYTEST=PASS
             test "$(systemctl is-active fintual-executor.service)" = active
             test "$(systemctl is-active fintual-browser.service || true)" = inactive
