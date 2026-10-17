@@ -136,6 +136,65 @@ jobs:
                     return {matchingRows:candidates.length,rows:candidates.slice(0,4)};
                 }""")
                 print("GF_TSLA_DUPLICATE_DOM_METADATA="+json.dumps(row_identity,sort_keys=True),flush=True)
+                # Read-only Playwright mouse movement: no click, no edit, no submit.
+                assert row_identity["matchingRows"]==2,"expected exactly two visually identical TSLA sale rows"
+                for target_index in (0,1):
+                    rectangle=writer.page.evaluate(r"""index => {
+                        const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                        const tables=[...document.querySelectorAll('table,[role="table"]')]
+                          .filter(vis).filter(t=>/acci[oó]n|action|tipo/i.test(
+                            [...t.querySelectorAll('th,[role="columnheader"]')]
+                             .map(e=>e.innerText||'').join(' ')));
+                        const rows=tables.flatMap(t=>[...t.querySelectorAll('tr,[role="row"]')])
+                         .filter(vis).filter(row=>{
+                           const s=(row.innerText||'').replace(/\s+/g,' ');
+                           return /March\s+25,\s*2024|25\s+marzo\s+2024|25\/03\/2024/i.test(s) &&
+                             /\bTSLA\b|Tesla Motors|Tesla Inc/i.test(s) && /\bVenta\b|\bSell\b/i.test(s);
+                         });
+                        if(rows.length!==2)return {valid:false,count:rows.length};
+                        rows[index].scrollIntoView({block:'center',inline:'nearest'});
+                        const r=rows[index].getBoundingClientRect();
+                        return {valid:r.width>0&&r.height>0,x:Math.round(r.left+r.width/2),
+                          y:Math.round(r.top+r.height/2)};
+                    }""",target_index)
+                    assert rectangle.get("valid") and rectangle["x"]>=0 and rectangle["y"]>=0,"row not visible"
+                    writer.page.mouse.move(rectangle["x"],rectangle["y"])
+                    writer.page.wait_for_timeout(900)
+                    controls=writer.page.evaluate(r"""index => {
+                        const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                        const tables=[...document.querySelectorAll('table,[role="table"]')]
+                          .filter(vis).filter(t=>/acci[oó]n|action|tipo/i.test(
+                            [...t.querySelectorAll('th,[role="columnheader"]')]
+                             .map(e=>e.innerText||'').join(' ')));
+                        const rows=tables.flatMap(t=>[...t.querySelectorAll('tr,[role="row"]')])
+                         .filter(vis).filter(row=>{
+                           const s=(row.innerText||'').replace(/\s+/g,' ');
+                           return /March\s+25,\s*2024|25\s+marzo\s+2024|25\/03\/2024/i.test(s) &&
+                             /\bTSLA\b|Tesla Motors|Tesla Inc/i.test(s) && /\bVenta\b|\bSell\b/i.test(s);
+                         });
+                        if(rows.length!==2)return {valid:false,count:rows.length};
+                        const row=rows[index], box=row.getBoundingClientRect();
+                        const items=[...row.querySelectorAll('button,[role="button"],a[href],[tabindex]')]
+                            .filter(vis).map(e=>{
+                              const label=(e.getAttribute('aria-label')||e.getAttribute('title')||
+                                (e.innerText||'').trim()).slice(0,75);
+                              return {tag:e.tagName,menu:/m[aá]s opciones|more_vert|more options/i.test(label),
+                                edit:/editar|edit/i.test(label),remove:/eliminar|borrar|delete|remove/i.test(label),
+                                labelCategory:/m[aá]s opciones|more_vert|more options/i.test(label)?'menu':
+                                  /editar|edit/i.test(label)?'edit':
+                                  /eliminar|borrar|delete|remove/i.test(label)?'delete':'other'};
+                            });
+                        const hit=document.elementFromPoint(Math.min(innerWidth-5,Math.max(4,box.right-18)),
+                          Math.min(innerHeight-5,Math.max(4,box.top+box.height/2)));
+                        return {valid:true,visibleControls:items.length,controlCategories:items.map(i=>i.labelCategory),
+                          menuVisible:items.some(i=>i.menu),editVisible:items.some(i=>i.edit),
+                          deleteVisible:items.some(i=>i.remove),
+                          rightEdgeHitTag:hit?.tagName||'NONE',
+                          rightEdgeHitHasButtonAncestor:!!hit?.closest('button,[role="button"]')};
+                    }""",target_index)
+                    print("GF_TSLA_HOVER_ROW_"+str(target_index+1)+"="+json.dumps(controls,sort_keys=True),flush=True)
+                writer.page.mouse.move(4,4)
+                print("GF_TSLA_HOVER_ONLY_NO_CLICKS=TRUE",flush=True)
                 print("GF_TSLA_COMPARISON_ONLY_NO_WRITES=TRUE",flush=True)
                 print("GF_TSLA_OBSERVED_MATCHING_SIGNATURES="+str(observed),flush=True)
                 print("GF_TSLA_REQUIRED_ORDINAL="+str(required),flush=True)
