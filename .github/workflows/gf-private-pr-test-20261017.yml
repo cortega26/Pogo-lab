@@ -36,7 +36,7 @@ jobs:
             UV=/home/fintual/.uv-bootstrap/bin/uv
             echo GF_TEST_GATE=CREATE_TMP
             RUN="$(sudo -n mktemp -d /tmp/gf-private-pr-test.XXXXXXXX)"
-            sudo -n chmod 0700 "$RUN"
+            sudo -n chmod 0711 "$RUN"
             cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
             trap cleanup EXIT
             echo GF_TEST_GATE=CHECK_UV
@@ -62,7 +62,7 @@ jobs:
               "$RUN/source/integrations/google-finance/gf_mirror" \
               "$RUN/source/integrations/google-finance/tests"
             echo GF_TEST_RUFF=PASS
-            sudo -n env PYTHONDONTWRITEBYTECODE=1 \
+            sudo -n -u fintual env PYTHONDONTWRITEBYTECODE=1 \
               PYTHONPATH="$RUN/source/integrations/google-finance" \
               "$RUN/venv/bin/python" -m pytest -q \
               "$RUN/source/integrations/google-finance/tests"
