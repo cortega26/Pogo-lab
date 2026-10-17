@@ -1,0 +1,144 @@
+name: GF new isolated portfolio first SPY buy canary (exactly one attempt)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-sandbox-spy-canary-once-20261017.yml]
+permissions:
+  contents: read
+concurrency:
+  group: gf-sandbox-spy-once-20261017
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Commit at most ONE SPY trade to new sandbox, never original or brokerage
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 625s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            BEFORE_EXEC="$(systemctl show -p MainPID --value fintual-executor.service)"
+            BEFORE_SHEETS="$(systemctl show -p MainPID --value fintual-sheet-sync.service)"
+            ROOT=/var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z
+            UUID="$(sudo -n cat "$ROOT/new-empty-sandbox-uuid.private")"
+            test "$UUID" = d24a1f7a-ad03-4bb4-b739-4da1d4561d61
+            RUN="$(sudo -n mktemp -d /tmp/gf-single-canary.XXXXXXXX)"
+            sudo -n chmod 0711 "$RUN"
+            cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
+            trap cleanup EXIT
+            KEY=/var/lib/fintual-ci-source-readonly
+            sudo -n env GIT_TERMINAL_PROMPT=0 \
+              GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
+              git@github.com:cortega26/fintual-executor.git "$RUN/source"
+            test "$(sudo -n git -C "$RUN/source" rev-parse HEAD)" = a543f8ce0304b13fdd4089ff207ede6870be4e8d
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,sqlite3,hashlib
+            from pathlib import Path
+            root=Path("/var/lib/fintual-gf-mirror")
+            new=root/"parallel-replay/parallel-replay-ledger.sqlite3"
+            old=root/"gf-push-ledger.sqlite3"
+            for path,expected,uuid in (
+                (new,{"PENDING":1178},"d24a1f7a-ad03-4bb4-b739-4da1d4561d61"),
+                (old,{"PENDING":1118,"VERIFIED":60},"86a77e49-9ac1-432e-8d3b-645b8cda19a2"),
+            ):
+                with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True) as db:
+                    assert db.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                    assert dict(db.execute(
+                      "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))==expected
+                    assert db.execute(
+                      "SELECT value FROM push_ledger_meta WHERE key='portfolio_id'"
+                    ).fetchone()[0]==uuid
+            marker=root/"recovery-backups/parallel-preflight-20261017T183832Z/SPY_FIRST_CANARY_ONCE"
+            os.umask(0o077)
+            fd=os.open(marker,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            with os.fdopen(fd,"w") as f:
+                f.write("Single canary reserved; never rerun without separate complete remote reconciliation.\n")
+            print("GF_CANARY_ONCE_MARKER_RESERVED=TRUE",flush=True)
+            PY
+            sudo -n -u fintual env GF_CANARY_SOURCE="$RUN/source/integrations/google-finance" \
+              GF_CANARY_UUID="$UUID" PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,sys,json,hashlib,io,contextlib
+            from pathlib import Path
+            sys.path.insert(0,os.environ["GF_CANARY_SOURCE"])
+            from gf_mirror import cli
+            from gf_mirror.config import WRITES_ACK,load_config
+            from gf_mirror.txstore import PushLedger
+            from gf_mirror.txsync import plan
+            env={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k,v=line.split("=",1)
+                    if k.strip().isidentifier():env[k.strip()]=v.strip().strip("'").strip('"')
+            assert not env.get("GF_MIRROR_WRITES"),"persistent write latch must be off"
+            assert not env.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            uid=os.environ["GF_CANARY_UUID"]
+            assert uid==cli.TX_REPLAY_SANDBOX_ID
+            env.update({
+                "GF_MIRROR_PORTFOLIO_URL":"https://www.google.com/finance/portfolio/"+uid,
+                "GF_MIRROR_PORTFOLIO_NAME":cli.TX_REPLAY_SANDBOX_NAME,
+                "GF_MIRROR_PUSH_LEDGER":"/var/lib/fintual-gf-mirror/parallel-replay/parallel-replay-ledger.sqlite3",
+                "GF_MIRROR_STATE":"/var/lib/fintual-gf-mirror/parallel-replay/mirror.sqlite3",
+                "GF_MIRROR_WRITES":WRITES_ACK,
+            })
+            os.environ.update(env)
+            cfg=load_config()
+            assert cfg.writes_armed and cli._assert_tx_replay_config(cfg)==uid
+            ledger=PushLedger(cfg.push_ledger_path)
+            assert ledger.bound_portfolio_id()==uid
+            assert ledger.counts()=={"PENDING":1178}
+            transactions,_skipped=cli._ledger_transactions(cfg,None)
+            assert len(transactions)==1178
+            first=plan(ledger,limit=1)
+            assert len(first)==1
+            t=first[0]
+            assert (t.ticker,t.action,t.trade_date.isoformat())==("SPY","BUY","2023-11-27")
+            assert hashlib.sha256(t.source_id.encode()).hexdigest()[:16]=="559e49c67a1a2cde"
+            assert ledger.record(t.source_id).fingerprint==t.fingerprint
+            print("GF_CANARY_FIRST_TX_IMMUTABLE=PASS",flush=True)
+            print("GF_CANARY_WRITES_ONLY_THIS_PROCESS=TRUE",flush=True)
+            output=io.StringIO()
+            error=None
+            try:
+                with contextlib.redirect_stdout(output):
+                    code=cli.main(["--json","tx-sync","--limit","1","--batch-size","1"])
+            except Exception as exc:
+                error=type(exc).__name__
+                code=1
+            payload={}
+            try:payload=json.loads(output.getvalue())
+            except ValueError:pass
+            counts=ledger.counts()
+            state=ledger.record(t.source_id).state
+            print("GF_CANARY_RESULT_OUTCOME="+str(payload.get("outcome","EXCEPTION" if error else "UNKNOWN")),flush=True)
+            print("GF_CANARY_RESULT_EXIT="+str(code),flush=True)
+            print("GF_CANARY_RESULT_EXCEPTION_CLASS="+str(error or "none"),flush=True)
+            print("GF_CANARY_RESULT_TRANSACTION_STATE="+str(state),flush=True)
+            print("GF_CANARY_RESULT_VERIFIED="+str(counts.get("VERIFIED",0)),flush=True)
+            print("GF_CANARY_RESULT_PENDING="+str(counts.get("PENDING",0)),flush=True)
+            print("GF_CANARY_RESULT_FAILED="+str(counts.get("FAILED",0)),flush=True)
+            print("GF_CANARY_RESULT_SUBMITTED="+str(counts.get("SUBMITTED",0)),flush=True)
+            assert code==0 and payload.get("outcome")=="OK"
+            assert counts=={"PENDING":1177,"VERIFIED":1}
+            assert state=="VERIFIED"
+            print("GF_CANARY_EXACTLY_ONE_HISTORICAL_TRADE_VERIFIED=PASS",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            test "$(systemctl show -p MainPID --value fintual-executor.service)" = "$BEFORE_EXEC"
+            test "$(systemctl show -p MainPID --value fintual-sheet-sync.service)" = "$BEFORE_SHEETS"
+            echo GF_CANARY_FINANCIAL_PRODUCTION_UNCHANGED=PASS
