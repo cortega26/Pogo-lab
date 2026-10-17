@@ -38,7 +38,7 @@ jobs:
             assert not values.get("GF_MIRROR_WRITES"),"writes must be disarmed"
             assert not values.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
             target=urlparse(values.get("GF_MIRROR_PORTFOLIO_URL","")).path.rstrip("/").split("/")[-1]
-            assert target=="86a77e49-9ac1-432e-8d3b-645b8cda19e2","wrong destination"
+            assert target=="86a77e49-9ac1-432e-8d3b-645b8cda19a2","wrong destination"
             db=Path(values.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
             with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=9) as con:
                 con.execute("PRAGMA query_only=ON")
