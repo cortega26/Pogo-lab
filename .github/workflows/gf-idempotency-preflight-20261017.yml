@@ -49,6 +49,25 @@ jobs:
             echo GF_CI_OCI_GH=$(command -v gh || true)
             echo GF_CI_TEST_SOURCE=$(test -d /opt/fintual-gf-mirror/integrations/google-finance/tests && echo EXISTS || echo ABSENT)
             echo GF_CI_GIT_WORKSPACE_COUNT=$(find /home /opt -maxdepth 4 -type d -name .git 2>/dev/null | wc -l || true)
+            for d in $(find /home /opt -maxdepth 4 -type d -name .git 2>/dev/null); do
+              r=${d%/.git}
+              echo GF_CI_CANDIDATE_REPO="$r"
+              echo GF_CI_CANDIDATE_SHA=$(git -C "$r" rev-parse HEAD 2>/dev/null || echo INACCESSIBLE)
+              if git -C "$r" config --get remote.origin.url 2>/dev/null | grep -q 'fintual-executor'; then
+                echo GF_CI_MATCHING_GIT_REPO=YES
+                if GIT_TERMINAL_PROMPT=0 timeout 15 git -C "$r" ls-remote origin refs/heads/feat/google-finance-mirror >/dev/null 2>&1; then
+                  echo GF_CI_CAN_FETCH_FEATURE_BRANCH=YES
+                else
+                  echo GF_CI_CAN_FETCH_FEATURE_BRANCH=NO
+                fi
+              fi
+            done
+            if sudo -n -u fintual test -x /opt/fintual-gf-mirror-venv/bin/python 2>/dev/null; then
+              echo GF_CI_FINTUAL_PYTHON=YES
+              sudo -n -u fintual /opt/fintual-gf-mirror-venv/bin/python -c 'import sys,importlib.util;print("GF_CI_RUNTIME="+sys.version.split()[0]);print("GF_CI_PYTEST="+str(importlib.util.find_spec("pytest") is not None));print("GF_CI_RUFF="+str(importlib.util.find_spec("ruff") is not None))'
+            else
+              echo GF_CI_FINTUAL_PYTHON=NO
+            fi
             if command -v gh >/dev/null 2>&1; then
               if gh auth status >/dev/null 2>&1; then echo GF_CI_GH_AUTH=YES; else echo GF_CI_GH_AUTH=NO; fi
             fi
