@@ -1,0 +1,56 @@
+name: GF mirror authentication probe (read-only, no browser close)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-session-once-20261017.yml
+permissions:
+  contents: read
+jobs:
+  inspect-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Read only the dedicated Google session state via CDP
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 75s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            sudo -n -u fintual env PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                browser=pw.chromium.connect_over_cdp("http://127.0.0.1:9223", timeout=15000)
+                contexts=browser.contexts
+                pages=[p for ctx in contexts for p in ctx.pages if p.url.startswith("http")]
+                print("GF_CDP_CONTEXTS="+str(len(contexts)),flush=True)
+                print("GF_CDP_PAGES="+str(len(pages)),flush=True)
+                if not pages:
+                    print("GF_LOGIN_STATE=NO_PAGE",flush=True)
+                else:
+                    page=next((p for p in pages if "google.com/finance" in p.url),pages[0])
+                    page.wait_for_timeout(3500)
+                    body=page.locator("body").inner_text(timeout=15000).lower()
+                    signed_out=any(s in body for s in ("sign in","iniciar sesión","iniciar sesion"))
+                    signed_in=("sign out" in body or "cerrar sesión" in body or "cerrar sesion" in body)
+                    portfolio=("my portfolios" in body or "portafolio actualizado" in body or "new portfolio" in body)
+                    if signed_out:
+                        state="SIGNED_OUT"
+                    elif signed_in or portfolio:
+                        state="POSSIBLY_SIGNED_IN"
+                    else:
+                        state="INDETERMINATE"
+                    print("GF_LOGIN_STATE="+state,flush=True)
+                    print("GF_PORTFOLIO_UI_PRESENT="+str(portfolio),flush=True)
+                # Deliberately DO NOT call browser.close(): attached CDP Chrome
+                # must survive disconnection, independent of the SSH job.
+            PY
