@@ -1,0 +1,148 @@
+name: GF full history vs ledger audit (read only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-entire-history-audit-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Independently compare all observed transactions to immutable Fintual ledger
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 320s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            import sqlite3,subprocess,json,os
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from collections import Counter,defaultdict
+            from decimal import Decimal,ROUND_HALF_UP
+            vals={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():vals[k.strip()]=v.strip().strip("'").strip('"')
+            assert not vals.get("GF_MIRROR_WRITES") and not vals.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protected="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            url=urlparse(vals.get("GF_MIRROR_PORTFOLIO_URL",""))
+            assert url.hostname=="www.google.com" and url.path=="/finance/portfolio/"+target
+            assert target!=protected
+            db=Path(vals.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=15) as cx:
+                cx.execute("PRAGMA query_only=ON")
+                assert cx.execute("PRAGMA quick_check").fetchone()==("ok",)
+                assert cx.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==target
+                status=dict(cx.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                records=cx.execute("SELECT signature,state,payload_json FROM pushed_transactions").fetchall()
+            assert len(records)==1178, "ledger changed: abort instead of guessing"
+            if status.get("SUBMITTED",0) or status.get("FAILED",0):
+                print("GF_FULL_AUDIT_WARNING=UNCERTAIN_LEDGER_ROWS",flush=True)
+            expected=defaultdict(list)
+            for sig,state,raw in records:
+                payload=json.loads(raw)
+                expected[tuple(json.loads(sig))].append({
+                    "qty":payload["quantity"],"price":payload["price"],"state":state})
+            env=[f"{k}={v}" for k,v in vals.items() if k.startswith("GF_MIRROR_") or k in ("GOOGLE_APPLICATION_CREDENTIALS","FINTUAL_SHEET_SPREADSHEET_ID")]
+            env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            code=r'''
+            import json
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txwriter import TransactionWriter
+            c=load_config()
+            assert not c.writes_armed
+            with _browser(c) as browser:
+                w=TransactionWriter(browser,c.portfolio_url,c.portfolio_name)
+                rows,meta=w.read_transactions_with_completeness()
+                assert meta.get("complete") and meta.get("unreadable_rows")==0
+                assert meta.get("stable_across_scrolls") and meta.get("pagination_control")==0
+                values=[{
+                    "sig":list(x.signature),
+                    "quantity":str(x.quantity_shown) if x.quantity_shown is not None else None,
+                    "price":str(x.price_shown) if x.price_shown is not None else None}
+                    for x in rows]
+                assert all(r["sig"][0] and r["sig"][1] and r["sig"][2] and r["sig"][3] for r in values)
+                print(json.dumps({"observed":values,"meta":meta},separators=(',',':')))
+            '''
+            proc=subprocess.run(["sudo","-n","-u","fintual","env",*env,
+                "/opt/fintual-gf-mirror-venv/bin/python","-c",code],
+                capture_output=True,text=True,timeout=260)
+            if proc.returncode:
+                print("GF_FULL_AUDIT_READ=FAILED_EXIT_"+str(proc.returncode),flush=True)
+                raise SystemExit(10)
+            try:
+                data=json.loads(proc.stdout.strip())
+            except Exception:
+                print("GF_FULL_AUDIT_READ=UNPARSABLE",flush=True)
+                raise SystemExit(11)
+            meta=data["meta"]
+            assert meta["complete"] and meta["pagination_control"]==0
+            observed=defaultdict(list)
+            for item in data["observed"]:
+                observed[tuple(item["sig"])].append(item)
+            def display_key(q,p):
+                if q is None or p is None:return None
+                return (
+                  str(Decimal(q).quantize(Decimal("0.001"),rounding=ROUND_HALF_UP)),
+                  str(Decimal(p).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)))
+            summary=Counter()
+            missing_ticker=Counter();excess_ticker=Counter()
+            extra_groups=[]
+            uncertain_groups=[]
+            verified_not_seen=0
+            for sig in set(expected)|set(observed):
+                e=expected.get(sig,[]);o=observed.get(sig,[])
+                sig_pairs=min(len(e),len(o))
+                surplus=max(0,len(o)-len(e))
+                shortfall=max(0,len(e)-len(o))
+                summary["matched_signatures"]+=sig_pairs
+                summary["missing"]+=shortfall
+                summary["excess"]+=surplus
+                missing_ticker[sig[1]]+=shortfall
+                excess_ticker[sig[1]]+=surplus
+                ec=Counter(display_key(v["qty"],v["price"]) for v in e)
+                oc=Counter(display_key(v["quantity"],v["price"]) for v in o)
+                compatible=sum(min(n,oc[key]) for key,n in ec.items() if key is not None)
+                summary["display_compatible_pairs"]+=compatible
+                if sig_pairs>compatible:
+                    summary["signature_match_not_confirmed_by_qty_price"]+=sig_pairs-compatible
+                    uncertain_groups.append({"date":sig[0],"ticker":sig[1],"action":sig[2],
+                        "signature_pairs":sig_pairs,"display_compatible":compatible})
+                if surplus:
+                    extra_groups.append({"date":sig[0],"ticker":sig[1],"action":sig[2],
+                        "expected":len(e),"observed":len(o),"excess":surplus,
+                        "all_observed_same_visible_qty_price":len(oc)==1 and None not in oc})
+                if any(x["state"]=="VERIFIED" for x in e) and not o:verified_not_seen+=sum(x["state"]=="VERIFIED" for x in e)
+            summary["expected"]=sum(len(v) for v in expected.values())
+            summary["observed"]=sum(len(v) for v in observed.values())
+            assert summary["matched_signatures"]+summary["missing"]==summary["expected"]
+            assert summary["matched_signatures"]+summary["excess"]==summary["observed"]
+            print("GF_FULL_AUDIT_LEDGER_STATES="+json.dumps(status,sort_keys=True),flush=True)
+            print("GF_FULL_AUDIT_HISTORY_COMPLETE="+str(meta["complete"]),flush=True)
+            print("GF_FULL_AUDIT_HISTORY_SCROLL_STABLE="+str(meta["stable_across_scrolls"]),flush=True)
+            print("GF_FULL_AUDIT_COUNTS="+json.dumps(summary,sort_keys=True),flush=True)
+            print("GF_FULL_AUDIT_EXCESS_GROUPS="+json.dumps(
+                sorted(extra_groups,key=lambda x:(-x["excess"],x["ticker"],x["date"]))[:20],sort_keys=True),flush=True)
+            print("GF_FULL_AUDIT_UNCERTAIN_GROUPS="+json.dumps(
+                sorted(uncertain_groups,key=lambda x:(x["ticker"],x["date"]))[:12],sort_keys=True),flush=True)
+            print("GF_FULL_AUDIT_MISSING_BY_TICKER="+json.dumps(dict(sorted(missing_ticker.items())),sort_keys=True),flush=True)
+            print("GF_FULL_AUDIT_EXCESS_BY_TICKER="+json.dumps(dict(sorted(excess_ticker.items())),sort_keys=True),flush=True)
+            print("GF_FULL_AUDIT_VERIFIED_WITHOUT_VISIBLE_SIGNATURE="+str(verified_not_seen),flush=True)
+            print("GF_FULL_AUDIT_NO_GOOGLE_FINANCE_OR_LEDGER_WRITES=TRUE",flush=True)
+            PY
