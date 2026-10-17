@@ -1,4 +1,4 @@
-name: GF mirror live NVDA sale proposal validation (no confirm)
+name: GF mirror live TSLA sale proposal validation (no confirm)
 on:
   push:
     branches:
@@ -49,7 +49,7 @@ jobs:
                 con.execute("PRAGMA query_only=ON")
                 assert con.execute("PRAGMA quick_check").fetchone()==("ok",)
                 counts=dict(con.execute("SELECT state,count(*) FROM pushed_transactions GROUP BY state"))
-                assert counts.get("VERIFIED")==58 and counts.get("PENDING")==1120 and not counts.get("SUBMITTED") and not counts.get("FAILED")
+                assert counts.get("VERIFIED")==60 and counts.get("PENDING")==1118 and not counts.get("SUBMITTED") and not counts.get("FAILED")
                 assert con.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==portfolio
             env=[f"{k}={v}" for k,v in c.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
             env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
@@ -62,11 +62,11 @@ jobs:
             cfg=load_config()
             assert not cfg.writes_armed
             ledger=PushLedger(cfg.push_ledger_path)
-            todo=plan(ledger,limit=1,tickers={"TSLA","NVDA","STX"})
+            todo=plan(ledger,limit=1,tickers={"TSLA","TSLA","STX"})
             assert len(todo)==1
             tx=todo[0]
-            assert tx.action=="SELL" and tx.ticker=="NVDA" and tx.trade_date.isoformat()=="2024-03-22"
-            print("GF_DRYRUN_SCOPE=EXACT_FIRST_PENDING_NVDA_SELL",flush=True)
+            assert tx.action=="SELL" and tx.ticker=="TSLA" and tx.trade_date.isoformat()=="2024-03-25"
+            print("GF_DRYRUN_SCOPE=EXACT_FIRST_PENDING_TSLA_SELL",flush=True)
             with _browser(cfg) as browser:
                 writer=TransactionWriter(browser,cfg.portfolio_url,cfg.portfolio_name)
                 p=writer.append_sale(tx,submit=False)
@@ -85,7 +85,7 @@ jobs:
                 # Verify the actual returned proposal data; assert against ledger.
                 from decimal import Decimal
                 assert proposal.get("date")==tx.trade_date.isoformat(),"PROPOSAL_DATE_WRONG"
-                assert proposal.get("ticker")=="NVDA","PROPOSAL_TICKER_WRONG"
+                assert proposal.get("ticker")=="TSLA","PROPOSAL_TICKER_WRONG"
                 assert Decimal(proposal["quantity"])==tx.quantity,"PROPOSAL_QUANTITY_WRONG"
                 assert abs(Decimal(proposal["price"])-tx.price)<=Decimal("0.01"),"PROPOSAL_PRICE_WRONG"
                 assert proposal.get("portfolio") in (cfg.portfolio_name,"New Portfolio","Nuevo Portafolio"),"PROPOSAL_TARGET_UNKNOWN"
