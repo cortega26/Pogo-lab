@@ -1,0 +1,99 @@
+name: GF TSLA 2024-03-25 sale existence read only
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-tsla-20240325-existence-readonly.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read complete New Portfolio history and check exact TSLA sale ordinal
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 205s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,sqlite3,json,subprocess
+            from pathlib import Path
+            from urllib.parse import urlparse
+            values={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():values[k.strip()]=v.strip().strip("'").strip('"')
+            assert not values.get("GF_MIRROR_WRITES"),"writes must be disarmed"
+            assert not values.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target=urlparse(values.get("GF_MIRROR_PORTFOLIO_URL","")).path.rstrip("/").split("/")[-1]
+            assert target=="86a77e49-9ac1-432e-8d3b-645b8cda19e2","wrong destination"
+            db=Path(values.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=9) as con:
+                con.execute("PRAGMA query_only=ON")
+                assert con.execute("PRAGMA quick_check").fetchone()==("ok",)
+                assert con.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==target
+                counts=dict(con.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                assert counts=={"PENDING":1118,"VERIFIED":60},counts
+                rows=con.execute("SELECT signature,required_ordinal,state,payload_json FROM pushed_transactions WHERE state='PENDING'").fetchall()
+                candidates=[]
+                for sig,ordinal,state,raw in rows:
+                    payload=json.loads(raw)
+                    if payload.get("action")=="SELL" and payload.get("ticker")=="TSLA" and payload.get("date")=="2024-03-25":
+                        candidates.append((tuple(json.loads(sig)),int(ordinal)))
+                assert len(candidates)==1,"target ambiguous: expected one pending sale on exact date"
+            print("GF_TSLA_TARGET_IDENTIFIED=TRUE",flush=True)
+            print("GF_TSLA_LEDGER_STATE=ONE_PENDING_SALE",flush=True)
+            env=[f"{k}={v}" for k,v in values.items() if k.startswith("GF_MIRROR_") or k in ("GOOGLE_APPLICATION_CREDENTIALS","FINTUAL_SHEET_SPREADSHEET_ID")]
+            env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            script=r'''
+            import json,os
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txwriter import TransactionWriter
+            cfg=load_config()
+            assert not cfg.writes_armed
+            with _browser(cfg) as b:
+                writer=TransactionWriter(b,cfg.portfolio_url,cfg.portfolio_name)
+                rows,report=writer.read_transactions_with_completeness()
+                print("GF_TSLA_HISTORY_COMPLETE="+str(report.get("complete")),flush=True)
+                print("GF_TSLA_HISTORY_ROWS="+str(report.get("rows_parsed")),flush=True)
+                print("GF_TSLA_HISTORY_SCROLL_STABLE="+str(report.get("stable_across_scrolls")),flush=True)
+                print("GF_TSLA_HISTORY_UNREADABLE="+str(report.get("unreadable_rows")),flush=True)
+                print("GF_TSLA_HISTORY_PAGINATION="+str(report.get("pagination_control")),flush=True)
+                target=json.loads(os.environ["GF_TSLA_TARGET_SIGNATURE_JSON"])
+                required=int(os.environ["GF_TSLA_TARGET_ORDINAL"])
+                observed=sum(1 for row in rows if row.signature==tuple(target))
+                print("GF_TSLA_OBSERVED_MATCHING_SIGNATURES="+str(observed),flush=True)
+                print("GF_TSLA_REQUIRED_ORDINAL="+str(required),flush=True)
+                if not report.get("complete") or report.get("pagination_control"):
+                    verdict="INCONCLUSIVE_PARTIAL_HISTORY"
+                elif observed>=required:
+                    verdict="EXISTS_CONFIRMED"
+                else:
+                    verdict="ABSENT_CONFIRMED"
+                print("GF_TSLA_SALE_VERDICT="+verdict,flush=True)
+            '''
+            sig,ordinal=candidates[0]
+            env+=["GF_TSLA_TARGET_SIGNATURE_JSON="+json.dumps(sig,separators=(",",":")),f"GF_TSLA_TARGET_ORDINAL={ordinal}"]
+            p=subprocess.run(["sudo","-n","-u","fintual","env",*env,
+                 "/opt/fintual-gf-mirror-venv/bin/python","-c",script],
+                 capture_output=True,text=True,timeout=180)
+            for line in p.stdout.splitlines():
+                if line.startswith("GF_TSLA_"):print(line,flush=True)
+            if p.returncode:
+                print("GF_TSLA_READ_ONLY_PROBE_FAILED="+str(p.returncode),flush=True)
+                raise SystemExit(10)
+            print("GF_TSLA_NO_PORTFOLIO_OR_LEDGER_WRITES=TRUE",flush=True)
+            PY
