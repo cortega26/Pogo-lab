@@ -1,0 +1,85 @@
+name: GF five-canary failure diagnosis and read-only reconciliation
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-five-canary-diagnose-20261017.yml
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Inspect submitted fingerprint, failure category and destination via safe dry-run
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 250s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            from urllib.parse import urlparse
+            import sqlite3,subprocess,json,re
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line: continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES") and not cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target=urlparse(cfg.get("GF_MIRROR_PORTFOLIO_URL","")).path.rstrip("/").split("/")[-1]
+            assert target and target!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            db=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10) as c:
+                c.execute("PRAGMA query_only=ON")
+                assert c.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                assert c.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==target
+                states=dict(c.execute("SELECT state,count(*) FROM pushed_transactions GROUP BY state"))
+                assert states.get("SUBMITTED")==1 and states.get("VERIFIED")==60 and states.get("PENDING")==1117,states
+                rows=c.execute("SELECT payload_json FROM pushed_transactions WHERE state='SUBMITTED'").fetchall()
+                assert len(rows)==1
+                payload=json.loads(rows[0][0])
+            print("GF_DIAG_STATES="+json.dumps(states,sort_keys=True),flush=True)
+            print("GF_DIAG_ACTION="+str(payload.get("action")),flush=True)
+            print("GF_DIAG_TICKER="+str(payload.get("ticker")),flush=True)
+            print("GF_DIAG_DATE="+str(payload.get("date")),flush=True)
+            logs=subprocess.run(["journalctl","-u","gf-mirror-five-canary-20261017.service","--no-pager","-o","cat","-n","40"],text=True,capture_output=True,timeout=12)
+            for line in logs.stdout.splitlines():
+                if not line.strip().startswith("{"):continue
+                try:
+                    item=json.loads(line)
+                except ValueError:continue
+                if not isinstance(item,dict):continue
+                print("GF_DIAG_JOURNAL_OUTCOME="+str(item.get("outcome")),flush=True)
+                err=str(item.get("error",""))
+                if err:
+                    # Sanitized error category and brief UI mismatch, never financial fields.
+                    redacted=re.sub(r"\d+(?:[.,]\d+)*","[NUMBER]",err)
+                    redacted=re.sub(r"https?://\S+","[URL]",redacted)
+                    print("GF_DIAG_JOURNAL_ERROR="+redacted[:440],flush=True)
+            env=[f"{k}={v}" for k,v in cfg.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
+            env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            p=subprocess.run(["sudo","-n","-u","fintual","env",*env,
+                 "/opt/fintual-gf-mirror-venv/bin/python","-m","gf_mirror","--json","tx-reconcile","--dry-run"],
+                 capture_output=True,text=True,timeout=195)
+            print("GF_DIAG_RECONCILE_EXIT="+str(p.returncode),flush=True)
+            try:
+                data=json.loads(p.stdout)
+                print("GF_DIAG_RECONCILE_OUTCOME="+str(data.get("outcome")),flush=True)
+                for k in ("submitted","verified","retryable"):
+                    print("GF_DIAG_WOULD_"+k.upper()+"="+str((data.get("settled") or {}).get(k)),flush=True)
+            except ValueError:
+                print("GF_DIAG_RECONCILE_PARSE_FAILED=TRUE",flush=True)
+            assert p.returncode==0,"DESTINATION_READ_FAILED"
+            print("GF_DIAG_READ_ONLY_COMPLETE=TRUE",flush=True)
+            PY
