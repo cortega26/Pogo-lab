@@ -1,0 +1,84 @@
+name: GF private replay CSV staging for feasibility review (no upload)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-private-csv-replay-evaluation-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Stage canonical remaining historical transactions privately; never upload
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 95s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import csv,hashlib,json,os,sqlite3
+            from pathlib import Path
+            from datetime import datetime,timezone
+            os.umask(0o077)
+            base=Path("/var/lib/fintual-gf-mirror")
+            dbpath=base/"parallel-replay/parallel-replay-ledger.sqlite3"
+            root=base/"recovery-backups/parallel-preflight-20261017T183832Z"
+            assert dbpath.is_file() and root.is_dir()
+            with sqlite3.connect(dbpath.as_uri()+"?mode=ro",uri=True) as c:
+                c.execute("PRAGMA query_only=ON")
+                assert c.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                assert c.execute(
+                   "SELECT value FROM push_ledger_meta WHERE key='portfolio_id'"
+                ).fetchone()[0]=="d24a1f7a-ad03-4bb4-b739-4da1d4561d61"
+                states=dict(c.execute(
+                   "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"
+                ))
+                assert states=={"PENDING":1177,"VERIFIED":1},states
+                records=c.execute(
+                  "SELECT source_id,state,attempts,payload_json "
+                  "FROM pushed_transactions "
+                  "ORDER BY json_extract(payload_json,'$.date'),source_id"
+                ).fetchall()
+            assert len(records)==1178
+            assert all(attempts==0 for _src,state,attempts,_p in records if state=="PENDING")
+            pending=[(src,json.loads(payload)) for src,state,_a,payload in records if state=="PENDING"]
+            assert len(pending)==1177
+            assert (pending[0][1]["ticker"],pending[0][1]["action"],pending[0][1]["date"]) == (
+              "NVDA","BUY","2024-01-23"
+            )
+            out=root/"remaining-replay-1177-private-review.csv"
+            fd=os.open(out,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            with os.fdopen(fd,"w",newline="") as file:
+                w=csv.writer(file,lineterminator="\n")
+                w.writerow(("source_id","date","ticker","action","quantity","price_usd","total_usd"))
+                for source,trade in pending:
+                    w.writerow((source,trade["date"],trade["ticker"],trade["action"],
+                       trade["quantity"],trade["price"],trade["usd"]))
+            import collections
+            with out.open(newline="") as file:
+                rd=csv.DictReader(file)
+                checks=collections.Counter()
+                for index,row in enumerate(rd):
+                    assert row["date"] and row["ticker"] and row["action"] in ("BUY","SELL")
+                    assert row["source_id"]
+                    checks[row["action"]]+=1
+                assert index+1==1177
+            os.chmod(out,0o600)
+            assert root.stat().st_mode&0o777==0o700
+            assert out.stat().st_mode&0o777==0o600
+            print("GF_PRIVATE_CSV_PENDING_TRANSACTIONS=1177",flush=True)
+            print("GF_PRIVATE_CSV_BUYS="+str(checks["BUY"]),flush=True)
+            print("GF_PRIVATE_CSV_SELLS="+str(checks["SELL"]),flush=True)
+            print("GF_PRIVATE_CSV_SHA256="+hashlib.sha256(out.read_bytes()).hexdigest(),flush=True)
+            print("GF_PRIVATE_CSV_ROOT_ONLY_NOT_UPLOADED=TRUE",flush=True)
+            print("GF_PRIVATE_CSV_DOES_NOT_ESTABLISH_BULK_IMPORT_SUPPORT=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_PRIVATE_CSV_FINANCIAL_SERVICES_INTACT=PASS
