@@ -38,7 +38,7 @@ jobs:
               git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
               git@github.com:cortega26/fintual-executor.git "$RUN/source"
             SHA="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
-            test "$SHA" = c188ee179ef8373057cf1f78a5871c7d1471cc78
+            test "$SHA" = e33d025772e8f79c9bf629b3f03f23914b5a7c78
             echo GF_DRYRUN_SOURCE_SHA_EXACT=PASS
             sudo -n -u fintual env GF_SANDBOX_EXPECTED_UUID="$UUID" \
               GF_SANDBOX_SOURCE_ROOT="$RUN/source/integrations/google-finance" \
@@ -91,6 +91,11 @@ jobs:
             print("GF_DRYRUN_EXIT="+str(exit_code),flush=True)
             if exit_code:
                 print("GF_DRYRUN_ERROR_TYPE="+str(payload.get("outcome","unknown")),flush=True)
+                print("GF_DRYRUN_STAGE="+str(payload.get("stage","none")),flush=True)
+                print("GF_DRYRUN_NOTE="+str(payload.get("note",""))[:180],flush=True)
+                print("GF_DRYRUN_ERROR_CLASS="+str(payload.get("error",""))[:240],flush=True)
+                print("GF_DRYRUN_EXCESS_COUNT="+str(len(payload.get("excess",[]))),flush=True)
+                print("GF_DRYRUN_UNMATCHED_VISIBLE="+str(payload.get("unmatched_visible","none")),flush=True)
             assert exit_code==0
             assert payload.get("outcome")=="OK"
             assert payload.get("pending_total")==1178
