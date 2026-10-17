@@ -1,0 +1,97 @@
+name: GF private immutable recovery snapshot (SQLite only; no finance writes)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-private-parallel-recovery-backup-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Back up private mirror ledger atomically without touching production
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 140s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,sqlite3,tempfile
+            from pathlib import Path
+            from datetime import datetime,timezone
+            from urllib.parse import urlparse
+            vals={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier(): vals[k.strip()]=v.strip().strip("'").strip('"')
+            assert not vals.get("GF_MIRROR_WRITES")
+            assert not vals.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protected="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            p=urlparse(vals["GF_MIRROR_PORTFOLIO_URL"])
+            assert p.hostname=="www.google.com" and p.path=="/finance/portfolio/"+target
+            assert target!=protected
+            source=Path(vals.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            assert source.is_file()
+            os.umask(0o077)
+            home=Path("/var/lib/fintual-gf-mirror/recovery-backups")
+            home.mkdir(mode=0o700,exist_ok=True)
+            os.chmod(home,0o700)
+            stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            dest=home/("parallel-preflight-"+stamp)
+            dest.mkdir(mode=0o700,exist_ok=False)
+            old=sqlite3.connect(source.as_uri()+"?mode=ro",uri=True,timeout=20)
+            try:
+                old.execute("PRAGMA query_only=ON")
+                assert old.execute("PRAGMA quick_check").fetchone()==("ok",)
+                bound=old.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]
+                assert bound==target
+                counts=dict(old.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                assert counts=={"PENDING":1118,"VERIFIED":60},counts
+                sqlite=dest/"historical-push-ledger.sqlite3"
+                with sqlite3.connect(sqlite) as copy:
+                    old.backup(copy)
+                    assert copy.execute("PRAGMA quick_check").fetchone()==("ok",)
+                    replay_count=copy.execute("SELECT COUNT(*) FROM pushed_transactions").fetchone()[0]
+                    assert replay_count==1178
+                    assert dict(copy.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))==counts
+            finally:
+                old.close()
+            os.chmod(sqlite,0o600)
+            h=hashlib.sha256(sqlite.read_bytes()).hexdigest()
+            details={
+                "created_at_utc":datetime.now(timezone.utc).isoformat(),
+                "snapshot_type":"private read-only sqlite backup",
+                "source_bound_portfolio_id":target,
+                "expected_source_transactions":1178,
+                "counts":counts,
+                "backup_sha256":h,
+                "snapshot_does_not_authorize_replay":True
+            }
+            manifest=dest/"snapshot-metadata.json"
+            manifest.write_text(json.dumps(details,indent=2,sort_keys=True)+"\n")
+            os.chmod(manifest,0o600)
+            assert (dest.stat().st_mode&0o777)==0o700
+            assert (sqlite.stat().st_mode&0o777)==0o600
+            print("GF_BACKUP_LEDGER_SHA256="+h,flush=True)
+            print("GF_BACKUP_RECORDS="+str(replay_count),flush=True)
+            print("GF_BACKUP_STATES="+json.dumps(counts,sort_keys=True),flush=True)
+            print("GF_BACKUP_ROOT_ONLY_PERMISSIONS=PASS",flush=True)
+            print("GF_BACKUP_NO_SOURCE_PORTFOLIO_WRITES=TRUE",flush=True)
+            print("GF_BACKUP_DIRECTORY="+str(dest),flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_BACKUP_PRODUCTION_UNCHANGED=PASS
