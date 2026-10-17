@@ -1,0 +1,75 @@
+name: G8 install Sheets venv and corrected unit without starting
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-unit-stage-no-start-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  stage-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Preserve defective venv, promote clean venv and install no-Chrome unit disabled
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 105s
+          script: |
+            set -eu
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(systemctl is-active fintual-sheet-sync.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-sheet-sync.service)" = disabled
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = /opt/fintual-sheet-sync-releases/643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            import os
+            canonical=Path('/opt/fintual-sheet-sync-venv')
+            stage=Path('/opt/fintual-sheet-sync-venv-g8-clean-20261016')
+            backup=Path('/opt/fintual-sheet-sync-venv-defective-backup-20261016')
+            assert stage.is_dir() and not stage.is_symlink()
+            assert (stage/'pyvenv.cfg').is_file()
+            assert (stage/'bin/python').is_file() or (stage/'bin/python').is_symlink()
+            assert stage.stat().st_uid!=0
+            if canonical.is_symlink():
+                assert canonical.resolve()==stage, 'Unexpected existing venv alias'
+            else:
+                assert canonical.is_dir() and not canonical.is_symlink() and canonical.stat().st_uid!=0
+                assert not backup.exists() and not backup.is_symlink()
+                old=canonical/'bin/python'
+                assert old.is_symlink() and 'cpython-3.13' in os.readlink(old), 'Old venv differs from diagnosed broken state'
+                canonical.rename(backup)
+                canonical.symlink_to(stage, target_is_directory=True)
+            print('G8_DEFECTIVE_VENV_BACKUP_PRESERVED=TRUE',flush=True)
+            print('G8_SHEET_CANONICAL_VENV_POINTS_TO_CLEAN_STAGE=TRUE',flush=True)
+            PY
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
+            import sys
+            import importlib.metadata as m
+            assert sys.version_info[:3]==(3,14,8)
+            for k,v in {'google-api-python-client':'2.194.0','google-auth':'2.49.2','playwright':'1.58.0','websockets':'17.1'}.items():
+                assert m.version(k)==v
+            print('G8_PROMOTED_VENV_PYTHON_AND_DEPENDENCIES=PASS',flush=True)
+            PY
+            UNIT=/opt/fintual-sheet-sync-current/deploy/oracle/fintual-sheet-sync.service
+            test -f "$UNIT"
+            ! grep -q 'Requires=fintual-browser.service' "$UNIT"
+            grep -q -- '--fills-only' "$UNIT"
+            grep -q '/opt/fintual-sheet-sync-current/src' "$UNIT"
+            sudo -n install -m 0644 "$UNIT" /etc/systemd/system/fintual-sheet-sync.service
+            sudo -n systemctl daemon-reload
+            test "$(systemctl is-enabled fintual-sheet-sync.service)" = disabled
+            test "$(systemctl is-active fintual-sheet-sync.service || true)" = inactive
+            test "$(systemctl show -P WorkingDirectory fintual-sheet-sync.service)" = /opt/fintual-sheet-sync-current
+            ! systemctl show -P Requires fintual-sheet-sync.service | grep -q fintual-browser.service
+            systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--fills-only'
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            echo G8_SHEET_CORRECTED_UNIT_INSTALLED_DISABLED=PASS
+            echo G8_SHEET_FINANCIAL_PRODUCTION_UNCHANGED=TRUE
