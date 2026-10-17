@@ -1,0 +1,56 @@
+name: GF private PR isolated tests on Oracle (no production changes)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-private-pr-test-20261017.yml
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Clone private PR using Oracle readonly key and run tests in disposable venv
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 8m
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            KEY=/var/lib/fintual-ci-source-readonly
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            RUN="$(sudo -n mktemp -d /tmp/gf-private-pr-test.XXXXXXXX)"
+            sudo -n chmod 0700 "$RUN"
+            cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
+            trap cleanup EXIT
+            test -x "$UV"
+            sudo -n env GIT_TERMINAL_PROMPT=0 \
+              GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
+              git@github.com:cortega26/fintual-executor.git "$RUN/source"
+            got="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
+            test "$got" = c58ed27fc2b32a599bc0a98ce42cea30212e2a19 || { echo GF_TEST_SOURCE_SHA=WRONG; exit 8; }
+            echo GF_TEST_SOURCE_SHA=EXACT
+            sudo -n env UV_NO_CONFIG=1 "$UV" venv --python /opt/fintual-gf-mirror-venv/bin/python "$RUN/venv" --quiet
+            sudo -n env UV_NO_CONFIG=1 "$UV" pip install --quiet --python "$RUN/venv/bin/python" \
+               'pytest>=8' 'ruff>=0.13' 'playwright==1.58.0' 'google-auth==2.49.2' 'requests==2.32.5'
+            cd "$RUN/source/integrations/google-finance"
+            echo GF_TEST_INSTALL=PASS
+            sudo -n env PYTHONDONTWRITEBYTECODE=1 "$RUN/venv/bin/python" -m compileall -q gf_mirror tests
+            echo GF_TEST_COMPILE=PASS
+            sudo -n "$RUN/venv/bin/ruff" check gf_mirror tests
+            echo GF_TEST_RUFF=PASS
+            sudo -n env PYTHONDONTWRITEBYTECODE=1 "$RUN/venv/bin/python" -m pytest -q tests
+            echo GF_TEST_PYTEST=PASS
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            echo GF_TEST_FINANCIAL_EXECUTOR_UNCHANGED=PASS
