@@ -40,6 +40,16 @@ jobs:
               echo GF_CI_REPO_GIT=FALSE
             fi
             if test -x /opt/fintual-gf-mirror-venv/bin/python; then
+              echo GF_CI_VENV_PYTHON=EXECUTABLE
               /opt/fintual-gf-mirror-venv/bin/python -c 'import importlib.util;print("GF_CI_PYTEST_INSTALLED="+str(importlib.util.find_spec("pytest") is not None));print("GF_CI_RUFF_INSTALLED="+str(importlib.util.find_spec("ruff") is not None))'
+            else
+              echo GF_CI_VENV_PYTHON=UNAVAILABLE
+            fi
+            echo GF_CI_OCI_GIT=$(command -v git || true)
+            echo GF_CI_OCI_GH=$(command -v gh || true)
+            echo GF_CI_TEST_SOURCE=$(test -d /opt/fintual-gf-mirror/integrations/google-finance/tests && echo EXISTS || echo ABSENT)
+            echo GF_CI_GIT_WORKSPACE_COUNT=$(find /home /opt -maxdepth 4 -type d -name .git 2>/dev/null | wc -l || true)
+            if command -v gh >/dev/null 2>&1; then
+              if gh auth status >/dev/null 2>&1; then echo GF_CI_GH_AUTH=YES; else echo GF_CI_GH_AUTH=NO; fi
             fi
             echo GF_CI_NO_PRODUCTION_CHANGES=TRUE
