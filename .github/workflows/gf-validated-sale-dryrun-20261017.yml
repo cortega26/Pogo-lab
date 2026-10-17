@@ -34,7 +34,7 @@ jobs:
             from urllib.parse import urlparse
             p=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror/txwriter.py")
             b=p.read_bytes()
-            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="a106f9a10fbe73a43028c059bf07cabef8197e57"
+            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="b617d0b5723c5cdde234ffe01fe18bafcab24aa8"
             c={}
             for s in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
                 s=s.strip()
@@ -121,6 +121,15 @@ jobs:
                       count:yes.length,candidates:yes.slice(0,6)};
                 }""",expected)
                 print("GF_DRYRUN_CONFIRM_CONTROL="+json.dumps(control,sort_keys=True),flush=True)
+                # Exercise the REAL Yes-button selection logic, but replace its
+                # mouse-click method with a spy that cannot interact with the page.
+                captured_click_targets=[]
+                writer._hover_click=lambda xy: captured_click_targets.append(xy)
+                virtual_label=writer._click_confirmation(message_body)
+                assert virtual_label and virtual_label.lower() in ("yes","sí","si","confirmar","confirm")
+                assert len(captured_click_targets)==1,"CONFIRM_BUTTON_NOT_UNIQUE"
+                print("GF_DRYRUN_REAL_SELECTOR=ONE_UNIQUE_BUTTON",flush=True)
+                print("GF_DRYRUN_MOUSE_CLICKS=0",flush=True)
                 print("GF_DRYRUN_CONFIRMED=FALSE",flush=True)
             '''
             p=subprocess.run(["sudo","-n","-u","fintual","env",*env,
