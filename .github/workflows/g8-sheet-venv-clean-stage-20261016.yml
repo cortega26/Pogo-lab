@@ -1,0 +1,67 @@
+name: G8 stage clean Python 3.14 Sheets venv independent of HTTPX
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-venv-clean-stage-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Rebuild dedicated Sheets-only venv at separate stage path
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 420s
+          script: |
+            set -eu
+            BASE=/opt/fintual-httpx-current/.venv/bin/python
+            STAGE=/opt/fintual-sheet-sync-venv-g8-clean-20261016
+            SOURCE=/opt/fintual-sheet-sync-current/src
+            EXPECTED=643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-sheet-sync.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-sheet-sync.service)" = disabled
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = "/opt/fintual-sheet-sync-releases/$EXPECTED"
+            test "$("$BASE" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = "3.14.8"
+            if test ! -e "$STAGE"; then
+              sudo -n install -d -o fintual -g fintual -m 0755 "$STAGE"
+            else
+              test -d "$STAGE" && test ! -L "$STAGE"
+              test "$(stat -c %U "$STAGE")" = fintual
+            fi
+            # Fix no permissions on the owner's home: run entirely from /tmp.
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$BASE" -m venv --copies --without-pip "$STAGE"
+            echo G8_STAGE_INTERPRETER="$(sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$STAGE/bin/python" -V)"
+            test "$(sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$STAGE/bin/python" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = "3.14.8"
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$STAGE/bin/python" -m ensurepip --upgrade
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$STAGE/bin/python" -m pip \
+              --disable-pip-version-check --no-input --no-cache-dir install \
+              'google-api-python-client==2.194.0' 'google-auth==2.49.2' \
+              'playwright==1.58.0' 'websockets==17.1'
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh env PYTHONPATH="$SOURCE" PYTHONDONTWRITEBYTECODE=1 "$STAGE/bin/python" - <<'PY'
+            import importlib.metadata as metadata
+            import pathlib
+            import sys
+            from fintual_executor import sheet_sync
+            assert sys.version_info[:3] == (3, 14, 8)
+            expected = {'google-api-python-client':'2.194.0', 'google-auth':'2.49.2',
+                        'playwright':'1.58.0', 'websockets':'17.1'}
+            for pkg, version in expected.items():
+                assert metadata.version(pkg)==version, (pkg,metadata.version(pkg))
+            assert pathlib.Path(sheet_sync.__file__).resolve()==pathlib.Path('/opt/fintual-sheet-sync-current/src/fintual_executor/sheet_sync.py').resolve()
+            print('G8_STAGE_ISOLATED_DEPENDENCIES=PASS',flush=True)
+            PY
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh env PYTHONPATH="$SOURCE" "$STAGE/bin/python" -m fintual_executor.sheet_sync --help | grep -q -- '--fills-only'
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-sheet-sync.service || true)" = inactive
+            echo G8_SHEET_CLEAN_VENV_STAGE=PASS
+            echo G8_SHEET_ORIGINAL_VENV_UNCHANGED=TRUE
+            echo G8_HTTPX_SERVICE_UNCHANGED=TRUE
