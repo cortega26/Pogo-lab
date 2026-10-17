@@ -69,3 +69,5 @@ jobs:
                 print("GF_DOM_CHIP_TOTAL="+str(data.get("chipsTotal")),flush=True)
                 print("GF_DOM_NO_ACTION=TRUE",flush=True)
             PY
+
+# Post-failure screenshot-free proof of active Yes choices; never click or submit.
