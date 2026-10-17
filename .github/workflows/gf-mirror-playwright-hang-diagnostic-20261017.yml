@@ -1,0 +1,74 @@
+name: GF dedicated Chrome Playwright hang diagnostic (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-mirror-playwright-hang-diagnostic-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect isolated browser resource and CDP health only
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import urllib.request,json,subprocess,importlib.util
+            from pathlib import Path
+            def unit(n):
+                p=subprocess.run(["systemctl","is-active",n],capture_output=True,text=True,timeout=7)
+                return p.stdout.strip()
+            for name in ("fintual-executor.service","fintual-sheet-sync.service",
+                         "fintual-gf-mirror-browser.service","fintual-gf-tx.timer"):
+                print("GF_HANG_UNIT_"+name+"="+unit(name),flush=True)
+            assert unit("fintual-executor.service")=="active"
+            assert unit("fintual-gf-mirror-browser.service")=="active"
+            assert unit("fintual-gf-tx.timer")=="inactive"
+            text=Path("/proc/meminfo").read_text()
+            vals={}
+            for line in text.splitlines():
+                k,rest=line.split(":",1)
+                if k in ("MemAvailable","SwapFree","MemTotal"):
+                    vals[k]=rest.strip()
+            print("GF_HANG_MEMORY="+json.dumps(vals,sort_keys=True),flush=True)
+            ps=subprocess.run(
+                ["ps","-eo","pid,ppid,user,etime,stat,comm,rss","--no-headers"],
+                capture_output=True,text=True,timeout=8,check=True
+            )
+            process=[]
+            for line in ps.stdout.splitlines():
+                parts=line.split()
+                if len(parts)!=7:continue
+                pid,ppid,user,age,state,exe,rss=parts
+                if user=="fintual" and (
+                    "python" in exe.lower() or
+                    "chrome" in exe.lower() or
+                    "chromium" in exe.lower() or
+                    "node" in exe.lower() or
+                    "playwright" in exe.lower()
+                ):
+                    process.append({"pid":pid,"ppid":ppid,"age":age,"state":state,"exe":exe,"rss_kib":int(rss)})
+            print("GF_HANG_FINTUAL_BROWSER_PROCESS_COUNT="+str(len(process)),flush=True)
+            print("GF_HANG_FINTUAL_PROCESSES="+json.dumps(process[:35],sort_keys=True),flush=True)
+            for target in ("json/version","json/list"):
+                try:
+                    with urllib.request.urlopen("http://127.0.0.1:9223/"+target,timeout=6) as r:
+                        data=json.loads(r.read(180000))
+                    print("GF_HANG_CDP_"+target.replace("/","_").upper()+"=OK",flush=True)
+                    if target=="json/list":
+                        from urllib.parse import urlparse
+                        pages=[urlparse(x.get("url","")).path for x in data if x.get("type")=="page"]
+                        print("GF_HANG_CDP_PAGE_PATHS="+json.dumps(pages[:8]),flush=True)
+                except Exception as exc:
+                    print("GF_HANG_CDP_"+target.replace("/","_").upper()+"="+type(exc).__name__,flush=True)
+            print("GF_HANG_WEBSOCKET_CLIENT_AVAILABLE="+str(importlib.util.find_spec("websocket") is not None),flush=True)
+            print("GF_HANG_READONLY_DIAGNOSTIC=PASS",flush=True)
+            PY
