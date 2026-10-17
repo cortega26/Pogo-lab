@@ -1,0 +1,121 @@
+name: GF mirror five-trade canary extension (test portfolio only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-five-trade-canary-20261017.yml
+permissions:
+  contents: read
+concurrency:
+  group: gf-mirror-live-writer-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - name: Safely extend Oracle canary by five, checkpoint and independently verify
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 15s
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            for s in fintual-executor.service fintual-sheet-sync.service fintual-gf-mirror-browser.service fintual-gf-xvfb.service; do
+              test "$(systemctl is-active "$s")" = active || { echo "GF_FIVE_SERVICE_GATE_FAILED"; exit 6; }
+            done
+            for s in fintual-browser.service fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$s" || true)" = inactive || { echo "GF_FIVE_UNEXPECTED_WRITER_OR_CHROME"; exit 7; }
+            done
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            sudo -n /opt/fintual-gf-mirror/integrations/google-finance/deploy/oracle/gf-memory-gate.sh >/dev/null
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,sqlite3,os,json,subprocess,datetime
+            from pathlib import Path
+            from urllib.parse import urlparse
+            base=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror")
+            known={"txsync.py":"24127cf958969984282be36a60eafed2155b15f0",
+                   "txwriter.py":"46a68e72477c86e4e21abe69af8913be85694cf3",
+                   "config.py":"4e8c8c7a6a94010fad44a0f044fa3db2a5ad8d5c"}
+            for name,want in known.items():
+              payload=(base/name).read_bytes()
+              assert hashlib.sha1(b"blob "+str(len(payload)).encode()+bytes([0])+payload).hexdigest()==want,("GF_FIVE_UNKNOWN_CODE",name)
+            print("GF_FIVE_CODE_GATE=PASS",flush=True)
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+              line=line.strip()
+              if line.startswith("#") or "=" not in line:continue
+              k,v=line.split("=",1)
+              if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert cfg.get("GF_MIRROR_WRITES","")=="" and cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO","")==""
+            url=cfg.get("GF_MIRROR_PORTFOLIO_URL","")
+            target=urlparse(url).path.rstrip("/").split("/")[-1]
+            assert target and target!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            assert cfg.get("GF_MIRROR_PORTFOLIO_NAME","New Portfolio") in ("New Portfolio","Nuevo Portafolio")
+            db=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            assert db.is_file()
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=12) as c:
+              c.execute("PRAGMA query_only=ON")
+              assert c.execute("PRAGMA quick_check").fetchone()==("ok",)
+              bound=c.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()
+              assert bound and bound[0]==target
+              before=dict(c.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+              assert before=={"PENDING":1118,"VERIFIED":60},before
+              root=Path("/var/lib/fintual-gf-mirror/reconcile-backups")
+              root.mkdir(mode=0o700,parents=True,exist_ok=True)
+              os.chmod(root,0o700)
+              bkp=root/("five-canary-"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")+".sqlite3")
+              fd=os.open(bkp,os.O_EXCL|os.O_CREAT|os.O_WRONLY,0o600);os.close(fd)
+              with sqlite3.connect(bkp) as dest:c.backup(dest)
+            with sqlite3.connect(bkp) as c: assert c.execute("PRAGMA integrity_check").fetchone()==("ok",)
+            print("GF_FIVE_BACKUP_AND_BINDING=PASS",flush=True)
+            trading=Path("/var/lib/fintual-executor/state.sqlite3")
+            with sqlite3.connect(trading.as_uri()+"?mode=ro",uri=True,timeout=12) as c:
+              c.execute("PRAGMA query_only=ON")
+              assert c.execute("PRAGMA quick_check").fetchone()==("ok",)
+              assert c.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]==0
+            print("GF_FIVE_TRADING_LEDGER=HEALTHY",flush=True)
+            cmd=["systemd-run","--quiet","--wait","--pipe","--collect",
+              "--unit=gf-mirror-five-canary-20261017",
+              "--property=User=fintual","--property=Group=fintual",
+              "--property=WorkingDirectory=/opt/fintual-gf-mirror",
+              "--property=EnvironmentFile=/etc/fintual-executor/gf-mirror.env",
+              "--property=Environment=GF_MIRROR_WRITES=ENABLED_I_ACCEPT_PORTFOLIO_EDITS",
+              "--property=Environment=PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance",
+              "--property=Environment=PYTHONDONTWRITEBYTECODE=1",
+              "--property=MemoryHigh=500M","--property=MemoryMax=900M",
+              "--property=CPUQuota=50%","--property=TimeoutStartSec=810",
+              "--property=UMask=0077","--property=NoNewPrivileges=true",
+              "--property=PrivateTmp=true","--property=ProtectSystem=strict",
+              "--property=ProtectHome=read-only",
+              "--property=ReadOnlyPaths=/etc/fintual-executor/gf-mirror.env /etc/fintual-executor/google-sheet-sync.json",
+              "--property=ReadWritePaths=/var/lib/fintual-gf-mirror",
+              "/opt/fintual-gf-mirror-venv/bin/python","-m","gf_mirror","--json","tx-sync",
+              "--limit","5","--batch-size","1","--tickers","TSLA,NVDA,STX"]
+            p=subprocess.run(cmd,capture_output=True,text=True,timeout=835)
+            try:
+              raw=p.stdout; outcome=json.loads(raw[raw.index("{"):])
+            except (ValueError,IndexError):
+              print("GF_FIVE_RESULT=UNREADABLE_EXIT_"+str(p.returncode),flush=True)
+              raise SystemExit(11)
+            print("GF_FIVE_OUTCOME="+str(outcome.get("outcome")),flush=True)
+            print("GF_FIVE_PUSH_COUNT="+str(len(outcome.get("pushed") or [])),flush=True)
+            print("GF_FIVE_VERIFIED_PUSH_COUNT="+str(sum(v.get("verified") is True for v in outcome.get("pushed") or [])),flush=True)
+            print("GF_FIVE_COUNTS="+json.dumps(outcome.get("counts") or {},sort_keys=True),flush=True)
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=12) as c:
+              c.execute("PRAGMA query_only=ON")
+              after=dict(c.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+              assert c.execute("PRAGMA quick_check").fetchone()==("ok",)
+            print("GF_FIVE_DURABLE_STATES="+json.dumps(after,sort_keys=True),flush=True)
+            assert p.returncode==0 and outcome.get("outcome")=="OK","CANARY_NOT_SUCCESSFUL"
+            assert len(outcome.get("pushed") or [])==5
+            assert all(v.get("verified") is True for v in outcome["pushed"])
+            assert after=={"PENDING":1113,"VERIFIED":65},after
+            assert subprocess.run(["systemctl","is-active","fintual-executor.service"],capture_output=True,text=True).stdout.strip()=="active"
+            assert subprocess.run(["systemctl","is-active","fintual-browser.service"],capture_output=True,text=True).stdout.strip()=="inactive"
+            print("GF_FIVE_CANARY=PASS",flush=True)
+            PY
