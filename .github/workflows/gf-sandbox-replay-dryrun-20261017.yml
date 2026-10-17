@@ -38,7 +38,7 @@ jobs:
               git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
               git@github.com:cortega26/fintual-executor.git "$RUN/source"
             SHA="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
-            test "$SHA" = 23aeb0266ff69ddef43343c7458d3f86f4e55584
+            test "$SHA" = 3ae023f16fa3eccc625cd7323d744f9a28708662
             echo GF_DRYRUN_SOURCE_SHA_EXACT=PASS
             sudo -n -u fintual env GF_SANDBOX_EXPECTED_UUID="$UUID" \
               GF_SANDBOX_SOURCE_ROOT="$RUN/source/integrations/google-finance" \
@@ -75,13 +75,13 @@ jobs:
             assert cli._assert_tx_replay_config(cfg)==uid
             ledger=PushLedger(cfg.push_ledger_path)
             assert ledger.bound_portfolio_id()==uid
-            assert ledger.counts()=={"PENDING":1178}
+            assert ledger.counts()=={"PENDING":1177,"VERIFIED":1}
             before_attempts=sum(rec.attempts for rec in ledger.by_state("PENDING"))
             assert before_attempts==0
             print("GF_DRYRUN_PERSISTENT_LEDGER_SEPARATE=PASS",flush=True)
             output=io.StringIO()
             with contextlib.redirect_stdout(output):
-                exit_code=cli.main(["--json","tx-sync","--dry-run","--limit","1"])
+                exit_code=cli.main(["--json","tx-sync","--dry-run","--limit","2"])
             try:
                 payload=json.loads(output.getvalue())
             except Exception:
@@ -98,9 +98,9 @@ jobs:
                 print("GF_DRYRUN_UNMATCHED_VISIBLE="+str(payload.get("unmatched_visible","none")),flush=True)
             assert exit_code==0
             assert payload.get("outcome")=="OK"
-            assert payload.get("pending_total")==1178
-            assert payload.get("pending_remaining")==1178
-            assert ledger.counts()=={"PENDING":1178}
+            assert payload.get("pending_total")==1177
+            assert payload.get("pending_remaining")==1177
+            assert ledger.counts()=={"PENDING":1177,"VERIFIED":1}
             assert sum(rec.attempts for rec in ledger.by_state("PENDING"))==0
             print("GF_DRYRUN_NO_TRANSACTIONS_SUBMITTED=TRUE",flush=True)
             print("GF_DRYRUN_PORTFOLIO_OLD_AND_PROTECTED_NOT_TOUCHED=TRUE",flush=True)
