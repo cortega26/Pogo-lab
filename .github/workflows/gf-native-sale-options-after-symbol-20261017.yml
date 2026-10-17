@@ -1,0 +1,69 @@
+name: GF transaction form after ticker selection (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-native-sale-options-after-symbol-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect only form control categories for TSLA with save prohibited
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 160s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,json
+            from pathlib import Path
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txwriter import TransactionWriter
+            cfg={}
+            for l in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                l=l.strip()
+                if l.startswith("#") or "=" not in l:continue
+                k,v=l.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            os.environ.update(cfg)
+            c=load_config()
+            assert not c.writes_armed
+            with _browser(c) as b:
+                w=TransactionWriter(b,c.portfolio_url,c.portfolio_name)
+                w._open_assets_tab()
+                w._open_add_dialog()
+                try:
+                    w._select_symbol("TSLA")
+                    data=b.page.evaluate(r"""() => {
+                      const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                      const candidates=[...document.querySelectorAll('input,select,button,[role=button],[role=tab],[role=menuitem],[role=combobox]')].filter(vis);
+                      const patterns=/venta|vender|sell|compra|comprar|buy|fecha|cantidad|precio|guardar|cancelar|agregar|tipo de operaci[oó]n|transaction type/i;
+                      const found=candidates.map(e=>{
+                        const a=e.getAttribute('aria-label')||e.getAttribute('placeholder')||'';
+                        const t=(e.innerText||'').trim().slice(0,100);
+                        return {tag:e.tagName,role:e.getAttribute('role')||'',label:a||t};
+                      }).filter(x=>patterns.test(x.label));
+                      const labels=found.map(x=>x.label);
+                      return {formLabels:labels,visibleSellOptions:labels.filter(x=>/venta|vender|sell/i.test(x)).length,
+                        hasDate:labels.some(x=>/fecha/i.test(x)),
+                        hasPrice:labels.some(x=>/precio/i.test(x)),
+                        hasQuantity:labels.some(x=>/cantidad/i.test(x))};
+                    }""")
+                    print("GF_NATIVE_TICKER_FORM="+json.dumps(data,ensure_ascii=False),flush=True)
+                    print("GF_NATIVE_NO_SUBMISSION=TRUE",flush=True)
+                finally:
+                    w._cancel_dialog()
+            PY
