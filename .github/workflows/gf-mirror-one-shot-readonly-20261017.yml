@@ -146,3 +146,29 @@ jobs:
                 except metadata.PackageNotFoundError:v="MISSING"
                 print("SHEET_PIN_"+pkg+"="+v,flush=True)
             PY
+
+
+      - name: Validate staged fills-only CLI using existing Python 3.13 (read-only)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 45s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-sheet-sync.service || true)" = inactive
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = /opt/fintual-sheet-sync-releases/643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            export PYTHONDONTWRITEBYTECODE=1
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-sheet-sync-current/src PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-sheet-sync-venv/bin/python -m fintual_executor.sheet_sync --help | grep -q -- '--fills-only'
+            echo GF_SHEET_FILLS_ONLY_CLI_PY313=PASS
+            UNIT=/opt/fintual-sheet-sync-current/deploy/oracle/fintual-sheet-sync.service
+            test -f "$UNIT"
+            grep -q -- '--fills-only' "$UNIT"
+            ! grep -q 'fintual-browser.service' "$UNIT"
+            sudo -n systemd-analyze verify "$UNIT"
+            echo GF_SHEET_NEW_UNIT_VERIFIED=PASS
