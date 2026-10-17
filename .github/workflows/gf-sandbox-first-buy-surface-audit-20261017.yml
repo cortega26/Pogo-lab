@@ -56,6 +56,7 @@ jobs:
                     sandbox=page.get_by_role("button",name="Fintual Historical Replay Sandbox 2026",exact=True)
                     sandbox.wait_for(state="visible",timeout=65000)
                     sandbox.click(no_wait_after=True,timeout=40000)
+                    page.wait_for_url("https://www.google.com/finance/portfolio/"+new,timeout=65000)
                     assert urlparse(page.url).path=="/finance/portfolio/"+new
                     page.wait_for_function(
                         "() => /Aún no hay nada en esta cartera|Nothing in this portfolio yet/i.test(document.body.innerText||'')",
@@ -93,6 +94,7 @@ jobs:
                         print("GF_FIRSTBUY_NO_NATIVE_ADD_CONTROL=TRUE",flush=True)
                 finally:
                     page.goto(cfg.portfolio_url,wait_until="commit",timeout=65000)
+                    page.wait_for_url(cfg.portfolio_url,timeout=65000)
                     assert urlparse(page.url).path=="/finance/portfolio/"+old
                     print("GF_FIRSTBUY_ORIGINAL_BROWSER_ROUTE_RESTORED=TRUE",flush=True)
             print("GF_FIRSTBUY_NO_GOOGLE_OR_LEDGER_WRITES=TRUE",flush=True)
