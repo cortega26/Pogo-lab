@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-one-shot-readonly-20261017.yml
 permissions:
   contents: read
 concurrency:
