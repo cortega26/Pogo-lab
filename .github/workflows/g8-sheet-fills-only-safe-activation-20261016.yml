@@ -1,0 +1,121 @@
+name: G8 activate Sheets fill-only with live Google readback, no Chrome
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-fills-only-safe-activation-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify credentials read-only, enable only Sheets, require Google status and no Chrome
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 245s
+          script: |
+            set -euo pipefail
+            SHEET=fintual-sheet-sync.service
+            VENV=/opt/fintual-sheet-sync-venv
+            SRC=/opt/fintual-sheet-sync-current/src
+            SOURCE_SHA=643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(systemctl is-active "$SHEET" || true)" = inactive
+            test "$(systemctl is-enabled "$SHEET")" = disabled
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = "/opt/fintual-sheet-sync-releases/$SOURCE_SHA"
+            test "$(readlink -f "$VENV")" = /opt/fintual-sheet-sync-venv-g8-clean-20261016
+            ! systemctl show -P Requires "$SHEET" | grep -q fintual-browser.service
+            systemctl show -P ExecStart "$SHEET" | grep -q -- '--fills-only'
+            test "$(systemctl show -P WorkingDirectory "$SHEET")" = /opt/fintual-sheet-sync-current
+            test -f /etc/fintual-executor/sheet-sync.env
+            sudo -n grep -q '^FINTUAL_SHEET_SPREADSHEET_ID=' /etc/fintual-executor/sheet-sync.env
+            sudo -n grep -q '^GOOGLE_APPLICATION_CREDENTIALS=' /etc/fintual-executor/sheet-sync.env
+            sudo -n -u fintual test -r /etc/fintual-executor/sheet-sync.env
+            sudo -n -u fintual test -r /etc/fintual-executor/google-sheet-sync.json
+            sudo -n /usr/bin/python3 - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            p=Path('/var/lib/fintual-executor/state.sqlite3')
+            with sqlite3.connect(p.as_uri()+'?mode=ro',uri=True,timeout=8) as con:
+                con.execute('PRAGMA query_only=ON')
+                assert con.execute('PRAGMA integrity_check').fetchone()==('ok',)
+                n=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')").fetchone()[0]
+                assert n==0, 'FINANCIAL_INTENTS_OPEN'
+                fills=con.execute('SELECT COUNT(*) FROM fills').fetchone()[0]
+                assert fills>=10
+                pending=con.execute("SELECT COUNT(*) FROM sheet_sync_outbox WHERE state!='SYNCED'").fetchone()[0]
+                print('G8_SHEET_PREACTIVATION_FILLS='+str(fills),flush=True)
+                print('G8_SHEET_PREACTIVATION_OUTBOX_PENDING='+str(pending),flush=True)
+            PY
+            # Prove the service account and target sheet are reachable before
+            # enabling anything; only a Sheets GET, never a broker query.
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$VENV/bin/python" - <<'PY'
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            path='/etc/fintual-executor/google-sheet-sync.json'
+            cred=service_account.Credentials.from_service_account_file(
+                path,scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
+            api=build('sheets','v4',credentials=cred,cache_discovery=False)
+            x=api.spreadsheets().values().get(
+                spreadsheetId='1KMWgfA66xwhm6iedNWqpkkWpfzd6DrksnbbsCofwBB4',
+                range='Sync_Status!B7:B9').execute()
+            assert isinstance(x.get('values',[]),list)
+            print('G8_SHEET_GOOGLE_READONLY_ACCESS=PASS',flush=True)
+            PY
+            STARTED=0
+            fail_safe() {
+              if [[ "$STARTED" = 1 ]]; then
+                sudo -n systemctl disable --now "$SHEET" || true
+                echo G8_SHEET_AUTOROLLBACK_ON_POSTFLIGHT_FAILURE=TRUE
+              fi
+            }
+            trap fail_safe ERR
+            STARTED=1
+            sudo -n systemctl enable --now "$SHEET"
+            sleep 35
+            test "$(systemctl is-active "$SHEET")" = active
+            test "$(systemctl is-enabled "$SHEET")" = enabled
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            # Confirm Google Sheet actually received the degradation state,
+            # not merely a superficially active worker.
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh "$VENV/bin/python" - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            cred=service_account.Credentials.from_service_account_file(
+                '/etc/fintual-executor/google-sheet-sync.json',
+                scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
+            api=build('sheets','v4',credentials=cred,cache_discovery=False)
+            v=api.spreadsheets().values().get(
+                spreadsheetId='1KMWgfA66xwhm6iedNWqpkkWpfzd6DrksnbbsCofwBB4',
+                range='Sync_Status!B7:B9').execute().get('values',[])
+            assert len(v)>=3 and v[0] and v[0][0]=='DEGRADED_CASH_SYNC', 'SHEETS_NOT_TRUTHFULLY_DEGRADED'
+            with sqlite3.connect(Path('/var/lib/fintual-executor/state.sqlite3').as_uri()+'?mode=ro',uri=True,timeout=8) as db:
+                db.execute('PRAGMA query_only=ON')
+                pending=db.execute("SELECT COUNT(*) FROM sheet_sync_outbox WHERE state!='SYNCED'").fetchone()[0]
+                assert int(float(v[1][0]))==pending,'OUTBOX_STATUS_NOT_MATCHED'
+                assert db.execute('PRAGMA integrity_check').fetchone()==('ok',)
+                assert db.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('SUBMITTING','UNKNOWN')").fetchone()[0]==0
+            chrome=0
+            for p in Path('/proc').iterdir():
+                if not p.name.isdecimal():continue
+                try:b=(p/'cmdline').read_bytes()
+                except (OSError,PermissionError):continue
+                if b'--user-data-dir=/var/lib/fintual-browser/profile' in b and (b'chrome' in b[:200] or b'chromium' in b[:200]):chrome+=1
+            assert chrome==0,'CHROME_RESIDENT'
+            print('G8_SHEET_GOOGLE_STATUS=DEGRADED_CASH_SYNC',flush=True)
+            print('G8_SHEET_REMOTE_PENDING='+str(pending),flush=True)
+            print('G8_SHEET_RESIDENT_CHROME_COUNT=0',flush=True)
+            print('G8_SHEET_FILLS_ONLY_ACTIVATION=PASS',flush=True)
+            PY
+            STARTED=0
