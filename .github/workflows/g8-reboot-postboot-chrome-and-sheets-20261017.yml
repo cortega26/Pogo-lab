@@ -1,0 +1,94 @@
+name: G8 postreboot browser-process identity and Sheets status (read only)
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-reboot-postboot-chrome-and-sheets-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Distinguish actual resident Chrome executables from parent shell source
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            from datetime import datetime,timezone,timedelta
+            import sqlite3,os
+            before=(Path('/var/lib/fintual-executor/g8-reboot-cert-20261017')/'before_boot_id.txt').read_text().strip()
+            assert before != Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'REBOOT_NOT_CONFIRMED'
+            print('G8_POST_NEW_BOOT=PASS',flush=True)
+            browser=[]
+            false_match=[]
+            for p in Path('/proc').iterdir():
+                if not p.name.isdigit(): continue
+                try:
+                    cmd=(p/'cmdline').read_bytes().replace(bytes([0]),b' ').decode('utf8','replace')
+                    exe=(p/'exe').resolve(strict=True).name.lower()
+                except (PermissionError,FileNotFoundError,ProcessLookupError,OSError):
+                    continue
+                if '/var/lib/fintual-browser/profile' not in cmd: continue
+                if exe in ('chrome','chromium','chromium-browser','chrome-headless-shell') or exe.startswith('chrome-'):
+                    browser.append(exe)
+                else:
+                    false_match.append(exe)
+            print('G8_POST_FINTUAL_PROFILE_ACTUAL_CHROME='+str(len(browser)),flush=True)
+            print('G8_POST_DIAGNOSTIC_SHELL_FALSE_MATCHES='+str(len(false_match)),flush=True)
+            assert not browser,'ACTUAL_RESIDENT_FINTUAL_BROWSER'
+            print('G8_POST_CHROME_PROCESS_IDENTITY=PASS',flush=True)
+            db=Path('/var/lib/fintual-executor/state.sqlite3')
+            with sqlite3.connect(db.as_uri()+'?mode=ro',uri=True,timeout=10) as con:
+                con.execute('PRAGMA query_only=ON')
+                assert con.execute('PRAGMA integrity_check').fetchone()==('ok',)
+                states=('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')
+                count=con.execute('SELECT COUNT(*) FROM order_intents WHERE state IN (?,?,?,?,?)',states).fetchone()[0]
+                print('G8_POST_OPEN_INTENTS='+str(count),flush=True)
+                assert count==0,'POSTBOOT_ORDER_INTENTS'
+            print('G8_POST_LEDGER_INTEGRITY=PASS',flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || :)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service || :)" = disabled
+            echo G8_POST_UNIT_STATES=PASS
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh \
+              env PYTHONPATH=/opt/fintual-sheet-sync-current/src PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
+            from pathlib import Path
+            from datetime import datetime,timezone,timedelta
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            from fintual_executor.client import get_buy_state
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            h=IpcReadOnlyBrokerHandle(Path('/var/lib/fintual-executor/cash-ipc/cash.sock'))
+            assert h.health()['order_capability'] is False
+            assert float(get_buy_state(h)['stocksWallet']['investableAmount']['amount'])>=0
+            print('G8_POST_HTTPX_AUTHENTICATED_BROKER=PASS',flush=True)
+            identifier=None
+            for line in Path('/etc/fintual-executor/sheet-sync.env').read_text().splitlines():
+                if line.startswith('FINTUAL_SHEET_SPREADSHEET_ID='):
+                    identifier=line.split('=',1)[1].strip().strip('"').strip("'")
+            assert identifier
+            cred=service_account.Credentials.from_service_account_file(
+              '/etc/fintual-executor/google-sheet-sync.json',
+              scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
+            api=build('sheets','v4',credentials=cred,cache_discovery=False)
+            values=api.spreadsheets().values().get(
+              spreadsheetId=identifier,range='Sync_Status!B7:B9').execute().get('values',[])
+            assert len(values)>=3
+            stamp=datetime.fromisoformat(str(values[2][0])).astimezone(timezone.utc)
+            boot=datetime.now(timezone.utc)-timedelta(seconds=float(Path('/proc/uptime').read_text().split()[0]))
+            print('G8_POST_SHEETS_STATE='+str(values[0][0]),flush=True)
+            print('G8_POST_SHEETS_PENDING='+str(values[1][0]),flush=True)
+            print('G8_POST_SHEETS_TIMESTAMP_AFTER_BOOT='+str(stamp>boot),flush=True)
+            PY
+            echo G8_REBOOT_POSTBOOT_DIAG=PASS
