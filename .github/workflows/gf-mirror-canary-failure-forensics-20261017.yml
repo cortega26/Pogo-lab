@@ -1,0 +1,66 @@
+name: GF mirror canary failure forensics (read only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-canary-failure-forensics-20261017.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect submitted states, recent errors and canary journal; no writes
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 120s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3,subprocess,re
+            from pathlib import Path
+            file=Path("/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3")
+            con=sqlite3.connect(file.as_uri()+"?mode=ro",uri=True,timeout=12)
+            con.execute("PRAGMA query_only=ON")
+            print("GF_DB_INTEGRITY="+str(con.execute("PRAGMA quick_check").fetchone()[0]),flush=True)
+            print("GF_COUNTS="+json.dumps(dict(con.execute("SELECT state,count(*) FROM pushed_transactions GROUP BY state")),sort_keys=True),flush=True)
+            for st in ("SUBMITTED","FAILED"):
+                rows=con.execute("SELECT source_id,attempts,last_error,updated_at FROM pushed_transactions WHERE state=? ORDER BY updated_at DESC LIMIT 4",(st,)).fetchall()
+                for _,attempts,last_error,updated in rows:
+                    hint=(last_error or "").split(":",1)[0].strip().replace("\n"," ")[:75]
+                    print("GF_UNRESOLVED_STATE="+st+" ATTEMPTS="+str(attempts)+" ERROR_PREFIX="+hint+" UPDATED="+str(updated),flush=True)
+            for typ,n in con.execute("SELECT event_type,count(*) FROM push_events GROUP BY event_type ORDER BY count(*) DESC LIMIT 18"):
+                print("GF_EVENT_TYPE="+str(typ)+" COUNT="+str(n),flush=True)
+            con.close()
+            for unit in ("fintual-executor.service","fintual-sheet-sync.service","fintual-browser.service",
+                         "fintual-gf-xvfb.service","fintual-gf-mirror-browser.service",
+                         "fintual-gf-tx-bootstrap.service","fintual-gf-tx.timer"):
+                a=subprocess.run(["systemctl","is-active",unit],capture_output=True,text=True,timeout=5)
+                print("GF_UNIT_"+unit+"="+a.stdout.strip(),flush=True)
+            j=subprocess.run(["journalctl","--no-pager","-o","cat","-n","150",
+              "-u","gf-mirror-two-op-canary-20261017.service"],capture_output=True,text=True,timeout=12)
+            for line in j.stdout.splitlines():
+                text=line.strip()
+                if not text:continue
+                if text.startswith("{"):
+                    try:
+                        item=json.loads(text)
+                        if isinstance(item,dict):
+                            print("GF_CANARY_JOURNAL_OUTCOME="+str(item.get("outcome","UNKNOWN")),flush=True)
+                            err=item.get("error","")
+                            if err:
+                                print("GF_CANARY_JOURNAL_ERROR_CATEGORY="+str(err).split(":")[0][:100],flush=True)
+                                print("GF_CANARY_JOURNAL_ERROR_LENGTH="+str(len(str(err))),flush=True)
+                        continue
+                    except json.JSONDecodeError:pass
+                if "Traceback" in text or "Exception" in text or "failed" in text.lower():
+                    # Output only a broad category, not portfolio/account details.
+                    if "Traceback" in text:print("GF_JOURNAL_TRACEBACK_PRESENT=TRUE",flush=True)
+                    elif "Exception" in text:print("GF_JOURNAL_EXCEPTION_PRESENT=TRUE",flush=True)
+            print("GF_POSTFAIL_READONLY_DIAG_COMPLETE=TRUE",flush=True)
+            PY
