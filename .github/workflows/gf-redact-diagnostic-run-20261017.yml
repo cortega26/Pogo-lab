@@ -1,0 +1,21 @@
+name: Remove diagnostic log with incidental personal metadata
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-redact-diagnostic-run-20261017.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Delete one diagnostic run's logs only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api -X DELETE "repos/$GH_REPO/actions/runs/39038048000/logs" >/dev/null
+          echo "GF_DIAGNOSTIC_RUN_LOGS_REDACTED=PASS"
