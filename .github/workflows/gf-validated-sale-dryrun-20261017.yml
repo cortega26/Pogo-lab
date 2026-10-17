@@ -1,0 +1,99 @@
+name: GF mirror live NVDA sale proposal validation (no confirm)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-validated-sale-dryrun-20261017.yml
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read ledger, validate live sale proposal and refuse any confirmation
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 170s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,subprocess,sqlite3,hashlib,json
+            from pathlib import Path
+            from urllib.parse import urlparse
+            p=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror/txwriter.py")
+            b=p.read_bytes()
+            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="46a68e72477c86e4e21abe69af8913be85694cf3"
+            c={}
+            for s in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                s=s.strip()
+                if s.startswith("#") or "=" not in s:continue
+                k,v=s.split("=",1)
+                if k.strip().isidentifier():c[k.strip()]=v.strip().strip("'").strip('"')
+            assert not c.get("GF_MIRROR_WRITES") and not c.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            portfolio=urlparse(c["GF_MIRROR_PORTFOLIO_URL"]).path.rstrip("/").split("/")[-1]
+            assert portfolio and portfolio!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            db=Path(c.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10) as con:
+                con.execute("PRAGMA query_only=ON")
+                assert con.execute("PRAGMA quick_check").fetchone()==("ok",)
+                counts=dict(con.execute("SELECT state,count(*) FROM pushed_transactions GROUP BY state"))
+                assert counts.get("VERIFIED")==58 and counts.get("PENDING")==1120 and not counts.get("SUBMITTED") and not counts.get("FAILED")
+                assert con.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==portfolio
+            env=[f"{k}={v}" for k,v in c.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
+            env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            code=r'''
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txstore import PushLedger
+            from gf_mirror.txsync import plan
+            from gf_mirror.txwriter import TransactionWriter,parse_sale_proposal,verify_sale_proposal
+            cfg=load_config()
+            assert not cfg.writes_armed
+            ledger=PushLedger(cfg.push_ledger_path)
+            todo=plan(ledger,limit=1,tickers={"TSLA","NVDA","STX"})
+            assert len(todo)==1
+            tx=todo[0]
+            assert tx.action=="SELL" and tx.ticker=="NVDA" and tx.trade_date.isoformat()=="2024-03-22"
+            print("GF_DRYRUN_SCOPE=EXACT_FIRST_PENDING_NVDA_SELL",flush=True)
+            with _browser(cfg) as browser:
+                writer=TransactionWriter(browser,cfg.portfolio_url,cfg.portfolio_name)
+                p=writer.append_sale(tx,submit=False)
+                assert p["submitted"] is False
+                proposal=p["proposal"]
+                observed=parse_sale_proposal(p["instruction"]) if False else None
+                # Verify the actual returned proposal data; assert against ledger.
+                from decimal import Decimal
+                assert proposal.get("date")==tx.trade_date.isoformat(),"PROPOSAL_DATE_WRONG"
+                assert proposal.get("ticker")=="NVDA","PROPOSAL_TICKER_WRONG"
+                assert Decimal(proposal["quantity"])==tx.quantity,"PROPOSAL_QUANTITY_WRONG"
+                assert abs(Decimal(proposal["price"])-tx.price)<=Decimal("0.01"),"PROPOSAL_PRICE_WRONG"
+                assert proposal.get("portfolio") in (cfg.portfolio_name,"New Portfolio","Nuevo Portafolio"),"PROPOSAL_TARGET_UNKNOWN"
+                assert proposal.get("complete") and proposal.get("is_sale"),"PROPOSAL_INCOMPLETE"
+                assert not proposal.get("mentions_modification"),"PROPOSAL_MODIFIES_OTHERS"
+                print("GF_DRYRUN_PROPOSAL=COMPLETE_AND_MATCHED",flush=True)
+                print("GF_DRYRUN_CONFIRMED=FALSE",flush=True)
+            '''
+            p=subprocess.run(["sudo","-n","-u","fintual","env",*env,
+                  "/opt/fintual-gf-mirror-venv/bin/python","-c",code],
+                 cwd="/tmp",capture_output=True,text=True,timeout=145)
+            for line in p.stdout.splitlines():
+                if line.startswith("GF_DRYRUN_"): print(line,flush=True)
+            if p.returncode!=0:
+                print("GF_DRYRUN_RESULT=BLOCKED",flush=True)
+                # Never disclose private financial values or account information.
+                print("GF_DRYRUN_ERROR_TYPE="+("ASSERTION_OR_UI" if "AssertionError" in p.stderr else "RUNTIME"),flush=True)
+                raise SystemExit(2)
+            print("GF_DRYRUN_RESULT=PASS",flush=True)
+            PY
