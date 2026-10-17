@@ -1,0 +1,105 @@
+name: GF isolated new sandbox ledger binding only (no Finance writes)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-bind-new-sandbox-staged-ledger-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  bind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Bind a new isolated all-pending copy to the new experimental UUID
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 125s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,sqlite3,pwd,hashlib,json
+            from pathlib import Path
+            from datetime import datetime,timezone
+            root=Path("/var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z")
+            source=root/"parallel-unbound-all-pending.sqlite3"
+            backup=root/"historical-push-ledger.sqlite3"
+            uuid_file=root/"new-empty-sandbox-uuid.private"
+            old_db=Path("/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3")
+            assert source.is_file() and backup.is_file() and uuid_file.is_file()
+            assert hashlib.sha256(source.read_bytes()).hexdigest()=="9d73708aafbe0fbd080469b14488240637a5f5571b232ca24a1b0dba4d28009c"
+            assert hashlib.sha256(backup.read_bytes()).hexdigest()=="13a575dc27d8eab01a028b9216f66bfb16c41935fb3192891e7bcba4d70b883d"
+            uid=uuid_file.read_text().strip()
+            assert uid=="d24a1f7a-ad03-4bb4-b739-4da1d4561d61"
+            assert uid not in ("86a77e49-9ac1-432e-8d3b-645b8cda19a2","d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f")
+            destdir=Path("/var/lib/fintual-gf-mirror/parallel-replay")
+            dest=destdir/"parallel-replay-ledger.sqlite3"
+            assert dest.resolve()!=old_db.resolve()
+            assert not destdir.exists(),"parallel ledger must be created exactly once"
+            os.umask(0o077)
+            destdir.mkdir(mode=0o700)
+            fd=os.open(dest,os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600)
+            os.close(fd)
+            src=sqlite3.connect(source.as_uri()+"?mode=ro",uri=True,timeout=20)
+            try:
+                src.execute("PRAGMA query_only=ON")
+                assert src.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                before=list(src.execute(
+                  "SELECT source_id,fingerprint,signature,required_ordinal,payload_json "
+                  "FROM pushed_transactions ORDER BY source_id"))
+                assert len(before)==1178
+                with sqlite3.connect(dest) as out:
+                    src.backup(out)
+                    now=datetime.now(timezone.utc).isoformat()
+                    url="https://www.google.com/finance/portfolio/"+uid
+                    with out:
+                        out.execute(
+                          "INSERT INTO push_ledger_meta(key,value,updated_at) VALUES (?,?,?)",
+                          ("portfolio_id",uid,now))
+                        out.execute(
+                          "INSERT INTO push_ledger_meta(key,value,updated_at) VALUES (?,?,?)",
+                          ("portfolio_url",url,now))
+                        out.execute(
+                          "INSERT INTO push_events(at,source_id,event_type,payload_json) "
+                          "VALUES (?,?,?,?)",
+                          (now,None,"PORTFOLIO_BOUND",json.dumps({"portfolio_id":uid})))
+                    assert out.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                    after=list(out.execute(
+                      "SELECT source_id,fingerprint,signature,required_ordinal,payload_json "
+                      "FROM pushed_transactions ORDER BY source_id"))
+                    assert before==after
+                    assert dict(out.execute(
+                      "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"
+                    ))=={"PENDING":1178}
+                    assert out.execute(
+                      "SELECT COUNT(*) FROM pushed_transactions WHERE attempts != 0 OR last_error != ''"
+                    ).fetchone()[0]==0
+                    assert out.execute(
+                      "SELECT value FROM push_ledger_meta WHERE key='portfolio_id'"
+                    ).fetchone()[0]==uid
+            finally:
+                src.close()
+            user=pwd.getpwnam("fintual")
+            os.chown(dest,user.pw_uid,user.pw_gid)
+            os.chown(destdir,user.pw_uid,user.pw_gid)
+            os.chmod(dest,0o600)
+            os.chmod(destdir,0o700)
+            assert hashlib.sha256(source.read_bytes()).hexdigest()=="9d73708aafbe0fbd080469b14488240637a5f5571b232ca24a1b0dba4d28009c"
+            print("GF_BIND_SANDBOX_TARGET_PINNED=TRUE",flush=True)
+            print("GF_BIND_SANDBOX_PATH_PRIVATE=TRUE",flush=True)
+            print("GF_BIND_SANDBOX_TRANSACTIONS_PENDING=1178",flush=True)
+            print("GF_BIND_SANDBOX_ATTEMPTS_ZERO=TRUE",flush=True)
+            print("GF_BIND_ORIGINAL_IMMUTABLE_BACKUPS_UNCHANGED=TRUE",flush=True)
+            print("GF_BIND_SANDBOX_ACTIVE_LEDGER_SHA256="+hashlib.sha256(dest.read_bytes()).hexdigest(),flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_BIND_FINANCIAL_PRODUCTION_UNCHANGED=PASS
