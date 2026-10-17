@@ -1,0 +1,73 @@
+name: GF assistant state read-only after no proposal
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-post-dryrun-ui-state-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect Google Finance assistant state through dedicated CDP with no interaction
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 70s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import json,os
+            from pathlib import Path
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                x=line.strip()
+                if x.startswith("#") or "=" not in x:continue
+                k,v=x.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            assert not cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            os.environ.update(cfg)
+            c=load_config()
+            assert not c.writes_armed
+            with _browser(c) as browser:
+                page=browser.page
+                obj=page.evaluate(r"""() => {
+                    const raw=(document.body?.innerText || '');
+                    const lower=raw.toLocaleLowerCase();
+                    const phrases={
+                       authRequired:/sign in|iniciar sesi[oó]n|acceder a tu cuenta/.test(lower),
+                       portfolioPresent:/new portfolio|nuevo portafolio/.test(lower),
+                       confirms:/¿?confirmas[^?]{0,1400}\?/gi.test(raw),
+                       cannotSell:/no (?:puedo|es posible|puedes) (?:registrar|realizar|vender|completar)/.test(lower),
+                       insufficient:/insuficientes|suficientes acciones|no tienes suficientes|no hay suficientes/.test(lower),
+                       verifyPrevious:/transacciones anteriores|verificar las transacciones/.test(lower),
+                       askMore:/necesito.+informaci[oó]n|podr[ií]as|puedes confirmar/.test(lower),
+                       apology:/lo siento|disculpa|error|problema/.test(lower),
+                       busy:/generando|pensando|procesando|loading|cargando/.test(lower),
+                    };
+                    return {
+                       urlIsPortfolio:location.pathname.includes('/finance/portfolio/'),
+                       textLength:raw.length,
+                       questionCount:[...raw.matchAll(/¿?confirmas[^?]{0,1400}\?/gi)].length,
+                       promptControls:[...document.querySelectorAll('textarea,[contenteditable=true]')].length,
+                       visibleButtons:[...document.querySelectorAll('button')].filter(e=>e.getBoundingClientRect().width>0).length,
+                       visibleDialogCount:[...document.querySelectorAll('[role=dialog]')].filter(e=>e.getBoundingClientRect().width>0).length,
+                       tailLines:raw.slice(-2500).split('\n').filter(Boolean).length,
+                       flags:phrases,
+                    };
+                }""")
+                print("GF_UI_DIAG="+json.dumps(obj,sort_keys=True),flush=True)
+            print("GF_UI_READ_ONLY=TRUE",flush=True)
+            PY
