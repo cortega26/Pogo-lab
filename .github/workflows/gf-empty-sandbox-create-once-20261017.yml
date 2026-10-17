@@ -1,0 +1,146 @@
+name: GF empty experimental sandbox creation once (zero trades permitted)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-empty-sandbox-create-once-20261017.yml]
+permissions:
+  contents: read
+concurrency:
+  group: gf-empty-sandbox-create-once-20261017
+  cancel-in-progress: false
+jobs:
+  create_once:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: One-time isolated empty portfolio request; never purchase or repeat
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 185s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,json,hashlib,sqlite3
+            from pathlib import Path
+            root=Path("/var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z")
+            old=root/"historical-push-ledger.sqlite3"
+            stage=root/"parallel-unbound-all-pending.sqlite3"
+            assert old.is_file() and stage.is_file()
+            assert hashlib.sha256(old.read_bytes()).hexdigest()=="13a575dc27d8eab01a028b9216f66bfb16c41935fb3192891e7bcba4d70b883d"
+            assert hashlib.sha256(stage.read_bytes()).hexdigest()=="9d73708aafbe0fbd080469b14488240637a5f5571b232ca24a1b0dba4d28009c"
+            with sqlite3.connect(stage.as_uri()+"?mode=ro",uri=True) as c:
+                assert c.execute("SELECT COUNT(*) FROM pushed_transactions WHERE state='PENDING'").fetchone()[0]==1178
+                assert c.execute("SELECT COUNT(*) FROM push_ledger_meta").fetchone()[0]==0
+            marker=root/"EMPTY_SANDBOX_CREATE_ATTEMPT_ONCE"
+            fd=os.open(marker,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            with os.fdopen(fd,"w") as f:
+                f.write("ONE ATTEMPT RESERVED; NEVER RESUBMIT WITHOUT REVIEW\n")
+            print("GF_CREATE_ONCE_GUARD=RESERVED",flush=True)
+            PY
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import json,os,re,hashlib
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txwriter import TransactionWriter
+            data={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if not line or line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier(): data[k.strip()]=v.strip().strip("'").strip('"')
+            assert not data.get("GF_MIRROR_WRITES")
+            assert not data.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protected="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            portfolio_name="Fintual Historical Replay Sandbox 2026"
+            route=urlparse(data.get("GF_MIRROR_PORTFOLIO_URL",""))
+            assert route.hostname=="www.google.com" and route.path=="/finance/portfolio/"+target
+            os.environ.update(data)
+            config=load_config()
+            assert not config.writes_armed
+            with _browser(config) as b:
+                page=b.page
+                try:
+                    page.goto(config.portfolio_url,wait_until="domcontentloaded")
+                    assert urlparse(page.url).path=="/finance/portfolio/"+target
+                    writer=TransactionWriter(b,config.portfolio_url,config.portfolio_name)
+                    old_rows,old_report=writer.read_transactions_with_completeness()
+                    assert old_report["complete"] and len(old_rows)==64
+                    def digest(rows):
+                        return hashlib.sha256(
+                          json.dumps(sorted(
+                            [r.describe() for r in rows],key=lambda x:json.dumps(x,sort_keys=True)
+                          ),sort_keys=True,default=str).encode()
+                        ).hexdigest()
+                    before=digest(old_rows)
+                    print("GF_CREATE_OLD_HISTORY_BEFORE_ROWS=64",flush=True)
+                    print("GF_CREATE_OLD_HISTORY_BEFORE_SHA256="+before,flush=True)
+                    page.goto("https://www.google.com/finance/",wait_until="domcontentloaded")
+                    page.wait_for_timeout(850)
+                    original_buttons=page.evaluate("""() => [...document.querySelectorAll('[role=button],button')]
+                        .map(e=>((e.getAttribute('aria-label')||e.innerText||'').trim()))
+                        .filter(x=>x==='Fintual Historical Replay Sandbox 2026').length""")
+                    assert original_buttons==0,"desired sandbox name already present; do not duplicate"
+                    create=page.get_by_role("button",name="Crear una cartera",exact=True)
+                    assert create.count()==1
+                    create.click()
+                    page.wait_for_timeout(1100)
+                    field=page.get_by_placeholder("O describe el contenido de tu cartera",exact=False)
+                    if field.count()!=1:
+                        field=page.locator("textarea")
+                    assert field.count()==1,"ambiguous creation field"
+                    assert not field.input_value().strip()
+                    instruction=(
+                        "Create a NEW portfolio named exactly 'Fintual Historical Replay Sandbox 2026' "
+                        "with ZERO investments, ZERO holdings, ZERO transactions and NO purchase or sale. "
+                        "This must be a truly EMPTY portfolio with no initial trades. "
+                        "Do not add any symbol, even a placeholder. "
+                        "Do NOT modify, rename or delete ANY existing portfolio, especially "
+                        "'New Portfolio' and 'Portafolio Actualizado'. "
+                        "If an empty portfolio cannot be created, do nothing at all and explain why."
+                    )
+                    field.fill(instruction)
+                    print("GF_CREATE_EMPTY_REQUEST_READY=TRUE",flush=True)
+                    field.press("Enter")
+                    print("GF_CREATE_EMPTY_REQUEST_SENT_ONCE=TRUE",flush=True)
+                    page.wait_for_timeout(10500)
+                    result=page.evaluate("""() => {
+                        const t=(document.body.innerText||'');
+                        const names=[...document.querySelectorAll('[role=button],button')]
+                            .map(e=>(e.getAttribute('aria-label')||e.innerText||'').trim())
+                            .filter(x=>x==='Fintual Historical Replay Sandbox 2026');
+                        const match=location.pathname.match(/\\/finance\\/portfolio\\/([0-9a-f-]{36})/);
+                        const empty=/nothing in this portfolio yet|no investments|sin inversiones|no hay inversiones|cartera vacía|portfolio is empty/i.test(t);
+                        return {urlPath:location.pathname, newPortfolioNameCount:names.length,
+                            portfolioUUID:match?match[1]:null,emptyTextVisible:empty,
+                            responseTail:t.slice(-500).replace(/[\\r\\n]+/g,' ').slice(-350)};
+                    }""")
+                    print("GF_CREATE_EMPTY_OBSERVED="+json.dumps(result,sort_keys=True,ensure_ascii=False),flush=True)
+                    print("GF_CREATE_NO_OTHER_INSTRUCTIONS_SENT=TRUE",flush=True)
+                finally:
+                    page.goto(config.portfolio_url,wait_until="domcontentloaded")
+                    assert urlparse(page.url).path=="/finance/portfolio/"+target
+                    reread=TransactionWriter(b,config.portfolio_url,config.portfolio_name)
+                    after_rows,after_report=reread.read_transactions_with_completeness()
+                    assert after_report["complete"] and len(after_rows)==64
+                    after=digest(after_rows)
+                    assert before==after,"PREEXISTING EXPERIMENTAL PORTFOLIO CHANGED"
+                    print("GF_CREATE_ORIGINAL_64_ROWS_UNCHANGED=TRUE",flush=True)
+                    print("GF_CREATE_ORIGINAL_SHA256="+after,flush=True)
+            print("GF_CREATE_NO_LEDGER_REPLAY=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_CREATE_FINANCIAL_PRODUCTION_UNCHANGED=PASS
