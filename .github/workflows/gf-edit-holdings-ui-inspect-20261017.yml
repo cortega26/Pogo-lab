@@ -70,29 +70,56 @@ jobs:
                 }""")
                 print("GF_MENU_CANDIDATES="+json.dumps(candidates,sort_keys=True),flush=True)
                 suitable=[x for x in candidates if x["nearNewPortfolio"]]
-                if len(suitable)!=1:
-                    print("GF_MENU_SELECTED=NONE_AMBIGUOUS",flush=True)
-                else:
+                assert len(suitable)==1, "New Portfolio menu is not unique; no action"
+                try:
                     page.locator('button[aria-label="Más opciones"]:visible').nth(suitable[0]["index"]).click()
-                    page.wait_for_timeout(500)
-                    info=page.evaluate(r"""() => {
-                        const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
-                        const exact=/^(?:Cambiar el nombre de la cartera|Editar participaciones|Editar participaci[oó]n|Borrar la cartera|Renombrar cartera|Rename portfolio|Edit holdings|Edit investments|Delete portfolio)$/i;
-                        const known=[...document.querySelectorAll('div,span,button,[role="menuitem"]')]
-                          .filter(visible)
-                          .map(e=>({label:(e.innerText||'').replace(/\s+/g,' ').trim(),
-                            tag:e.tagName,role:e.getAttribute('role')||''}))
-                          .filter(x=>exact.test(x.label));
-                        const distinct=[...new Map(known.map(x=>[x.label,x])).values()];
-                        const menus=[...document.querySelectorAll('[role=menu],[role=menuitem]')]
-                          .filter(visible).map(e=>({tag:e.tagName,role:e.getAttribute('role')||'',
-                            label:(e.innerText||'').replace(/\s+/g,' ').trim().slice(0,100)}));
-                        return {knownMenuOptions:distinct.slice(0,8),
-                          roleMenuItemCount:menus.filter(x=>x.role==='menuitem').length,
-                          roleMenus:menus.filter(x=>x.role==='menu').length,
-                          visibleMenuItems:menus.filter(x=>exact.test(x.label)).slice(0,8)};
+                    page.wait_for_timeout(400)
+                    items=page.locator('[role="menuitem"]:visible').filter(has_text="Editar participaciones")
+                    assert items.count()==1, "Edit holdings menu item ambiguous"
+                    print("GF_EDIT_MENU_ITEM=UNIQUE",flush=True)
+                    items.first.click()
+                    page.wait_for_timeout(1200)
+                    assert urlparse(page.url).path=="/finance/portfolio/"+expected,"Destination changed"
+                    summary=page.evaluate(r"""() => {
+                      const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                      const labels=[...document.querySelectorAll('button,[role="button"],[role="tab"],[role="menuitem"],input,select,[role="combobox"],[role="dialog"],[role="columnheader"],th')]
+                        .filter(vis).map(e=>({
+                          tag:e.tagName,role:e.getAttribute('role')||'',
+                          value:(e.getAttribute('aria-label')||e.getAttribute('placeholder')||
+                            (e.innerText||'').replace(/\s+/g,' ').trim()).slice(0,75)
+                        }));
+                      const patterns={
+                        save:/guardar|save|aplicar|apply/i,
+                        cancel:/cancelar|cancel|cerrar|close/i,
+                        edit:/editar|edit/i,
+                        delete:/borrar|eliminar|delete|remove|quitar/i,
+                        sale:/venta|vender|sell/i,
+                        transaction:/transacc|activity|historial/i,
+                        date:/fecha|date/i,
+                        quantity:/cantidad|quantity/i,
+                        price:/precio|price/i
+                      };
+                      const categories=Object.fromEntries(Object.entries(patterns)
+                        .map(([name,re])=>[name,labels.filter(e=>re.test(e.value)).length]));
+                      const uniqueLabels=[...new Set(labels.filter(e=>Object.values(patterns)
+                        .some(re=>re.test(e.value))).map(e=>e.value))].slice(0,30);
+                      const tableHeaderLabels=[...document.querySelectorAll('[role="columnheader"],th')]
+                        .filter(vis).map(e=>(e.innerText||'').replace(/\s+/g,' ').trim())
+                        .filter(t=>/^(s[íi]mbolos?|cantidad|fecha|precio|tipo|acci[oó]n|operaci[oó]n|transacciones|total)$/i.test(t)).slice(0,12);
+                      return {
+                        visibleDialogs:labels.filter(e=>e.role==='dialog').length,
+                        visibleInputs:labels.filter(e=>e.tag==='INPUT').length,
+                        visibleSelects:labels.filter(e=>e.tag==='SELECT').length,
+                        categoryCounts:categories,
+                        knownControls:uniqueLabels,
+                        tableHeaderLabels,
+                        newPortfolioTitleVisible:!![...document.querySelectorAll('h1,h2,h3')]
+                          .filter(vis).find(e=>(e.innerText||'').trim()==='New Portfolio')
+                      };
                     }""")
-                    print("GF_MENU_VISIBLE_OPTIONS="+json.dumps(info,ensure_ascii=False,sort_keys=True),flush=True)
-                    page.keyboard.press("Escape")
-                print("GF_MENU_ONLY_NO_EDIT_NO_SAVE_NO_DELETE=TRUE",flush=True)
+                    print("GF_EDIT_HOLDINGS_UI="+json.dumps(summary,sort_keys=True,ensure_ascii=False),flush=True)
+                finally:
+                    # No fields ever changed. Close the UI by navigating back to the target.
+                    page.goto(config.portfolio_url,wait_until="domcontentloaded")
+                    print("GF_EDIT_NO_FORM_CHANGES_NO_SAVE_NO_DELETE=TRUE",flush=True)
             PY
