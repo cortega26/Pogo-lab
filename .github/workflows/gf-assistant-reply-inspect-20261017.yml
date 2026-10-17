@@ -75,3 +75,5 @@ jobs:
 # Read-only follow-up after structured parser dry-run 39033030434
 
 # Post-reboot isolated browser message check, read-only.
+
+# Diagnose the fresh-thread Assistant response from post-reboot dry-run 39033512743.
