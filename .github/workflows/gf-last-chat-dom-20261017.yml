@@ -1,0 +1,95 @@
+name: GF last chat DOM structure (read only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-last-chat-dom-20261017.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect message structure after last sale request without interaction
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import json,os
+            from pathlib import Path
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            env={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():env[k.strip()]=v.strip().strip("'").strip('"')
+            assert not env.get("GF_MIRROR_WRITES") and not env.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            os.environ.update(env)
+            cfg=load_config()
+            assert not cfg.writes_armed
+            with _browser(cfg) as b:
+                result=b.page.evaluate(r"""() => {
+                  const marker='Añade una única transacción nueva a este portafolio';
+                  const body=document.body;
+                  const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                  const w=document.createTreeWalker(body,NodeFilter.SHOW_TEXT);
+                  const all=[];let node;
+                  while((node=w.nextNode())){
+                    const val=(node.textContent||'').trim();
+                    if(val && node.parentElement && visible(node.parentElement)){
+                      all.push({node,text:val,el:node.parentElement});
+                    }
+                  }
+                  let last=-1;
+                  for(let i=0;i<all.length;i++)if(all[i].text.includes(marker))last=i;
+                  if(last<0)return {outgoingFound:false,chatStructureReadable:false};
+                  const origin=all[last];
+                  const elementInfo=e=>{
+                    if(!e)return null;
+                    return {tag:e.tagName,role:e.getAttribute('role')||'',
+                      testIdPresent:!!e.getAttribute('data-testid'),
+                      ariaLabelPresent:!!e.getAttribute('aria-label'),
+                      children:e.children.length};
+                  };
+                  const ancestry=[];let el=origin.el;
+                  for(let i=0;i<6&&el;i++,el=el.parentElement){
+                    ancestry.push(elementInfo(el));
+                  }
+                  const following=all.slice(last+1,last+32).map((x,i)=>({
+                    offset:i+1,chars:x.text.length,
+                    parent:elementInfo(x.el),
+                    withinOriginParent:origin.el.contains(x.node),
+                    isInterfaceLabel:/^(?:yes|cancel|nuevo hilo|new chat|investigar|edit|expand_more|expandir|cancelar|preguntarle a la ia|el contenido generado|ayuda|enviar comentarios|privacidad|condiciones|todo listo|mic|add|arrow_upward)$/i.test(x.text),
+                    containsConfirmation:/confirmas|confirmadd|desea proceder|solicito su confirmaci[oó]n/i.test(x.text),
+                    containsRefusal:/no puedo|no es posible|lo siento|disculpa|error|try again/i.test(x.text),
+                    containsTradeTerms:/transacci[oó]n|venta|compra|portafolio/i.test(x.text)
+                  }));
+                  const nextContent=following.filter(x=>!x.isInterfaceLabel&&x.chars>35);
+                  return {
+                    outgoingFound:true,chatStructureReadable:true,
+                    totalVisibleTextNodes:all.length,
+                    outgoingTextNodeIndex:last,
+                    followingVisibleTextNodes:all.length-last-1,
+                    ancestry,following,substantiveFollowingNodes:nextContent.length,
+                    substantiveConfirmationNodes:nextContent.filter(x=>x.containsConfirmation).length,
+                    substantiveRefusalNodes:nextContent.filter(x=>x.containsRefusal).length
+                  };
+                }""")
+                print("GF_DOM_LAST_MESSAGE_STRUCTURE="+json.dumps(result,sort_keys=True),flush=True)
+            print("GF_DOM_READ_ONLY=PASS",flush=True)
+            PY
