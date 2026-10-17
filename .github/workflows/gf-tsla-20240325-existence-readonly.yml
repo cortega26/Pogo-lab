@@ -74,7 +74,27 @@ jobs:
                 print("GF_TSLA_HISTORY_PAGINATION="+str(report.get("pagination_control")),flush=True)
                 target=json.loads(os.environ["GF_TSLA_TARGET_SIGNATURE_JSON"])
                 required=int(os.environ["GF_TSLA_TARGET_ORDINAL"])
-                observed=sum(1 for row in rows if row.signature==tuple(target))
+                matches=[row for row in rows if row.signature==tuple(target)]
+                observed=len(matches)
+                # Compare rendered values without publishing personal trade amounts
+                # into public operations-workflow logs.
+                from decimal import Decimal, ROUND_HALF_UP
+                ledger_qty=Decimal("0.057887121")
+                ledger_price=Decimal("172.74999736")
+                def rounded(x,places):
+                    return x.quantize(Decimal(places),rounding=ROUND_HALF_UP)
+                for i,row in enumerate(matches,1):
+                    qty=row.quantity_shown
+                    price=row.price_shown
+                    print("GF_TSLA_ROW_"+str(i)+"_QUANTITY_PRESENT="+str(qty is not None),flush=True)
+                    print("GF_TSLA_ROW_"+str(i)+"_PRICE_PRESENT="+str(price is not None),flush=True)
+                    print("GF_TSLA_ROW_"+str(i)+"_QUANTITY_MATCHES_LEDGER_3DP="+str(qty is not None and rounded(qty,"0.001")==rounded(ledger_qty,"0.001")),flush=True)
+                    print("GF_TSLA_ROW_"+str(i)+"_PRICE_MATCHES_LEDGER_2DP="+str(price is not None and rounded(price,"0.01")==rounded(ledger_price,"0.01")),flush=True)
+                if len(matches)==2:
+                    a,b=matches
+                    print("GF_TSLA_TWO_ROWS_SAME_RENDERED_QTY="+str(a.quantity_shown is not None and a.quantity_shown==b.quantity_shown),flush=True)
+                    print("GF_TSLA_TWO_ROWS_SAME_RENDERED_PRICE="+str(a.price_shown is not None and a.price_shown==b.price_shown),flush=True)
+                print("GF_TSLA_COMPARISON_ONLY_NO_WRITES=TRUE",flush=True)
                 print("GF_TSLA_OBSERVED_MATCHING_SIGNATURES="+str(observed),flush=True)
                 print("GF_TSLA_REQUIRED_ORDINAL="+str(required),flush=True)
                 if not report.get("complete") or report.get("pagination_control"):
