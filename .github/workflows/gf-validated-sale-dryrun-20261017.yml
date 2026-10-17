@@ -34,7 +34,7 @@ jobs:
             from urllib.parse import urlparse
             p=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror/txwriter.py")
             b=p.read_bytes()
-            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="46a68e72477c86e4e21abe69af8913be85694cf3"
+            assert hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()=="f56ed88804d4636f54135a84793a178c347ddeb2"
             c={}
             for s in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
                 s=s.strip()
@@ -62,7 +62,7 @@ jobs:
             cfg=load_config()
             assert not cfg.writes_armed
             ledger=PushLedger(cfg.push_ledger_path)
-            todo=plan(ledger,limit=1,tickers={"TSLA","TSLA","STX"})
+            todo=plan(ledger,limit=1,tickers={"TSLA","NVDA","STX"})
             assert len(todo)==1
             tx=todo[0]
             assert tx.action=="SELL" and tx.ticker=="TSLA" and tx.trade_date.isoformat()=="2024-03-25"
