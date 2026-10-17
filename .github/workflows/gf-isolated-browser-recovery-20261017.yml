@@ -28,7 +28,11 @@ jobs:
                 if p.returncode:raise RuntimeError("command failed: "+args[0]+" "+str(p.returncode))
                 return p.stdout.strip()
             def active(unit):
-                return run("systemctl","is-active",unit)
+                # systemctl is-active returns status 3 for an intentionally
+                # inactive unit; it is expected for the disarmed replay timer.
+                p=subprocess.run(["systemctl","is-active",unit],
+                                 capture_output=True,text=True,timeout=12)
+                return p.stdout.strip()
             def pid(unit):
                 return run("systemctl","show",unit,"-p","MainPID","--value")
             browser="fintual-gf-mirror-browser.service"
