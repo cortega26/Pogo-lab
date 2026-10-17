@@ -22,21 +22,31 @@ jobs:
           command_timeout: 8m
           script: |
             set -euo pipefail
+            echo GF_TEST_GATE=CHECK_FINANCIAL_SERVICE
             test "$(systemctl is-active fintual-executor.service)" = active
+            echo GF_TEST_GATE=FINANCIAL_SERVICE_OK
+            echo GF_TEST_GATE=CHECK_BROWSER_SERVICE
             test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            echo GF_TEST_GATE=BROWSER_INACTIVE_OK
+            echo GF_TEST_GATE=CHECK_BOOTSTRAP
             test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
             test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_TEST_GATE=PRECHECKS_OK
             KEY=/var/lib/fintual-ci-source-readonly
             UV=/home/fintual/.uv-bootstrap/bin/uv
+            echo GF_TEST_GATE=CREATE_TMP
             RUN="$(sudo -n mktemp -d /tmp/gf-private-pr-test.XXXXXXXX)"
             sudo -n chmod 0700 "$RUN"
             cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
             trap cleanup EXIT
+            echo GF_TEST_GATE=CHECK_UV
             test -x "$UV"
+            echo GF_TEST_GATE=FETCH_PRIVATE_BRANCH
             sudo -n env GIT_TERMINAL_PROMPT=0 \
               GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
               git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
               git@github.com:cortega26/fintual-executor.git "$RUN/source"
+            echo GF_TEST_GATE=BRANCH_FETCHED
             got="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
             test "$got" = c58ed27fc2b32a599bc0a98ce42cea30212e2a19 || { echo GF_TEST_SOURCE_SHA=WRONG; exit 8; }
             echo GF_TEST_SOURCE_SHA=EXACT
