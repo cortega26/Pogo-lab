@@ -41,7 +41,7 @@ jobs:
             assert active(executor)=="active"
             assert active(sheets)=="active"
             assert active(browser)=="active"
-            assert run("systemctl","is-active","fintual-gf-tx.timer")=="inactive"
+            assert subprocess.run(["systemctl","is-active","fintual-gf-tx.timer"],capture_output=True,text=True,timeout=7).stdout.strip()=="inactive"
             old_executor=pid(executor)
             old_sheets=pid(sheets)
             for prop in ("Requires","BindsTo","PartOf","ConsistsOf","PropagatesStopTo"):
@@ -79,7 +79,7 @@ jobs:
             assert active(browser)=="active"
             assert active(executor)=="active" and pid(executor)==old_executor
             assert active(sheets)=="active" and pid(sheets)==old_sheets
-            assert run("systemctl","is-active","fintual-gf-tx.timer")=="inactive"
+            assert subprocess.run(["systemctl","is-active","fintual-gf-tx.timer"],capture_output=True,text=True,timeout=7).stdout.strip()=="inactive"
             cdp_ok=False
             for _ in range(20):
                 try:
