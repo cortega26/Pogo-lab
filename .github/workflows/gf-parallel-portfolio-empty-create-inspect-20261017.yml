@@ -75,7 +75,28 @@ jobs:
                     }""")
                     assert urlparse(page.url).hostname=="www.google.com"
                     print("GF_EMPTY_CREATE_UI="+json.dumps(result,sort_keys=True,ensure_ascii=False),flush=True)
-                    print("GF_EMPTY_CREATE_NO_CLICK_NO_FORM_NO_SUBMIT=TRUE",flush=True)
+                    entry=page.get_by_role("button",name="Crear una cartera",exact=True)
+                    assert entry.count()==1,"creation entry not unique; no click"
+                    entry.click()
+                    page.wait_for_timeout(1050)
+                    form=page.evaluate(r"""() => {
+                        const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                        const fields=[...document.querySelectorAll('input,textarea,select,[contenteditable=true]')]
+                          .filter(visible).map(e=>({
+                            tag:e.tagName,type:e.getAttribute('type')||'',
+                            label:(e.getAttribute('aria-label')||e.getAttribute('placeholder')||'').slice(0,65)
+                          })).slice(0,14);
+                        const buttons=[...document.querySelectorAll('button,[role=button],[role=menuitem]')]
+                          .filter(visible).map(e=>(e.getAttribute('aria-label')||
+                            (e.innerText||'').replace(/\\s+/g,' ').trim()).slice(0,55))
+                          .filter(t=>/crear|create|guardar|save|siguiente|next|hecho|done|cancel|aceptar|submit|listo|continuar/i.test(t)).slice(0,18);
+                        const dialogs=[...document.querySelectorAll('[role=dialog]')].filter(visible).length;
+                        return {urlPath:location.pathname,fields,buttons,dialogs};
+                    }""")
+                    assert urlparse(page.url).hostname=="www.google.com"
+                    assert protected not in page.url,"unexpected protected portfolio navigation"
+                    print("GF_EMPTY_CREATE_FORM="+json.dumps(form,sort_keys=True,ensure_ascii=False),flush=True)
+                    print("GF_EMPTY_CREATE_ENTRY_OPEN_ONLY_NO_FIELD_CHANGES_NO_SUBMIT=TRUE",flush=True)
                 finally:
                     page.goto(cfg.portfolio_url,wait_until="domcontentloaded")
                     assert urlparse(page.url).path=="/finance/portfolio/"+target
