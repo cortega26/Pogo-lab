@@ -1,0 +1,156 @@
+name: G8 native broker cash vs Sheets ledger (read only)
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-cash-native-ledger-readonly-reconciliation-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare 26 dividend and 17 interest IDs and cash via readonly IPC and Google GET
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 150s
+          script: |
+            set -euo pipefail
+            TARGET=81e3fb22788582806c991d4fc2e89b9e54e7219a
+            SHEET_BASE=643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = "/opt/fintual-httpx-releases/$TARGET"
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = "/opt/fintual-sheet-sync-releases/$SHEET_BASE"
+            systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--fills-only'
+            systemctl show -P ExecStart fintual-executor.service | grep -q -- '--sheet-cash-socket'
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh \
+              env PYTHONPATH="/opt/fintual-sheet-sync-releases/$TARGET/src" \
+              PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
+            import sqlite3
+            from pathlib import Path
+            from decimal import Decimal, InvalidOperation
+            from datetime import datetime, timedelta, timezone
+            from zoneinfo import ZoneInfo
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            from fintual_executor.client import (
+                get_wallet_dividends, get_wallet_cash_interests, get_buy_state
+            )
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            from fintual_executor.sheet_sync import DEFAULT_CASH_EVENT_LOOKBACK_DAYS
+            root=Path('/var/lib/fintual-executor')
+            db=root/'state.sqlite3'
+            with sqlite3.connect(db.as_uri()+'?mode=ro',uri=True,timeout=8) as con:
+                con.execute('PRAGMA query_only=ON')
+                assert con.execute('PRAGMA integrity_check').fetchone()==('ok',)
+                states=('SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED','SIGNALLED')
+                assert con.execute('SELECT COUNT(*) FROM order_intents WHERE state IN ('+','.join('?'*len(states))+')',states).fetchone()[0]==0
+            handle=IpcReadOnlyBrokerHandle(root/'cash-ipc/cash.sock')
+            assert handle.health()['order_capability'] is False
+            dividends=get_wallet_dividends(handle)
+            interest=get_wallet_cash_interests(handle)
+            wallet=get_buy_state(handle)
+            assert isinstance(dividends,list) and isinstance(interest,list) and isinstance(wallet,dict)
+            ids=[('D',str(x['id'])) for x in dividends]+[('I',str(x['id'])) for x in interest]
+            assert len(set(ids))==len(ids),'BROKER_DUPLICATE_NATIVE_IDS'
+            settings={}
+            for line in Path('/etc/fintual-executor/sheet-sync.env').read_text().splitlines():
+                if line.startswith('FINTUAL_SHEET_SPREADSHEET_ID='):
+                    settings['sheet_id']=line.split('=',1)[1].strip().strip('"').strip("'")
+            assert settings.get('sheet_id'),'SHEET_ID_MISSING'
+            cred=service_account.Credentials.from_service_account_file(
+                '/etc/fintual-executor/google-sheet-sync.json',
+                scopes=['https://www.googleapis.com/auth/spreadsheets.readonly'])
+            sheet=build('sheets','v4',credentials=cred,cache_discovery=False)
+            def read(r):
+                return sheet.spreadsheets().values().get(
+                    spreadsheetId=settings['sheet_id'],range=r,
+                    valueRenderOption='UNFORMATTED_VALUE',
+                    dateTimeRenderOption='SERIAL_NUMBER').execute().get('values',[])
+            ledger=read('Ledger_Fintual!A2:M1400')
+            cash=read('Cash_Fintual!A2:K510')
+            assert len(ledger)>100 and cash, 'MISSING_SHEET_LEDGER'
+            source_rows={}
+            for line in ledger:
+                if len(line)>10 and line[10]:
+                    source_rows.setdefault(str(line[10]),[]).append(line)
+            today=datetime.now(timezone.utc)
+            cutoff=today-timedelta(days=DEFAULT_CASH_EVENT_LOOKBACK_DAYS)
+            missing=0
+            conflicts=0
+            eligible=0
+            matched=0
+            native_stx=False
+            chile=ZoneInfo('America/Santiago')
+            def near(v,w):
+                try:return abs(Decimal(str(v))-Decimal(str(w)))<=Decimal('0.005')
+                except (InvalidOperation,TypeError,ValueError):return False
+            def verify(source,kind,symbol,amount,date):
+                nonlocal_result=None
+                rows=source_rows.get(source,[])
+                if not rows:return 'MISSING'
+                if len(rows)!=1:return 'CONFLICT'
+                x=rows[0]
+                if len(x)<=5 or str(x[1]).upper()!=symbol or str(x[2]).upper()!=kind or not near(x[5],amount):
+                    return 'CONFLICT'
+                # Check ledger date agrees with broker's Chile-local posting date
+                dt=x[0]
+                if isinstance(dt,(int,float)):
+                    from datetime import date
+                    date_string=(date(1899,12,30)+timedelta(days=int(dt))).isoformat()
+                else:
+                    date_string=str(dt)[:10]
+                return 'MATCH' if date_string==date else 'CONFLICT'
+            for row in dividends:
+                created=datetime.fromisoformat(str(row['createdAt'])).astimezone(timezone.utc)
+                date=created.astimezone(chile).date().isoformat()
+                gross=Decimal(str(row['grossCapital']['amount']))
+                net=Decimal(str(row['netCapital']['amount']))
+                tax=Decimal(str(row['taxCapital']['amount']))
+                assert abs((gross-tax)-net)<=Decimal('0.01'), 'NATIVE_DIVIDEND_MONEY_INCONSISTENT'
+                source='fintual-dividend:'+str(row['id'])
+                if row['asset']['symbol']=='STX' and date=='2026-10-07' and str(row['id'])=='1163144':
+                    native_stx=near(net,'0.27') and near(gross,'0.27') and near(tax,'0')
+                if created<cutoff:continue
+                eligible+=1
+                tests=[verify(source+':gross','DIVIDEND',str(row['asset']['symbol']).upper(),gross,date)]
+                if tax>0:tests.append(verify(source+':tax','FEE',str(row['asset']['symbol']).upper(),tax,date))
+                if 'CONFLICT' in tests:conflicts+=1
+                elif 'MISSING' in tests:missing+=1
+                else:matched+=1
+            for row in interest:
+                created=datetime.fromisoformat(str(row['createdAt'])).astimezone(timezone.utc)
+                if created<cutoff:continue
+                eligible+=1
+                x=verify('fintual-cash-interest:'+str(row['id']),'INTEREST','CASH',row['amount'],
+                         created.astimezone(chile).date().isoformat())
+                if x=='CONFLICT':conflicts+=1
+                elif x=='MISSING':missing+=1
+                else:matched+=1
+            assert native_stx,'STX_BROKER_NATIVE_DETAIL_MISMATCH'
+            last=next((line[8] for line in reversed(cash) if len(line)>8 and line[8] not in ('',None)),None)
+            assert last is not None,'NO_CASH_SNAPSHOT'
+            balance=wallet['stocksWallet']['investableAmount']['amount']
+            assert near(last,balance),'BROKER_SHEETS_CASH_BALANCE_MISMATCH'
+            print('G8_NATIVE_DIVIDENDS_COUNT='+str(len(dividends)),flush=True)
+            print('G8_NATIVE_INTERESTS_COUNT='+str(len(interest)),flush=True)
+            print('G8_CASH_LOOKBACK_DAYS='+str(DEFAULT_CASH_EVENT_LOOKBACK_DAYS),flush=True)
+            print('G8_CASH_EVENTS_WITHIN_LOOKBACK='+str(eligible),flush=True)
+            print('G8_CASH_EVENTS_ALREADY_MATCHED='+str(matched),flush=True)
+            print('G8_CASH_EVENTS_MISSING_FROM_LEDGER='+str(missing),flush=True)
+            print('G8_CASH_EVENTS_CONFLICTING='+str(conflicts),flush=True)
+            print('G8_STX_BROKER_NET_GROSS_TAX_MATCH=PASS',flush=True)
+            print('G8_BROKER_VS_SHEETS_CASH_BALANCE=PASS',flush=True)
+            print('G8_NATIVE_SHEET_AUDIT_READONLY=PASS',flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            echo G8_NATIVE_CASH_AUDIT_SERVICES_UNCHANGED=PASS
