@@ -1,0 +1,78 @@
+name: GF mirror prepare isolated browser (no writes)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-browser-once-20261017.yml
+permissions:
+  contents: read
+concurrency:
+  group: gf-mirror-browser-prepare-20261017
+  cancel-in-progress: false
+jobs:
+  browser-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Start only dedicated Xvfb and Google Finance browser if safe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 95s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(systemctl is-active fintual-gf-mirror-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            # A mirror browser cannot interfere with the only financial executor.
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            mem={}
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith(("MemAvailable:","SwapTotal:","SwapFree:")):
+                    k,v=line.split(":",1)
+                    mem[k]=int(v.split()[0])
+            print("GF_BROWSER_MEMAVAILABLE_GIB="+str(round(mem["MemAvailable"]/1048576,2)),flush=True)
+            assert mem["MemAvailable"] >= 4*1048576,"Insufficient memory for isolated browser"
+            assert mem["SwapTotal"]==0 or mem["SwapFree"]*4 >= mem["SwapTotal"]*3,"Swap pressure exceeds 25 percent"
+            PY
+            was_xvfb="$(systemctl is-active fintual-gf-xvfb.service || true)"
+            started_xvfb=0
+            cleanup(){
+              rc=$?
+              if [[ $rc -ne 0 ]]; then
+                sudo -n systemctl stop fintual-gf-mirror-browser.service || true
+                if [[ $started_xvfb -eq 1 ]]; then sudo -n systemctl stop fintual-gf-xvfb.service || true; fi
+                echo "GF_BROWSER_PREPARE_FAILED_ROLLED_BACK"
+              fi
+              exit "$rc"
+            }
+            trap cleanup EXIT
+            if [[ "$was_xvfb" != active ]]; then
+              sudo -n systemctl start fintual-gf-xvfb.service
+              started_xvfb=1
+            fi
+            sudo -n systemctl start fintual-gf-mirror-browser.service
+            sleep 5
+            test "$(systemctl is-active fintual-gf-xvfb.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import urllib.request
+            from pathlib import Path
+            with urllib.request.urlopen("http://127.0.0.1:9223/json/version",timeout=6) as r:
+                assert r.status == 200
+            print("GF_BROWSER_ISOLATED_CDP=PASS",flush=True)
+            print("GF_BROWSER_PROFILE=DEDICATED",flush=True)
+            print("GF_BROWSER_WRITES_NOT_STARTED=TRUE",flush=True)
+            PY
+            echo GF_BROWSER_PREPARE=PASS
