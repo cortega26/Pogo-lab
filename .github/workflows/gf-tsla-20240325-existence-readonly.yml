@@ -94,6 +94,48 @@ jobs:
                     a,b=matches
                     print("GF_TSLA_TWO_ROWS_SAME_RENDERED_QTY="+str(a.quantity_shown is not None and a.quantity_shown==b.quantity_shown),flush=True)
                     print("GF_TSLA_TWO_ROWS_SAME_RENDERED_PRICE="+str(a.price_shown is not None and a.price_shown==b.price_shown),flush=True)
+                row_identity=writer.page.evaluate(r"""() => {
+                    const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                    const tables=[...document.querySelectorAll('table,[role="table"]')]
+                      .filter(vis).filter(t=>/acci[oó]n|action|tipo/i.test(
+                        [...t.querySelectorAll('th,[role="columnheader"]')]
+                          .map(e=>e.innerText||'').join(' ')));
+                    const candidates=[];
+                    for(const table of tables){
+                        const rows=[...table.querySelectorAll('tr,[role="row"]')].filter(vis);
+                        rows.forEach((row,index)=>{
+                            const t=(row.innerText||'').replace(/\s+/g,' ');
+                            if(!/March\s+25,\s*2024|25\s+marzo\s+2024|25\/03\/2024/i.test(t))return;
+                            if(!/\bTSLA\b|Tesla Motors|Tesla Inc/i.test(t))return;
+                            if(!/\bVenta\b|\bSell\b/i.test(t))return;
+                            const attrs=[...row.attributes].map(a=>a.name);
+                            const all=[row,...row.querySelectorAll('*')];
+                            const ids=all.filter(e=>e.id).length;
+                            const dataKeys=[...new Set(all.flatMap(e=>[...e.attributes]
+                                .filter(a=>a.name.startsWith('data-')).map(a=>a.name)))];
+                            const timeAttrs=all.filter(e=>e.hasAttribute('datetime') ||
+                                e.hasAttribute('data-timestamp') || e.tagName==='TIME').length;
+                            const directLinks=[...row.querySelectorAll('a[href]')].map(a=>a.getAttribute('href')||'');
+                            const buttons=[...row.querySelectorAll('button,[role="button"]')].filter(vis);
+                            candidates.push({
+                                indexInTable:index,
+                                hasDirectRowId:row.hasAttribute('id'),
+                                directRowAttrKeys:attrs.filter(x=>/^(data-|id$|aria-|title$)/.test(x)),
+                                descendantElementIds:ids,
+                                descendantDataAttrKeys:dataKeys,
+                                timestampAttributeCount:timeAttrs,
+                                nonQuoteDetailLinks:directLinks.filter(h=>!h.includes('/quote/')).length,
+                                actionableControls:buttons.length,
+                                editControlVisible:buttons.some(b=>/edit|editar/i.test(
+                                    (b.getAttribute('aria-label')||'')+' '+(b.innerText||''))),
+                                deleteControlVisible:buttons.some(b=>/delete|borrar|eliminar/i.test(
+                                    (b.getAttribute('aria-label')||'')+' '+(b.innerText||'')))
+                            });
+                        });
+                    }
+                    return {matchingRows:candidates.length,rows:candidates.slice(0,4)};
+                }""")
+                print("GF_TSLA_DUPLICATE_DOM_METADATA="+json.dumps(row_identity,sort_keys=True),flush=True)
                 print("GF_TSLA_COMPARISON_ONLY_NO_WRITES=TRUE",flush=True)
                 print("GF_TSLA_OBSERVED_MATCHING_SIGNATURES="+str(observed),flush=True)
                 print("GF_TSLA_REQUIRED_ORDINAL="+str(required),flush=True)
