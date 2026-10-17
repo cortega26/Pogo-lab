@@ -1,0 +1,88 @@
+name: GF New Portfolio edit holdings UI inspection (no save)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-edit-holdings-ui-inspect-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Open edit participations UI and inspect without saving
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 120s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,json
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txwriter import TransactionWriter
+            vals={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():vals[k.strip()]=v.strip().strip("'").strip('"')
+            assert not vals.get("GF_MIRROR_WRITES") and not vals.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            configured=urlparse(vals.get("GF_MIRROR_PORTFOLIO_URL",""))
+            expected="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            assert configured.hostname=="www.google.com" and configured.path=="/finance/portfolio/"+expected
+            os.environ.update(vals)
+            config=load_config()
+            assert not config.writes_armed
+            with _browser(config) as browser:
+                writer=TransactionWriter(browser,config.portfolio_url,config.portfolio_name)
+                writer._open_assets_tab()
+                page=browser.page
+                assert urlparse(page.url).path=="/finance/portfolio/"+expected
+                menu=page.locator('button[aria-label="Más opciones"]').first
+                assert menu.count()==1 and menu.is_visible(),"portfolio menu not found"
+                menu.click()
+                edit=page.get_by_text("Editar participaciones",exact=True)
+                assert edit.count()==1 and edit.is_visible(),"edit participations menu item not uniquely visible"
+                print("GF_EDIT_MENU_FOUND=TRUE",flush=True)
+                edit.click()
+                page.wait_for_timeout(1800)
+                result=page.evaluate(r"""() => {
+                  const vis=e=>{const r=e.getBoundingClientRect();return r.width>0 && r.height>0};
+                  const texts=[...document.querySelectorAll('button,[role=button],[role=tab],[role=menuitem],input,select,[role=dialog]')]
+                    .filter(vis).map(e=>{
+                      const t=(e.getAttribute('aria-label')||e.getAttribute('placeholder')||(e.innerText||'').trim()).slice(0,90);
+                      return {tag:e.tagName,role:e.getAttribute('role')||'',label:t};
+                    });
+                  const relevant=texts.filter(e=>/guardar|save|cancelar|cancel|cerrar|close|editar|edit|borrar|eliminar|delete|quitar|remove|cantidad|quantity|fecha|date|transacc|venta|sell|comprar|compra|buy|agregar|add/i.test(e.label));
+                  const dialogs=[...document.querySelectorAll('[role=dialog]')].filter(vis);
+                  const labels=relevant.map(e=>e.label);
+                  const headings=[...document.querySelectorAll('th,[role=columnheader]')].filter(vis).map(x=>(x.innerText||'').trim().slice(0,60));
+                  return {dialogCount:dialogs.length,visibleInputCount:texts.filter(e=>e.tag==='INPUT').length,
+                    visibleSelectCount:texts.filter(e=>e.tag==='SELECT').length,
+                    buttons:relevant.slice(0,32),
+                    headings:headings.slice(0,18),
+                    hasSave:labels.some(x=>/guardar|save/i.test(x)),
+                    hasCancel:labels.some(x=>/cancelar|cancel/i.test(x)),
+                    hasDelete:labels.some(x=>/borrar|eliminar|delete|remove/i.test(x)),
+                    hasSale:labels.some(x=>/venta|vender|sell/i.test(x)),
+                    hasTransaction:labels.some(x=>/transacc/i.test(x)),
+                    hasDate:labels.some(x=>/fecha|date/i.test(x))};
+                }""")
+                print("GF_EDIT_UI_SUMMARY="+json.dumps(result,sort_keys=True,ensure_ascii=False),flush=True)
+                # No fields touched. Navigate out to exit editing UI without saving.
+                page.goto(config.portfolio_url,wait_until="domcontentloaded")
+                print("GF_EDIT_NO_SAVE_NO_DELETE_NO_LEDGER_WRITES=TRUE",flush=True)
+            PY
