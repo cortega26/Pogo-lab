@@ -1,0 +1,39 @@
+name: GF mirror secure private-source fetch preflight (no changes)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-private-fetch-probe-20261017.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check authorized read-only Oracle deploy key for private GF PR head
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 65s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            KEY=/var/lib/fintual-ci-source-readonly
+            if ! sudo test -s "$KEY/github_ed25519" || ! sudo test -s "$KEY/known_hosts"; then
+              echo GF_PRIVATE_SOURCE_ACCESS=NO_DEPLOY_KEY
+              exit 0
+            fi
+            result="$(sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+               timeout 30 git ls-remote git@github.com:cortega26/fintual-executor.git refs/heads/feat/google-finance-mirror 2>/dev/null || true)"
+            case "$result" in
+              c58ed27fc2b32a599bc0a98ce42cea30212e2a19*) echo GF_PRIVATE_SOURCE_ACCESS=EXACT_SHA_AVAILABLE;;
+              "") echo GF_PRIVATE_SOURCE_ACCESS=UNAVAILABLE;;
+              *) echo GF_PRIVATE_SOURCE_ACCESS=REF_CHANGED;;
+            esac
+            echo GF_NO_SERVICE_OR_REPO_MUTATIONS=TRUE
