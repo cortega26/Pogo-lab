@@ -1,4 +1,4 @@
-name: GF mirror five-trade canary extension (test portfolio only)
+name: GF mirror one-sale canary validated parser (test portfolio only)
 on:
   push:
     branches:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 17
     steps:
-      - name: Safely extend Oracle canary by five, checkpoint and independently verify
+      - name: Check and write exactly one historical sale on test portfolio, then verify
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -39,7 +39,7 @@ jobs:
             from urllib.parse import urlparse
             base=Path("/opt/fintual-gf-mirror/integrations/google-finance/gf_mirror")
             known={"txsync.py":"24127cf958969984282be36a60eafed2155b15f0",
-                   "txwriter.py":"46a68e72477c86e4e21abe69af8913be85694cf3",
+                   "txwriter.py":"a106f9a10fbe73a43028c059bf07cabef8197e57",
                    "config.py":"4e8c8c7a6a94010fad44a0f044fa3db2a5ad8d5c"}
             for name,want in known.items():
               payload=(base/name).read_bytes()
@@ -80,7 +80,7 @@ jobs:
               assert c.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]==0
             print("GF_FIVE_TRADING_LEDGER=HEALTHY",flush=True)
             cmd=["systemd-run","--quiet","--wait","--pipe","--collect",
-              "--unit=gf-mirror-five-canary-20261017",
+              "--unit=gf-mirror-one-sale-20261017",
               "--property=User=fintual","--property=Group=fintual",
               "--property=WorkingDirectory=/opt/fintual-gf-mirror",
               "--property=EnvironmentFile=/etc/fintual-executor/gf-mirror.env",
@@ -95,7 +95,7 @@ jobs:
               "--property=ReadOnlyPaths=/etc/fintual-executor/gf-mirror.env /etc/fintual-executor/google-sheet-sync.json",
               "--property=ReadWritePaths=/var/lib/fintual-gf-mirror",
               "/opt/fintual-gf-mirror-venv/bin/python","-m","gf_mirror","--json","tx-sync",
-              "--limit","5","--batch-size","1","--tickers","TSLA,NVDA,STX"]
+              "--limit","1","--batch-size","1","--tickers","TSLA,NVDA,STX"]
             p=subprocess.run(cmd,capture_output=True,text=True,timeout=835)
             try:
               raw=p.stdout; outcome=json.loads(raw[raw.index("{"):])
@@ -112,10 +112,10 @@ jobs:
               assert c.execute("PRAGMA quick_check").fetchone()==("ok",)
             print("GF_FIVE_DURABLE_STATES="+json.dumps(after,sort_keys=True),flush=True)
             assert p.returncode==0 and outcome.get("outcome")=="OK","CANARY_NOT_SUCCESSFUL"
-            assert len(outcome.get("pushed") or [])==5
+            assert len(outcome.get("pushed") or [])==1
             assert all(v.get("verified") is True for v in outcome["pushed"])
-            assert after=={"PENDING":1113,"VERIFIED":65},after
+            assert after=={"PENDING":1117,"VERIFIED":61},after
             assert subprocess.run(["systemctl","is-active","fintual-executor.service"],capture_output=True,text=True).stdout.strip()=="active"
             assert subprocess.run(["systemctl","is-active","fintual-browser.service"],capture_output=True,text=True).stdout.strip()=="inactive"
-            print("GF_FIVE_CANARY=PASS",flush=True)
+            print("GF_ONE_SALE_CANARY=PASS",flush=True)
             PY
