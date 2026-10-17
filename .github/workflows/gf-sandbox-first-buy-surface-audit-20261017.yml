@@ -49,10 +49,17 @@ jobs:
                 page=browser.page
                 page.set_default_timeout(32000)
                 try:
-                    page.goto("https://www.google.com/finance/portfolio/"+new,
-                              wait_until="commit",timeout=65000)
-                    page.wait_for_timeout(1900)
+                    # Wait for a fully rendered portfolio route, not merely the
+                    # first HTTP commit: Google Finance hydrates the UI asynchronously.
+                    page.goto("https://www.google.com/finance/",wait_until="commit",timeout=65000)
+                    sandbox=page.get_by_role("button",name="Fintual Historical Replay Sandbox 2026",exact=True)
+                    sandbox.wait_for(state="visible",timeout=65000)
+                    sandbox.click(no_wait_after=True,timeout=40000)
                     assert urlparse(page.url).path=="/finance/portfolio/"+new
+                    page.wait_for_function(
+                        "() => /Aún no hay nada en esta cartera|Nothing in this portfolio yet/i.test(document.body.innerText||'')",
+                        timeout=65000
+                    )
                     def controls():
                         return page.evaluate(r"""() => {
                             const visible=e=>{const r=e.getBoundingClientRect();return !!(r.width&&r.height)};
