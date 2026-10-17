@@ -1,0 +1,92 @@
+name: GF canary sale proposal diagnostic (never confirms)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-canary-sale-proposal-diagnostic-20261017.yml
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request and validate historical sale proposal without confirming
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 175s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance \
+              PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import sqlite3,os,json,re
+            from datetime import date
+            from decimal import Decimal
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.tx import LedgerTransaction
+            from gf_mirror.txwriter import TransactionWriter
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                l=line.strip()
+                if l.startswith("#") or "=" not in l:continue
+                k,v=l.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            assert not cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            portfolio=cfg.get("GF_MIRROR_PORTFOLIO_URL","")
+            assert "/finance/portfolio/" in portfolio and "d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f" not in portfolio
+            db=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=12) as con:
+                con.execute("PRAGMA query_only=ON")
+                rows=con.execute("SELECT source_id,payload_json FROM pushed_transactions WHERE state='SUBMITTED'").fetchall()
+                assert len(rows)==1
+                p=json.loads(rows[0][1])
+            assert p.get("action")=="SELL" and p.get("ticker")=="NVDA"
+            tx=LedgerTransaction(
+                source_id=rows[0][0],trade_date=date.fromisoformat(p["date"]),
+                action=p["action"],ticker=p["ticker"],
+                quantity=Decimal(p["quantity"]),price=Decimal(p["price"]),usd=Decimal(p["usd"]),
+                adjustment=p.get("adjustment","")
+            )
+            values={k:v for k,v in cfg.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")}
+            os.environ.update(values)
+            config=load_config()
+            assert not config.writes_armed
+            with _browser(config) as browser:
+                writer=TransactionWriter(browser,config.portfolio_url,config.portfolio_name)
+                try:
+                    r=writer.append_sale(tx,submit=False)
+                except Exception as e:
+                    msg=re.sub(r"[0-9]+(?:[.,][0-9]+)?","<num>",str(e))
+                    print("GF_SALE_PROPOSAL=ERROR",flush=True)
+                    print("GF_SALE_ERROR_CLASS="+type(e).__name__,flush=True)
+                    print("GF_SALE_ERROR_SANITIZED="+msg[:400],flush=True)
+                    raise SystemExit(0)
+                v=r["proposal"]
+                print("GF_SALE_PROPOSAL=RECEIVED",flush=True)
+                print("GF_SALE_COMPLETE="+str(v.get("complete")),flush=True)
+                print("GF_SALE_TYPE_MATCH="+str(v.get("is_sale")),flush=True)
+                print("GF_SALE_TICKER_MATCH="+str(v.get("ticker")=="NVDA"),flush=True)
+                print("GF_SALE_DATE_MATCH="+str(v.get("date")==p["date"]),flush=True)
+                q=v.get("quantity");price=v.get("price")
+                print("GF_SALE_QUANTITY_MATCH="+str(q is not None and abs(Decimal(q)-tx.quantity)<=Decimal("0.000000001")),flush=True)
+                print("GF_SALE_PRICE_MATCH="+str(price is not None and abs(Decimal(price)-tx.price)<=Decimal("0.01")),flush=True)
+                print("GF_SALE_TARGET_PRESENT="+str(bool(v.get("portfolio"))),flush=True)
+                print("GF_SALE_MENTIONS_MODIFICATION="+str(v.get("mentions_modification")),flush=True)
+                print("GF_SALE_PARSE_PROBLEMS="+json.dumps(v.get("problems") or []),flush=True)
+                print("GF_SALE_SUBMITTED=FALSE",flush=True)
+            PY
