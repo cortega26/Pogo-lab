@@ -1,0 +1,111 @@
+name: GF parallel replay staged ledger preparation (no external writes)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-parallel-replay-ledger-preparation-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Stage independent all-PENDING ledger from verified immutable backup
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 120s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,hashlib,json,sqlite3
+            from pathlib import Path
+            from datetime import datetime,timezone
+            os.umask(0o077)
+            root=Path("/var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z")
+            protected=Path("/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3")
+            original=root/"historical-push-ledger.sqlite3"
+            target=root/"parallel-unbound-all-pending.sqlite3"
+            expected_hash="13a575dc27d8eab01a028b9216f66bfb16c41935fb3192891e7bcba4d70b883d"
+            assert original.is_file() and protected.is_file() and not target.exists()
+            assert original.resolve()!=protected.resolve()
+            assert hashlib.sha256(original.read_bytes()).hexdigest()==expected_hash
+            def facts(c):
+                return list(c.execute(
+                  "SELECT source_id,fingerprint,signature,required_ordinal,payload_json "
+                  "FROM pushed_transactions ORDER BY source_id"))
+            before=sqlite3.connect(original.as_uri()+"?mode=ro",uri=True,timeout=20)
+            try:
+                before.execute("PRAGMA query_only=ON")
+                assert before.execute("PRAGMA quick_check").fetchone()==("ok",)
+                baseline=facts(before)
+                assert len(baseline)==1178
+                assert dict(before.execute(
+                  "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"
+                ))=={"PENDING":1118,"VERIFIED":60}
+                # Only this new ROOT-PRIVATE file is mutable; no untrusted writes
+                # can ever target the historical backup or production ledger.
+                fd=os.open(target,os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600)
+                os.close(fd)
+                new=sqlite3.connect(target,timeout=20)
+                try:
+                    before.backup(new)
+                    with new:
+                        new.execute("DELETE FROM push_events")
+                        new.execute("DELETE FROM push_ledger_meta")
+                        stamp=datetime.now(timezone.utc).isoformat()
+                        new.execute(
+                          "UPDATE pushed_transactions SET state='PENDING', "
+                          "attempts=0,last_error='',updated_at=?",(stamp,))
+                    assert new.execute("PRAGMA quick_check").fetchone()==("ok",)
+                    assert facts(new)==baseline,"immutable canonical trade facts changed"
+                    states=dict(new.execute(
+                      "SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                    assert states=={"PENDING":1178},states
+                    assert new.execute(
+                      "SELECT COUNT(*) FROM pushed_transactions WHERE attempts!=0 OR last_error!=''"
+                    ).fetchone()[0]==0
+                    assert new.execute("SELECT COUNT(*) FROM push_events").fetchone()[0]==0
+                    assert new.execute("SELECT COUNT(*) FROM push_ledger_meta").fetchone()[0]==0
+                finally:
+                    new.close()
+            finally:
+                before.close()
+            os.chmod(target,0o600)
+            assert original.is_file()
+            assert hashlib.sha256(original.read_bytes()).hexdigest()==expected_hash
+            assert target.stat().st_mode&0o777==0o600
+            assert root.stat().st_mode&0o777==0o700
+            digest=hashlib.sha256(target.read_bytes()).hexdigest()
+            manifest=root/"parallel-staging-metadata.json"
+            fd=os.open(manifest,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            meta={
+              "created_utc":datetime.now(timezone.utc).isoformat(),
+              "source_snapshot_sha256":expected_hash,
+              "staged_ledger_sha256":digest,
+              "source_count":1178,
+              "staged_states":{"PENDING":1178},
+              "portfolio_binding":None,
+              "authorized_for_replay":False,
+              "source_ledger_and_google_finance_unchanged":True
+            }
+            with os.fdopen(fd,"w") as file:json.dump(meta,file,sort_keys=True,indent=2)
+            print("GF_PARALLEL_STAGED_SHA256="+digest,flush=True)
+            print("GF_PARALLEL_ALL_PENDING=1178",flush=True)
+            print("GF_PARALLEL_BINDING=NONE",flush=True)
+            print("GF_PARALLEL_ATTEMPTS_AND_EVENTS=ZERO",flush=True)
+            print("GF_PARALLEL_SOURCE_SNAPSHOT_UNCHANGED=TRUE",flush=True)
+            print("GF_PARALLEL_PRIVATE_ONLY=TRUE",flush=True)
+            print("GF_PARALLEL_NO_GOOGLE_OR_FINANCIAL_WRITES=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_PARALLEL_FINANCIAL_PRODUCTION_UNCHANGED=PASS
