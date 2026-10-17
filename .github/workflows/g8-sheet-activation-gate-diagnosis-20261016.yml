@@ -1,0 +1,39 @@
+name: G8 identify exact Sheet enablement preflight gate
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-activation-gate-diagnosis-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Diagnose metadata-only preflight without secrets or mutations
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            set -u
+            echo G8_CHECK_EXECUTOR="$(systemctl is-active fintual-executor.service 2>&1 || true)"
+            echo G8_CHECK_EXECUTOR_ENABLED="$(systemctl is-enabled fintual-executor.service 2>&1 || true)"
+            echo G8_CHECK_BROWSER="$(systemctl is-active fintual-browser.service 2>&1 || true)"
+            echo G8_CHECK_BROWSER_ENABLED="$(systemctl is-enabled fintual-browser.service 2>&1 || true)"
+            echo G8_CHECK_SHEETS="$(systemctl is-active fintual-sheet-sync.service 2>&1 || true)"
+            echo G8_CHECK_SHEETS_ENABLED="$(systemctl is-enabled fintual-sheet-sync.service 2>&1 || true)"
+            echo G8_CHECK_SHEET_RELEASE="$(sudo -n readlink -f /opt/fintual-sheet-sync-current 2>&1 || true)"
+            echo G8_CHECK_VENV="$(readlink -f /opt/fintual-sheet-sync-venv 2>&1 || true)"
+            echo G8_CHECK_SHEET_UNIT_REQUIRES="$(systemctl show -P Requires fintual-sheet-sync.service 2>&1 || true)"
+            echo G8_CHECK_SHEET_UNIT_WORKDIR="$(systemctl show -P WorkingDirectory fintual-sheet-sync.service 2>&1 || true)"
+            echo G8_CHECK_SHEET_UNIT_FILLS_ONLY="$(systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--fills-only' && echo YES || echo NO)"
+            test -f /etc/fintual-executor/sheet-sync.env && echo G8_CHECK_ENV_FILE=YES || echo G8_CHECK_ENV_FILE=NO
+            sudo -n grep -q '^FINTUAL_SHEET_SPREADSHEET_ID=' /etc/fintual-executor/sheet-sync.env && echo G8_CHECK_SPREADSHEET_KEY=YES || echo G8_CHECK_SPREADSHEET_KEY=NO
+            sudo -n grep -q '^GOOGLE_APPLICATION_CREDENTIALS=' /etc/fintual-executor/sheet-sync.env && echo G8_CHECK_GOOGLE_CREDS_KEY=YES || echo G8_CHECK_GOOGLE_CREDS_KEY=NO
+            sudo -n -u fintual test -r /etc/fintual-executor/sheet-sync.env && echo G8_CHECK_ENV_READABLE=YES || echo G8_CHECK_ENV_READABLE=NO
+            sudo -n -u fintual test -r /etc/fintual-executor/google-sheet-sync.json && echo G8_CHECK_CREDENTIALS_READABLE=YES || echo G8_CHECK_CREDENTIALS_READABLE=NO
+            echo G8_CHECK_UNMODIFIED_READONLY=TRUE
