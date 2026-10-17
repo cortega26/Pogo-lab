@@ -119,3 +119,30 @@ jobs:
             p=subprocess.run(["systemctl","show","-p","FragmentPath","-p","Requires","fintual-sheet-sync.service"],capture_output=True,text=True,timeout=12)
             print("SHEET_LOADED_UNIT="+p.stdout.strip().replace("\n",";"),flush=True)
             PY
+
+
+      - name: Check Sheets venv imports and version without installing
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 45s
+          script: |
+            sudo -n -u fintual /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
+            import sys,importlib.util
+            from importlib import metadata
+            print("SHEET_VENV_VERSION="+sys.version.split()[0],flush=True)
+            print("SHEET_VENV_INTERPRETER="+sys.executable,flush=True)
+            for mod in ("pip","ensurepip","googleapiclient","google.auth","playwright","websockets"):
+                try:
+                    present=importlib.util.find_spec(mod) is not None
+                except ModuleNotFoundError:
+                    present=False
+                print("SHEET_IMPORT_"+mod.replace(".","_")+"="+str(present),flush=True)
+            for pkg in ("google-api-python-client","google-auth","playwright","websockets"):
+                try:v=metadata.version(pkg)
+                except metadata.PackageNotFoundError:v="MISSING"
+                print("SHEET_PIN_"+pkg+"="+v,flush=True)
+            PY
