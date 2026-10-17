@@ -1,0 +1,56 @@
+name: G8 repair isolated Sheets cash IPC HTTPX dependency (no service changes)
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-cash-runtime-pinned-httpx-install-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  isolated-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install pinned httpx into standalone Sheets venv only and verify private socket
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 165s
+          script: |
+            set -euo pipefail
+            NEW=81e3fb22788582806c991d4fc2e89b9e54e7219a
+            OLD_SHEET=643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            VENV=/opt/fintual-sheet-sync-venv
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = "/opt/fintual-httpx-releases/$NEW"
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = "/opt/fintual-sheet-sync-releases/$OLD_SHEET"
+            systemctl show -P ExecStart fintual-executor.service | grep -q -- '--sheet-cash-socket'
+            systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--fills-only'
+            test -x "$VENV/bin/python"
+            test "$("$VENV/bin/python" -c 'import sys;print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh \
+              "$VENV/bin/python" -m pip --no-cache-dir --disable-pip-version-check \
+              --no-input install 'httpx==0.28.1'
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh \
+              env PYTHONPATH="/opt/fintual-sheet-sync-releases/$NEW/src" \
+              PYTHONDONTWRITEBYTECODE=1 "$VENV/bin/python" - <<'PY'
+            import importlib.metadata as m
+            from pathlib import Path
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            assert m.version('httpx')=='0.28.1'
+            handle=IpcReadOnlyBrokerHandle(
+                Path('/var/lib/fintual-executor/cash-ipc/cash.sock'))
+            assert handle.health()['order_capability'] is False
+            print('G8_SHEETS_HTTPX_PINNED_IMPORT=PASS',flush=True)
+            print('G8_SHEETS_CASH_SOCKET_READONLY_HEALTH=PASS',flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--fills-only'
+            echo G8_SHEETS_CASH_IPC_DEPENDENCY_REPAIRED_NO_SERVICE_CHANGES=PASS
