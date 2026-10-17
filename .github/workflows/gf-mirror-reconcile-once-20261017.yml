@@ -1,0 +1,80 @@
+name: GF mirror reconcile preview (read-only, bound portfolio)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-reconcile-once-20261017.yml
+permissions:
+  contents: read
+jobs:
+  reconcile-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check bound portfolio and classify unconfirmed operations without any writes
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 150s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,json,sqlite3,subprocess
+            from pathlib import Path
+            from urllib.parse import urlparse
+            config={}
+            envfile=Path("/etc/fintual-executor/gf-mirror.env")
+            if not envfile.is_file():
+                print("GF_RECONCILE_CONFIG=MISSING",flush=True);raise SystemExit(0)
+            for line in envfile.read_text().splitlines():
+                line=line.strip()
+                if not line or line.startswith("#") or "=" not in line:continue
+                key,val=line.split("=",1)
+                key=key.strip()
+                if key.isidentifier():
+                    config[key]=val.strip().strip('"').strip("'")
+            url=config.get("GF_MIRROR_PORTFOLIO_URL","")
+            target=urlparse(url).path.rstrip("/").split("/")[-1]
+            db=Path(config.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            if not db.is_file():
+                print("GF_RECONCILE_LEDGER=MISSING",flush=True);raise SystemExit(0)
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=9) as con:
+                con.execute("PRAGMA query_only=ON")
+                row=con.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()
+                if row is None:
+                    metas=dict(con.execute("SELECT key,value FROM push_ledger_meta").fetchall())
+                    bound=next((v for k,v in metas.items() if "portfolio_id" in k.lower()),None)
+                else: bound=row[0]
+            main_id="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            safe=bool(target and bound and target==bound and target!=main_id and "google.com/finance/portfolio/" in url)
+            print("GF_CONFIG_DESTINATION_ISOLATED_AND_BOUND="+str(safe),flush=True)
+            print("GF_WRITES_ACK_CONFIGURED="+str(bool(config.get("GF_MIRROR_WRITES"))),flush=True)
+            if not safe or config.get("GF_MIRROR_WRITES"):
+                print("GF_RECONCILE_PREVIEW=WITHHELD",flush=True)
+                raise SystemExit(0)
+            values=[f"{k}={v}" for k,v in config.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
+            values+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            p=subprocess.run(
+              ["sudo","-n","-u","fintual","env",*values,
+                "/opt/fintual-gf-mirror-venv/bin/python","-m","gf_mirror",
+                "--json","tx-reconcile","--dry-run"],
+              capture_output=True,text=True,timeout=115)
+            try:d=json.loads(p.stdout)
+            except json.JSONDecodeError:
+                print("GF_RECONCILE_CLI=NON_JSON_EXIT_"+str(p.returncode),flush=True);raise SystemExit(0)
+            print("GF_RECONCILE_EXIT="+str(p.returncode),flush=True)
+            print("GF_RECONCILE_OUTCOME="+str(d.get("outcome","UNKNOWN")),flush=True)
+            settled=d.get("settled") or {}
+            print("GF_RECONCILE_SUBMITTED="+str(settled.get("submitted","UNKNOWN")),flush=True)
+            print("GF_RECONCILE_WOULD_VERIFY="+str(settled.get("verified","UNKNOWN")),flush=True)
+            print("GF_RECONCILE_WOULD_RETRY="+str(settled.get("retryable","UNKNOWN")),flush=True)
+            print("GF_RECONCILE_PREVIEW=READ_ONLY",flush=True)
+            PY
