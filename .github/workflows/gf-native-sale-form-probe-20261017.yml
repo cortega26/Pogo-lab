@@ -1,0 +1,70 @@
+name: GF native transaction form capability probe (zero submissions)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-native-sale-form-probe-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect native Google Finance Add dialog without submitting
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 150s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for s in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$s" || true)" = inactive
+            done
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,json
+            from pathlib import Path
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            from gf_mirror.txwriter import TransactionWriter
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            os.environ.update(cfg)
+            c=load_config()
+            assert not c.writes_armed
+            with _browser(c) as b:
+                w=TransactionWriter(b,c.portfolio_url,c.portfolio_name)
+                w._open_assets_tab()
+                w._open_add_dialog()
+                try:
+                    data=b.page.evaluate(r"""() => {
+                      const vis=e=>{const r=e.getBoundingClientRect();return r.width>0 && r.height>0};
+                      const gather=(sel,lim)=>[...document.querySelectorAll(sel)]
+                        .filter(vis).map(e=>({
+                          role:e.getAttribute('role')||'',
+                          tag:e.tagName,
+                          label:(e.getAttribute('aria-label')||e.getAttribute('placeholder')||(e.innerText||'').trim().slice(0,90))
+                        })).slice(0,lim);
+                      const names=gather('button,[role=button],[role=tab],[role=option],select',55);
+                      return {controls:names,
+                        inputs:gather('input,select,[role=combobox]',25),
+                        visibleSellControls:names.filter(e=>/venta|vender|sell|tipo de operaci[oó]n/i.test(e.label)).length};
+                    }""")
+                    print("GF_NATIVE_FORM_CONTROLS="+json.dumps(data["controls"],ensure_ascii=False),flush=True)
+                    print("GF_NATIVE_FORM_INPUTS="+json.dumps(data["inputs"],ensure_ascii=False),flush=True)
+                    print("GF_NATIVE_SELL_CONTROL_COUNT="+str(data["visibleSellControls"]),flush=True)
+                    print("GF_NATIVE_SUBMITTED=FALSE",flush=True)
+                finally:
+                    w._cancel_dialog()
+            print("GF_NATIVE_PROBE=PASS_NO_PORTFOLIO_WRITES",flush=True)
+            PY
