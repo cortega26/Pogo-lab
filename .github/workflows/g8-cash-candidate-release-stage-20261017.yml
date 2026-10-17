@@ -1,0 +1,124 @@
+name: G8 stage checked cash IPC releases without live cutover
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-cash-candidate-release-stage-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Stage existing private verified candidate on Oracle only
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 155s
+          script: |
+            set -euo pipefail
+            SOURCE=81e3fb22788582806c991d4fc2e89b9e54e7219a
+            BASE=e922e0d153f32c8319bc4ec8b9165f39c7dfeac8
+            SHEET_BASE=643b4feadf8f0fd223eaa1c95fd6adc1f55f8ed8
+            CANDIDATE=/opt/fintual-cash-ipc-candidates/$SOURCE
+            HTTPX=/opt/fintual-httpx-releases/$SOURCE
+            SHEET=/opt/fintual-sheet-sync-releases/$SOURCE
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-enabled fintual-executor.service)" = enabled
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-enabled fintual-sheet-sync.service)" = enabled
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = "/opt/fintual-httpx-releases/$BASE"
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = "/opt/fintual-sheet-sync-releases/$SHEET_BASE"
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib, os, pathlib, shutil, stat, tempfile
+            source='81e3fb22788582806c991d4fc2e89b9e54e7219a'
+            base='e922e0d153f32c8319bc4ec8b9165f39c7dfeac8'
+            candidate=pathlib.Path('/opt/fintual-cash-ipc-candidates')/source
+            assert candidate.is_dir() and not candidate.is_symlink()
+            assert candidate.stat().st_uid==0 and stat.S_IMODE(candidate.stat().st_mode)==0o750
+            assert (candidate/'src/fintual_executor/cash_ipc_bridge.py').is_file()
+            def code_hash(root):
+                return {str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest()
+                        for p in (root/'src').rglob('*.py')}
+            expected=code_hash(candidate)
+            assert len(expected)==34,len(expected)
+            for releases,make_venv in [('/opt/fintual-httpx-releases',True),('/opt/fintual-sheet-sync-releases',False)]:
+                parent=pathlib.Path(releases)
+                assert parent.is_dir() and parent.stat().st_uid==0
+                target=parent/source
+                if not target.exists():
+                    tmp=pathlib.Path(tempfile.mkdtemp(dir=parent,prefix='.g8-stage-'))
+                    try:
+                        shutil.copytree(candidate/'src',tmp/'src')
+                        shutil.copytree(candidate/'deploy',tmp/'deploy')
+                        if make_venv:
+                            old=pathlib.Path('/opt/fintual-httpx-releases')/base/'.venv'
+                            assert (old/'bin/python').exists()
+                            (tmp/'.venv').symlink_to(old)
+                        os.chown(tmp,0,__import__('grp').getgrnam('fintual').gr_gid)
+                        os.chmod(tmp,0o750)
+                        os.rename(tmp,target)
+                        tmp=None
+                    finally:
+                        if tmp is not None and tmp.exists():
+                            shutil.rmtree(tmp)
+                assert target.is_dir() and not target.is_symlink() and target.stat().st_uid==0
+                assert code_hash(target)==expected,'SOURCE_COPY_MISMATCH'
+                if make_venv:
+                    assert (target/'.venv').is_symlink()
+                    assert (target/'.venv').resolve()==(pathlib.Path('/opt/fintual-httpx-releases')/base/'.venv').resolve()
+                print('G8_PHASE2_CANDIDATE_READY='+str(target),flush=True)
+            PY
+            # Only backup service definitions. Never change currently loaded ones.
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            import os,stat
+            root=Path('/etc/fintual-executor/g8-phase2-pre-cutover-backups')
+            root.mkdir(mode=0o700,exist_ok=True)
+            assert root.stat().st_uid==0 and stat.S_IMODE(root.stat().st_mode)==0o700
+            for unit in ('fintual-executor.service','fintual-sheet-sync.service'):
+                src=Path('/etc/systemd/system')/unit
+                dst=root/unit
+                assert src.is_file()
+                old=src.read_bytes()
+                if dst.exists():
+                    assert dst.read_bytes()==old,'Existing rollback backup differs from live unit'
+                else:
+                    fd=os.open(dst,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                    try:
+                        with os.fdopen(fd,'wb') as f:f.write(old)
+                    except Exception:
+                        dst.unlink(missing_ok=True)
+                        raise
+                print('G8_PHASE2_ROLLBACK_UNIT_SAVED='+unit,flush=True)
+            PY
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh \
+              env PYTHONPATH=/opt/fintual-httpx-releases/$SOURCE/src PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-httpx-current/.venv/bin/python - <<'PY'
+            from pathlib import Path
+            import sys
+            import fintual_executor.runner as runner
+            from fintual_executor.cash_ipc_bridge import _CashReadLease
+            assert sys.version_info[:3]==(3,14,8)
+            assert str(Path(runner.__file__).resolve()).startswith('/opt/fintual-httpx-releases/81e3fb2')
+            print('G8_PHASE2_NEW_OWNER_IMPORT=PASS',flush=True)
+            PY
+            sudo -n -H -u fintual sh -c 'cd /tmp && exec "$@"' sh \
+              env PYTHONPATH=/opt/fintual-sheet-sync-releases/$SOURCE/src PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
+            from pathlib import Path
+            import fintual_executor.sheet_sync as sheet
+            assert str(Path(sheet.__file__).resolve()).startswith('/opt/fintual-sheet-sync-releases/81e3fb2')
+            print('G8_PHASE2_NEW_SHEETS_IMPORT=PASS',flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(sudo -n readlink -f /opt/fintual-httpx-current)" = "/opt/fintual-httpx-releases/$BASE"
+            test "$(sudo -n readlink -f /opt/fintual-sheet-sync-current)" = "/opt/fintual-sheet-sync-releases/$SHEET_BASE"
+            echo G8_PHASE2_RELEASES_STAGED_NO_LIVE_CHANGES=PASS
