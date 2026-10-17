@@ -1,0 +1,71 @@
+name: GF confirmation chip and proposal DOM inspection (read only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-confirmation-dom-inspect-20261017.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect visible assistant questions and confirmation chips without clicking
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 85s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import re,os,json
+            from pathlib import Path
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            cfg={}
+            for l in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                l=l.strip()
+                if l.startswith("#") or "=" not in l:continue
+                k,v=l.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            os.environ.update(cfg)
+            config=load_config()
+            assert not config.writes_armed
+            with _browser(config) as browser:
+                page=browser.page
+                data=page.evaluate(r"""() => {
+                  const body=document.body.innerText || '';
+                  const prompts=[...body.matchAll(/¿?Confirmas[^?]{0,650}\?/gi)].map(x=>x[0]);
+                  const tags=[];
+                  const vis=e=>{const r=e.getBoundingClientRect();return r.width>0 && r.height>0};
+                  for(const e of document.querySelectorAll('span,button,[role=button],div')){
+                    if(!vis(e))continue;
+                    const t=(e.innerText||'').trim();
+                    if(!/^(yes|s[íi]|confirmar|confirm)$/i.test(t))continue;
+                    const r=e.getBoundingClientRect();
+                    tags.push({tag:e.tagName,role:e.getAttribute('role')||'',
+                      parent:e.parentElement?.tagName||'', parentRole:e.parentElement?.getAttribute('role')||'',
+                      x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),
+                      h:Math.round(r.height), clickable:e.tagName==='BUTTON'||e.getAttribute('role')==='button',
+                      parentClickable:e.parentElement?.tagName==='BUTTON'||e.parentElement?.getAttribute('role')==='button'});
+                  }
+                  return {prompts:prompts.map(s=>({n:s.length,date:/\d{1,2}\/\d{1,2}\/\d{4}/.test(s),
+                    hasTicker:/\b[A-Z]{2,8}:[A-Z]{2,8}\b/.test(s),hasPrice:/precio\s+de/i.test(s)})),
+                    chips:tags.slice(0,12),chipsTotal:tags.length};
+                }""")
+                print("GF_DOM_PROMPT_COUNT="+str(len(data.get("prompts") or [])),flush=True)
+                print("GF_DOM_PROMPT_FLAGS="+json.dumps(data.get("prompts") or []),flush=True)
+                print("GF_DOM_CONFIRMATION_CHIPS="+json.dumps(data.get("chips") or []),flush=True)
+                print("GF_DOM_CHIP_TOTAL="+str(data.get("chipsTotal")),flush=True)
+                print("GF_DOM_NO_ACTION=TRUE",flush=True)
+            PY
