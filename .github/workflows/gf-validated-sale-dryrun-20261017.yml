@@ -54,6 +54,7 @@ jobs:
             env=[f"{k}={v}" for k,v in c.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
             env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
             code=r'''
+            import json
             from gf_mirror.config import load_config
             from gf_mirror.cli import _browser
             from gf_mirror.txstore import PushLedger
