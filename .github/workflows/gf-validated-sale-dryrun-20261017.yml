@@ -70,6 +70,11 @@ jobs:
             print("GF_DRYRUN_SCOPE=EXACT_FIRST_PENDING_TSLA_SELL",flush=True)
             with _browser(cfg) as browser:
                 writer=TransactionWriter(browser,cfg.portfolio_url,cfg.portfolio_name)
+                new_thread=writer.page.locator('[aria-label="Nuevo hilo"],[aria-label="New chat"]')
+                assert new_thread.count()>=1,"ASSISTANT_NEW_THREAD_CONTROL_NOT_FOUND"
+                new_thread.first.click()
+                writer.page.wait_for_timeout(1800)
+                print("GF_DRYRUN_FRESH_THREAD=PASS",flush=True)
                 p=writer.append_sale(tx,submit=False)
                 assert p["submitted"] is False
                 proposal=p["proposal"]
