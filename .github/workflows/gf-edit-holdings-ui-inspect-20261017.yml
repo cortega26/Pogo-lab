@@ -118,6 +118,43 @@ jobs:
                       };
                     }""")
                     print("GF_EDIT_HOLDINGS_UI="+json.dumps(summary,sort_keys=True,ensure_ascii=False),flush=True)
+
+                    view=page.evaluate(r"""() => {
+                      const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                      const allowedTab=/^(?:Activos|Transacciones|Estadísticas|Investments|Activity|Statistics)$/i;
+                      const selected=[...document.querySelectorAll('[role=tab],[aria-selected]')].filter(vis)
+                        .filter(e=>e.getAttribute('aria-selected')==='true')
+                        .map(e=>(e.innerText||e.getAttribute('aria-label')||'').trim())
+                        .filter(t=>allowedTab.test(t)).slice(0,5);
+                      const buttons=[...document.querySelectorAll('button,[role=button],[role=menuitem]')]
+                        .filter(vis).map(e=>(
+                          (e.getAttribute('aria-label')||e.getAttribute('title')||(e.innerText||'')).replace(/\s+/g,' ').trim()
+                        ));
+                      const hasPattern=p=>buttons.some(x=>p.test(x));
+                      const rows=[...document.querySelectorAll('tr,[role=row]')].filter(vis);
+                      const tslaSales=rows.filter(r=>/March\s+25,\s*2024/i.test(r.innerText||'') &&
+                          /Tesla|TSLA/.test(r.innerText||'') &&
+                          /Venta|Sell/i.test(r.innerText||''));
+                      return {
+                        urlTab:new URL(location.href).searchParams.get('tab')||'none',
+                        selectedTab:selected,
+                        visibleRows:rows.length,
+                        targetedTslaSaleRows:tslaSales.length,
+                        visibleRowControls:tslaSales.map(r=>[...r.querySelectorAll('button,[role=button],[role=menuitem],input')]
+                            .filter(vis).length),
+                        anyDeleteControl:hasPattern(/^(?:Eliminar|Borrar|Delete|Remove)(?:\s+transacci[oó]n)?$/i),
+                        anySaveControl:hasPattern(/^(?:Guardar|Save|Aplicar|Apply)(?:\s+cambios)?$/i),
+                        anyEditControl:hasPattern(/^(?:Editar|Edit)(?:\s+transacci[oó]n)?$/i),
+                        editableFields:[...document.querySelectorAll('input,textarea,select,[contenteditable=true]')]
+                          .filter(vis).length,
+                        dialogs:[...document.querySelectorAll('[role=dialog]')].filter(vis).length,
+                        pageHeadingEditable:/editar participaciones|edit holdings/i.test(
+                          [...document.querySelectorAll('h1,h2,h3')].filter(vis)
+                            .map(e=>e.innerText||'').join(' '))
+                      };
+                    }""")
+                    print("GF_EDIT_VIEW_ROUTE_AND_CONTROLS="+json.dumps(view,sort_keys=True),flush=True)
+
                 finally:
                     # No fields ever changed. Close the UI by navigating back to the target.
                     page.goto(config.portfolio_url,wait_until="domcontentloaded")
