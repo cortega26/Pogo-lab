@@ -40,7 +40,7 @@ jobs:
             cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
             trap cleanup EXIT
             echo GF_TEST_GATE=CHECK_UV
-            test -x "$UV"
+            sudo -n test -x "$UV"
             echo GF_TEST_GATE=FETCH_PRIVATE_BRANCH
             sudo -n env GIT_TERMINAL_PROMPT=0 \
               GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
