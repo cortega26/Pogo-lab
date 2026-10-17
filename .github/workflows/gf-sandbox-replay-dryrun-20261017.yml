@@ -1,0 +1,105 @@
+name: GF pinned isolated sandbox historical replay dry-run (no writes)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-sandbox-replay-dryrun-20261017.yml]
+permissions:
+  contents: read
+concurrency:
+  group: gf-sandbox-history-dryrun-20261017
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - name: Run sandbox tx-sync dry-run with the exact private reviewed HEAD
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 490s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            UUID="$(sudo -n cat /var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z/new-empty-sandbox-uuid.private)"
+            test "$(printf %s "$UUID" | wc -c)" = 36
+            RUN="$(sudo -n mktemp -d /tmp/gf-sandbox-replay-dryrun.XXXXXXXX)"
+            sudo -n chmod 0711 "$RUN"
+            cleanup(){ sudo -n rm -rf -- "$RUN" || true; }
+            trap cleanup EXIT
+            KEY=/var/lib/fintual-ci-source-readonly
+            sudo -n env GIT_TERMINAL_PROMPT=0 \
+              GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
+              git@github.com:cortega26/fintual-executor.git "$RUN/source"
+            SHA="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
+            test "$SHA" = c188ee179ef8373057cf1f78a5871c7d1471cc78
+            echo GF_DRYRUN_SOURCE_SHA_EXACT=PASS
+            sudo -n -u fintual env GF_SANDBOX_EXPECTED_UUID="$UUID" \
+              GF_SANDBOX_SOURCE_ROOT="$RUN/source/integrations/google-finance" \
+              PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,sys,json,io,contextlib
+            from pathlib import Path
+            root=os.environ["GF_SANDBOX_SOURCE_ROOT"]
+            sys.path.insert(0,root)
+            from gf_mirror import cli
+            from gf_mirror.config import load_config
+            from gf_mirror.txstore import PushLedger
+            env={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k,v=line.split("=",1)
+                    if k.strip().isidentifier(): env[k.strip()]=v.strip().strip("'").strip('"')
+            uid=os.environ["GF_SANDBOX_EXPECTED_UUID"]
+            assert uid==cli.TX_REPLAY_SANDBOX_ID
+            path="/var/lib/fintual-gf-mirror/parallel-replay/parallel-replay-ledger.sqlite3"
+            env.update({
+                "GF_MIRROR_PORTFOLIO_URL":"https://www.google.com/finance/portfolio/"+uid,
+                "GF_MIRROR_PORTFOLIO_NAME":cli.TX_REPLAY_SANDBOX_NAME,
+                "GF_MIRROR_PUSH_LEDGER":path,
+                "GF_MIRROR_STATE":"/var/lib/fintual-gf-mirror/parallel-replay/mirror.sqlite3",
+            })
+            env.pop("GF_MIRROR_WRITES",None)
+            env.pop("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO",None)
+            os.environ.update(env)
+            os.environ.pop("GF_MIRROR_WRITES",None)
+            os.environ.pop("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO",None)
+            cfg=load_config()
+            assert not cfg.writes_armed
+            assert cli._assert_tx_replay_config(cfg)==uid
+            ledger=PushLedger(cfg.push_ledger_path)
+            assert ledger.bound_portfolio_id()==uid
+            assert ledger.counts()=={"PENDING":1178}
+            before_attempts=sum(rec.attempts for rec in ledger.by_state("PENDING"))
+            assert before_attempts==0
+            print("GF_DRYRUN_PERSISTENT_LEDGER_SEPARATE=PASS",flush=True)
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):
+                exit_code=cli.main(["--json","tx-sync","--dry-run","--limit","1"])
+            try:
+                payload=json.loads(output.getvalue())
+            except Exception:
+                print("GF_DRYRUN_OUTPUT_PARSE=FAILED",flush=True)
+                raise
+            print("GF_DRYRUN_OUTCOME="+str(payload.get("outcome","unknown")),flush=True)
+            print("GF_DRYRUN_EXIT="+str(exit_code),flush=True)
+            if exit_code:
+                print("GF_DRYRUN_ERROR_TYPE="+str(payload.get("outcome","unknown")),flush=True)
+            assert exit_code==0
+            assert payload.get("outcome")=="OK"
+            assert payload.get("pending_total")==1178
+            assert payload.get("pending_remaining")==1178
+            assert ledger.counts()=={"PENDING":1178}
+            assert sum(rec.attempts for rec in ledger.by_state("PENDING"))==0
+            print("GF_DRYRUN_NO_TRANSACTIONS_SUBMITTED=TRUE",flush=True)
+            print("GF_DRYRUN_PORTFOLIO_OLD_AND_PROTECTED_NOT_TOUCHED=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_DRYRUN_FINANCIAL_PRODUCTION_UNCHANGED=PASS
