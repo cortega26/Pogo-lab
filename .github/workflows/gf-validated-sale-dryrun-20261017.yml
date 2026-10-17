@@ -72,6 +72,15 @@ jobs:
                 p=writer.append_sale(tx,submit=False)
                 assert p["submitted"] is False
                 proposal=p["proposal"]
+                from decimal import Decimal
+                print("GF_DRYRUN_FIELDS_COMPLETE="+str(bool(proposal.get("complete"))),flush=True)
+                print("GF_DRYRUN_FIELDS_SALE="+str(bool(proposal.get("is_sale"))),flush=True)
+                print("GF_DRYRUN_FIELDS_TICKER_MATCH="+str(proposal.get("ticker")==tx.ticker),flush=True)
+                print("GF_DRYRUN_FIELDS_DATE_MATCH="+str(proposal.get("date")==tx.trade_date.isoformat()),flush=True)
+                print("GF_DRYRUN_FIELDS_QUANTITY_MATCH="+str(proposal.get("quantity") is not None and Decimal(proposal["quantity"])==tx.quantity),flush=True)
+                print("GF_DRYRUN_FIELDS_PRICE_MATCH="+str(proposal.get("price") is not None and abs(Decimal(proposal["price"])-tx.price)<=Decimal("0.01")),flush=True)
+                print("GF_DRYRUN_FIELDS_PORTFOLIO_PRESENT="+str(bool(proposal.get("portfolio"))),flush=True)
+                print("GF_DRYRUN_FIELDS_PORTFOLIO_EXPECTED="+str(proposal.get("portfolio") in (cfg.portfolio_name,"New Portfolio","Nuevo Portafolio")),flush=True)
                 observed=parse_sale_proposal(p["instruction"]) if False else None
                 # Verify the actual returned proposal data; assert against ledger.
                 from decimal import Decimal
