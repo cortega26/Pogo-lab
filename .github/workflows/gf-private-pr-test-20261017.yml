@@ -64,6 +64,7 @@ jobs:
             echo GF_TEST_RUFF=PASS
             sudo -n -u fintual env PYTHONDONTWRITEBYTECODE=1 \
               PYTHONPATH="$RUN/source/integrations/google-finance" \
+              /bin/bash -c 'cd /tmp && exec "$@"' bash \
               "$RUN/venv/bin/python" -m pytest -q \
               "$RUN/source/integrations/google-finance/tests"
             echo GF_TEST_PYTEST=PASS
