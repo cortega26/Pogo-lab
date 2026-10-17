@@ -1,0 +1,97 @@
+name: GF one-shot empty sandbox outcome audit (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-empty-sandbox-result-readonly-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Read outcome after single create request and prove target isolation
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 340s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n test -f /var/lib/fintual-gf-mirror/recovery-backups/parallel-preflight-20261017T183832Z/EMPTY_SANDBOX_CREATE_ATTEMPT_ONCE
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import json,re,os,hashlib
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            params={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k,v=line.split("=",1)
+                    if k.strip().isidentifier():params[k.strip()]=v.strip().strip("'").strip('"')
+            assert not params.get("GF_MIRROR_WRITES")
+            assert not params.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            oldid="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protectedid="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            name="Fintual Historical Replay Sandbox 2026"
+            os.environ.update(params)
+            cfg=load_config()
+            assert not cfg.writes_armed
+            assert urlparse(cfg.portfolio_url).path=="/finance/portfolio/"+oldid
+            with _browser(cfg) as b:
+                p=b.page
+                page_before=p.url
+                print("GF_OUTCOME_CURRENT_ROUTE="+urlparse(page_before).path,flush=True)
+                p.goto("https://www.google.com/finance/",wait_until="domcontentloaded")
+                p.wait_for_timeout(1800)
+                labels=p.evaluate("""() => [...document.querySelectorAll('[role="button"],button')]
+                    .map(x=>(x.getAttribute('aria-label')||x.innerText||'').trim())
+                    .filter(x=>x==='Fintual Historical Replay Sandbox 2026'||
+                       x==='New Portfolio'||x==='Portafolio Actualizado')""")
+                count=labels.count(name)
+                print("GF_OUTCOME_SANDBOX_NAME_COUNT="+str(count),flush=True)
+                print("GF_OUTCOME_OLD_PORTFOLIO_VISIBLE="+str("New Portfolio" in labels),flush=True)
+                print("GF_OUTCOME_PROTECTED_PORTFOLIO_VISIBLE="+str("Portafolio Actualizado" in labels),flush=True)
+                if count==1:
+                    n=p.get_by_role("button",name=name,exact=True)
+                    assert n.count()==1
+                    n.click()
+                    p.wait_for_timeout(1500)
+                    path=urlparse(p.url).path
+                    uid=re.fullmatch(r"/finance/portfolio/([0-9a-f-]{36})",path)
+                    assert uid and uid.group(1) not in (oldid,protectedid)
+                    new_id=uid.group(1)
+                    print("GF_OUTCOME_NEW_UUID_DIFFERENT_AND_VALID=TRUE",flush=True)
+                    print("GF_OUTCOME_NEW_UUID_SHA256="+hashlib.sha256(new_id.encode()).hexdigest(),flush=True)
+                    state=p.evaluate("""() => {
+                        const body=document.body.innerText||'';
+                        const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                        const tables=[...document.querySelectorAll('table,[role="table"]')].filter(visible)
+                         .map(x=>({headers:[...x.querySelectorAll('th,[role=columnheader]')]
+                             .map(c=>(c.innerText||'').trim()).slice(0,8),
+                            rows:[...x.querySelectorAll('tr,[role=row]')].filter(visible).length}));
+                        return {urlPath:location.pathname,tables:tables.slice(0,8),
+                            noHoldingsText:/nothing in this portfolio yet|no investments|sin inversiones|cartera vacía|aún no hay inversiones/i.test(body),
+                            navTabs:[...document.querySelectorAll('[role=tab]')]
+                              .filter(visible).map(e=>(e.innerText||'').trim()).slice(0,8)};
+                    }""")
+                    print("GF_OUTCOME_SANDBOX_VISIBLE_STATE="+json.dumps(state,sort_keys=True,ensure_ascii=False),flush=True)
+                elif count==0:
+                    print("GF_OUTCOME_NEW_PORTFOLIO_NOT_FOUND=TRUE",flush=True)
+                else:
+                    print("GF_OUTCOME_DUPLICATE_NAMES=TRUE",flush=True)
+                p.goto(cfg.portfolio_url,wait_until="domcontentloaded")
+                assert urlparse(p.url).path=="/finance/portfolio/"+oldid
+                print("GF_OUTCOME_ORIGINAL_PAGE_RESTORED=TRUE",flush=True)
+            print("GF_OUTCOME_NO_BROWSER_WRITES=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_OUTCOME_FINANCIAL_PRODUCTION_UNCHANGED=PASS
