@@ -78,7 +78,7 @@ jobs:
                 assert db.execute("PRAGMA integrity_check").fetchone()==("ok",)
                 assert db.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()[0]==portfolio
                 counts=dict(db.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
-                assert counts.get("PENDING")==1120 and counts.get("VERIFIED")==58 and not counts.get("SUBMITTED") and not counts.get("FAILED"),counts
+                assert counts.get("PENDING")==1118 and counts.get("VERIFIED")==60 and not counts.get("SUBMITTED") and not counts.get("FAILED"),counts
             if digest(dst)==new:
                 print("GF_DEPLOY_ALREADY_AT_VALIDATED_SHA=TRUE",flush=True)
                 raise SystemExit(0)
