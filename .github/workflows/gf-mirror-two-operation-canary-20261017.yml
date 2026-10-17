@@ -1,0 +1,133 @@
+name: GF mirror two-operation isolated canary (bound test portfolio)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-two-operation-canary-20261017.yml
+permissions:
+  contents: read
+concurrency:
+  group: gf-mirror-live-writer-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Fail-closed preflight, backup and two genuine historical operations
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 15s
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-enabled fintual-browser.service)" = disabled
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-xvfb.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /opt/fintual-gf-mirror/integrations/google-finance/deploy/oracle/gf-memory-gate.sh >/dev/null
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,subprocess,sqlite3,os,json
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from datetime import datetime, timezone
+            base=Path("/opt/fintual-gf-mirror")
+            expected={
+              "txsync.py":"24127cf958969984282be36a60eafed2155b15f0",
+              "txwriter.py":"2db4313520613ca6b499e399667edc8f74690890",
+              "config.py":"4e8c8c7a6a94010fad44a0f044fa3db2a5ad8d5c",
+            }
+            for name,want in expected.items():
+                p=base/"integrations/google-finance/gf_mirror"/name
+                data=p.read_bytes()
+                blob=hashlib.sha1(b"blob "+str(len(data)).encode()+b"\\0"+data).hexdigest()
+                assert blob==want,("SOURCE_UNREVIEWED",name)
+            print("GF_CANARY_REVIEWED_SOURCE_BLOBS=PASS",flush=True)
+            envfile=Path("/etc/fintual-executor/gf-mirror.env")
+            cfg={}
+            for line in envfile.read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line:continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert cfg.get("GF_MIRROR_WRITES","")=="" and cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO","")==""
+            target=urlparse(cfg.get("GF_MIRROR_PORTFOLIO_URL","")).path.rstrip("/").split("/")[-1]
+            assert target and target!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            path=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            assert path.is_file()
+            with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=9) as db:
+                db.execute("PRAGMA query_only=ON")
+                assert db.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                bound=db.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()
+                assert bound and bound[0]==target,"PORTFOLIO_MISMATCH"
+                before=dict(db.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                assert before.get("SUBMITTED",0)==0 and before.get("FAILED",0)==0,before
+                assert before.get("VERIFIED",0)==58 and before.get("PENDING",0)==1120,before
+            fin=Path("/var/lib/fintual-executor/state.sqlite3")
+            with sqlite3.connect(fin.as_uri()+"?mode=ro",uri=True,timeout=9) as db:
+                db.execute("PRAGMA query_only=ON")
+                assert db.execute("PRAGMA quick_check").fetchone()==("ok",)
+                assert db.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]==0
+                assert db.execute("SELECT COUNT(*) FROM sheet_sync_outbox WHERE state != 'SYNCED'").fetchone()[0]==0
+            print("GF_CANARY_FINANCIAL_SOURCE_AND_DESTINATION=PASS",flush=True)
+            root=Path("/var/lib/fintual-gf-mirror/reconcile-backups")
+            root.mkdir(mode=0o700,parents=True,exist_ok=True)
+            os.chmod(root,0o700)
+            new=root/("before-canary-"+datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")+".sqlite3")
+            fd=os.open(new,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd)
+            with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True) as src, sqlite3.connect(new) as dst:
+                src.backup(dst)
+            with sqlite3.connect(new) as db:assert db.execute("PRAGMA integrity_check").fetchone()==("ok",)
+            print("GF_CANARY_SQLITE_BACKUP=PASS",flush=True)
+            # systemd resource boundaries match the normal gf-tx unit; all
+            # portfolio mutation permissions are ephemeral to THIS process.
+            cmd=[
+                "systemd-run","--quiet","--wait","--pipe","--collect",
+                "--unit=gf-mirror-two-op-canary-20261017",
+                "--property=User=fintual","--property=Group=fintual",
+                "--property=WorkingDirectory=/opt/fintual-gf-mirror",
+                "--property=EnvironmentFile=/etc/fintual-executor/gf-mirror.env",
+                "--property=Environment=GF_MIRROR_WRITES=ENABLED_I_ACCEPT_PORTFOLIO_EDITS",
+                "--property=Environment=PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance",
+                "--property=Environment=PYTHONDONTWRITEBYTECODE=1",
+                "--property=MemoryHigh=500M","--property=MemoryMax=900M",
+                "--property=CPUQuota=50%","--property=TimeoutStartSec=540",
+                "--property=UMask=0077","--property=NoNewPrivileges=true",
+                "--property=PrivateTmp=true","--property=ProtectSystem=strict",
+                "--property=ProtectHome=read-only",
+                "--property=ReadOnlyPaths=/etc/fintual-executor/gf-mirror.env /etc/fintual-executor/google-sheet-sync.json",
+                "--property=ReadWritePaths=/var/lib/fintual-gf-mirror",
+                "/opt/fintual-gf-mirror-venv/bin/python","-m","gf_mirror",
+                "--json","tx-sync","--limit","2","--batch-size","1",
+                "--tickers","TSLA,NVDA,STX"
+            ]
+            r=subprocess.run(cmd,capture_output=True,text=True,timeout=555)
+            try:
+                raw=r.stdout
+                data=json.loads(raw[raw.index("{"):])
+            except Exception:
+                print("GF_CANARY_JSON_PARSE=FAIL",flush=True)
+                print("GF_CANARY_SYSTEMD_EXIT="+str(r.returncode),flush=True)
+                raise SystemExit(10)
+            print("GF_CANARY_OUTCOME="+str(data.get("outcome")),flush=True)
+            print("GF_CANARY_PUSHED_COUNT="+str(len(data.get("pushed") or [])),flush=True)
+            print("GF_CANARY_PUSHED_VERIFIED="+str(sum(bool(x.get("verified")) for x in data.get("pushed") or [])),flush=True)
+            print("GF_CANARY_COUNTS="+json.dumps(data.get("counts"),sort_keys=True),flush=True)
+            print("GF_CANARY_SYSTEMD_EXIT="+str(r.returncode),flush=True)
+            assert r.returncode==0 and data.get("outcome")=="OK" and len(data.get("pushed") or [])==2
+            assert all(x.get("verified") for x in data["pushed"])
+            after=data.get("counts") or {}
+            assert after.get("VERIFIED")==60 and after.get("SUBMITTED",0)==0 and after.get("FAILED",0)==0,after
+            assert subprocess.run(["systemctl","is-active","fintual-executor.service"],capture_output=True,text=True).stdout.strip()=="active"
+            assert subprocess.run(["systemctl","is-active","fintual-browser.service"],capture_output=True,text=True).stdout.strip()=="inactive"
+            print("GF_CANARY_TWO_OPERATIONS=PASS",flush=True)
+            PY
