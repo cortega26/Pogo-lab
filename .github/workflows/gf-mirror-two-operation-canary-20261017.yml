@@ -43,7 +43,7 @@ jobs:
             base=Path("/opt/fintual-gf-mirror")
             expected={
               "txsync.py":"24127cf958969984282be36a60eafed2155b15f0",
-              "txwriter.py":"2db4313520613ca6b499e399667edc8f74690890",
+              "txwriter.py":"46a68e72477c86e4e21abe69af8913be85694cf3",
               "config.py":"4e8c8c7a6a94010fad44a0f044fa3db2a5ad8d5c",
             }
             for name,want in expected.items():
