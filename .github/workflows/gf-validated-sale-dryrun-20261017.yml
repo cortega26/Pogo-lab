@@ -92,6 +92,34 @@ jobs:
                 assert proposal.get("complete") and proposal.get("is_sale"),"PROPOSAL_INCOMPLETE"
                 assert not proposal.get("mentions_modification"),"PROPOSAL_MODIFIES_OTHERS"
                 print("GF_DRYRUN_PROPOSAL=COMPLETE_AND_MATCHED",flush=True)
+
+                from gf_mirror.txwriter import SALE_CONFIRMATION_QUESTION
+                message_body=writer.page.evaluate("() => document.body.innerText || ''")
+                prompts=list(SALE_CONFIRMATION_QUESTION.finditer(message_body))
+                assert prompts,"MISSING_LIVE_ASSISTANT_QUESTION"
+                expected=prompts[-1].group(0)
+                control=writer.page.evaluate(r"""question => {
+                    const normalize=s=>(s||'').replace(/\s+/g,' ').trim();
+                    const body=normalize(document.body.innerText||'');
+                    if(!body.includes(normalize(question)))return {state:'question_missing'};
+                    const yes=[],seen=new Set();
+                    for(const e of document.querySelectorAll('button,[role=button],span,div')){
+                      const label=(e.innerText||'').trim();
+                      if(!/^(yes|s[íi]|confirmar|confirm)$/i.test(label))continue;
+                      const rect=e.getBoundingClientRect();
+                      const x=Math.round(rect.left+rect.width/2),y=Math.round(rect.top+rect.height/2);
+                      if(!rect.width||!rect.height||x<0||y<0||x>=innerWidth||y>=innerHeight)continue;
+                      const key=x+':'+y;if(seen.has(key))continue;seen.add(key);
+                      const hit=document.elementFromPoint(x,y);
+                      const hitLabel=(hit?.innerText||'').trim();
+                      yes.push({tag:e.tagName,hitTag:hit?.tagName||'',
+                        hitIsYes:/^(yes|s[íi]|confirmar|confirm)$/i.test(hitLabel),
+                        parentIsButton:e.closest('button,[role=button]')!==null});
+                    }
+                    return {state:yes.length===1?'unique':yes.length?'ambiguous':'not_ready',
+                      count:yes.length,candidates:yes.slice(0,6)};
+                }""",expected)
+                print("GF_DRYRUN_CONFIRM_CONTROL="+json.dumps(control,sort_keys=True),flush=True)
                 print("GF_DRYRUN_CONFIRMED=FALSE",flush=True)
             '''
             p=subprocess.run(["sudo","-n","-u","fintual","env",*env,
