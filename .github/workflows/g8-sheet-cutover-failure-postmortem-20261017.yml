@@ -1,0 +1,39 @@
+name: G8 Sheets post-rollback diagnostics (read only)
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-cutover-failure-postmortem-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify rollback and inspect unit lifecycle without printing credentials
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          script: |
+            set -u
+            for svc in fintual-executor.service fintual-sheet-sync.service fintual-browser.service; do
+              echo G8_POST_${svc}_ACTIVE="$(systemctl is-active "$svc" 2>/dev/null || true)"
+              echo G8_POST_${svc}_ENABLED="$(systemctl is-enabled "$svc" 2>/dev/null || true)"
+              echo G8_POST_${svc}_NRESTARTS="$(systemctl show -P NRestarts "$svc" 2>/dev/null || true)"
+              echo G8_POST_${svc}_EXIT="$(systemctl show -P ExecMainStatus "$svc" 2>/dev/null || true)"
+            done
+            echo G8_POST_HTTPX_RELEASE="$(sudo -n readlink -f /opt/fintual-httpx-current || true)"
+            echo G8_POST_SHEET_RELEASE="$(sudo -n readlink -f /opt/fintual-sheet-sync-current || true)"
+            systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--fills-only' && echo G8_POST_SHEETS_FILLS_ONLY=YES || echo G8_POST_SHEETS_FILLS_ONLY=NO
+            systemctl show -P ExecStart fintual-sheet-sync.service | grep -q -- '--cash-ipc-socket' && echo G8_POST_SHEETS_CASH_IPC=YES || echo G8_POST_SHEETS_CASH_IPC=NO
+            systemctl show -P ExecStart fintual-executor.service | grep -q -- '--sheet-cash-socket' && echo G8_POST_HTTPX_CASH_OWNER=YES || echo G8_POST_HTTPX_CASH_OWNER=NO
+            echo G8_POST_UNIT_MATCH_BACKUP="$(sudo -n cmp -s /etc/systemd/system/fintual-sheet-sync.service /etc/fintual-executor/g8-phase2-pre-cutover-backups/fintual-sheet-sync.service && echo YES || echo NO)"
+            echo G8_POST_STAGED_RELEASE_EXISTS="$(sudo -n test -d /opt/fintual-sheet-sync-releases/b9d82a7668ea1ff67e9623499b0df6f778b50d1b && echo YES || echo NO)"
+            echo G8_POST_SHEET_JOURNAL_ERRORS_BEGIN
+            sudo -n journalctl --since '-25 min' -u fintual-sheet-sync.service --no-pager -q -o cat 2>/dev/null | grep -E '^\{|^Traceback|^ModuleNotFoundError|^ImportError|^PermissionError|^FileNotFoundError|^AssertionError|^RuntimeError|^OSError|^  File ' | sed -E 's@/etc/fintual-executor/[^ ]+@<CONFIG_FILE>@g' | tail -n 16 || true
+            echo G8_POST_SHEET_JOURNAL_ERRORS_END
+            echo G8_POST_CASH_SYNC_ROLLBACK_READONLY_CHECK=COMPLETE
