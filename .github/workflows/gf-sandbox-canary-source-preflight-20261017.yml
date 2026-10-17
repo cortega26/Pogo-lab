@@ -1,0 +1,61 @@
+name: GF canary first canonical transaction preflight (no writes)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-sandbox-canary-source-preflight-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Confirm first trade and both ledgers immutable
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import sqlite3,json,hashlib
+            from pathlib import Path
+            from urllib.parse import urlparse
+            root=Path("/var/lib/fintual-gf-mirror")
+            new=root/"parallel-replay/parallel-replay-ledger.sqlite3"
+            old=root/"gf-push-ledger.sqlite3"
+            checks={"new":(new,{"PENDING":1178}),"old":(old,{"PENDING":1118,"VERIFIED":60})}
+            for name,(file,expected) in checks.items():
+                assert file.is_file()
+                with sqlite3.connect(file.as_uri()+"?mode=ro",uri=True) as db:
+                    db.execute("PRAGMA query_only=ON")
+                    assert db.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                    counts=dict(db.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                    assert counts==expected,(name,counts)
+                    meta=dict(db.execute("SELECT key,value FROM push_ledger_meta"))
+                    expect_uid=("d24a1f7a-ad03-4bb4-b739-4da1d4561d61" if name=="new"
+                                else "86a77e49-9ac1-432e-8d3b-645b8cda19a2")
+                    assert meta.get("portfolio_id")==expect_uid
+                    if name=="new":
+                        rows=db.execute(
+                            "SELECT payload_json,source_id,attempts FROM pushed_transactions "
+                            "WHERE state='PENDING' ORDER BY json_extract(payload_json,'$.date'),source_id LIMIT 5"
+                        ).fetchall()
+                        assert rows and all(r[2]==0 for r in rows)
+                        for i,(text,source_id,_attempts) in enumerate(rows):
+                            p=json.loads(text)
+                            print("GF_CANARY_NEXT_"+str(i+1)+"_DATE="+str(p["date"]),flush=True)
+                            print("GF_CANARY_NEXT_"+str(i+1)+"_ACTION="+str(p["action"]),flush=True)
+                            print("GF_CANARY_NEXT_"+str(i+1)+"_TICKER="+str(p["ticker"]),flush=True)
+                            print("GF_CANARY_NEXT_"+str(i+1)+"_SOURCE_SHA256="+hashlib.sha256(str(source_id).encode()).hexdigest()[:16],flush=True)
+                    print("GF_CANARY_"+name.upper()+"_LEDGER_COUNT="+str(sum(counts.values())),flush=True)
+            print("GF_CANARY_SOURCE_PREFLIGHT_READONLY=PASS",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_CANARY_FINANCIAL_SERVICES_INTACT=PASS
