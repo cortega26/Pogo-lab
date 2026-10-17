@@ -38,7 +38,7 @@ jobs:
               git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
               git@github.com:cortega26/fintual-executor.git "$RUN/source"
             SHA="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
-            test "$SHA" = 3ae023f16fa3eccc625cd7323d744f9a28708662
+            test "$SHA" = 547117712f6cd6bbd53776ddda56cfefb176e4da
             echo GF_DRYRUN_SOURCE_SHA_EXACT=PASS
             sudo -n -u fintual env GF_SANDBOX_EXPECTED_UUID="$UUID" \
               GF_SANDBOX_SOURCE_ROOT="$RUN/source/integrations/google-finance" \
