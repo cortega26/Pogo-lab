@@ -1,0 +1,47 @@
+name: GF finance CDP current pages heartbeat (read-only HTTP)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-browser-cdp-heartbeat-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check dedicated browser target list without UI interaction
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 70s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            sudo -n /usr/bin/python3 - <<'PY'
+            import urllib.request,json,os,time
+            for endpoint in ("json/version","json/list"):
+                started=time.monotonic()
+                try:
+                    with urllib.request.urlopen("http://127.0.0.1:9223/"+endpoint,timeout=7) as r:
+                        data=json.loads(r.read(250000))
+                    elapsed=round(time.monotonic()-started,2)
+                    print("GF_CDP_"+endpoint.replace("/","_").upper()+"_PASS=TRUE",flush=True)
+                    print("GF_CDP_"+endpoint.replace("/","_").upper()+"_SECS="+str(elapsed),flush=True)
+                    if endpoint=="json/list":
+                        pages=[x for x in data if x.get("type")=="page"]
+                        print("GF_CDP_PAGE_COUNT="+str(len(pages)),flush=True)
+                        for page in pages[:6]:
+                            from urllib.parse import urlparse
+                            u=urlparse(page.get("url",""))
+                            print("GF_CDP_PAGE_HOST_PATH="+str((u.hostname or "")+u.path),flush=True)
+                except Exception as exc:
+                    print("GF_CDP_"+endpoint.replace("/","_").upper()+"_ERROR="+type(exc).__name__,flush=True)
+            print("GF_CDP_HEARTBEAT_ONLY_NO_UI_CHANGES=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            echo GF_CDP_PRODUCTION_UNCHANGED=PASS
