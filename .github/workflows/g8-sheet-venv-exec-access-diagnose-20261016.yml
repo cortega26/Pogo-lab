@@ -1,0 +1,38 @@
+name: G8 diagnose Sheets-only venv execute permission
+on:
+  push:
+    branches: [ops/g8-live-reboot-cert-20261016]
+    paths: [.github/workflows/g8-sheet-venv-exec-access-diagnose-20261016.yml]
+permissions:
+  contents: read
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Read-only classify the Sheets venv execute failure
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 80s
+          script: |
+            set -eu
+            echo G8_EXECUTOR_ACTIVE="$(systemctl is-active fintual-executor.service || true)"
+            echo G8_BROWSER_ACTIVE="$(systemctl is-active fintual-browser.service || true)"
+            echo G8_SHEET_ACTIVE="$(systemctl is-active fintual-sheet-sync.service || true)"
+            for path in /opt /opt/fintual-sheet-sync-venv /opt/fintual-sheet-sync-venv/bin /opt/fintual-sheet-sync-venv/bin/python /opt/fintual-sheet-sync-venv/bin/python3 /opt/fintual-sheet-sync-venv/bin/python3.14; do
+              if test -e "$path" || test -L "$path"; then
+                echo G8_PATH_METADATA="$(stat -c '%n %A %a %U:%G %F %N' "$path" 2>&1)"
+              else
+                echo G8_PATH_MISSING="$path"
+              fi
+            done
+            echo G8_VENV_RESOLVED="$(readlink -f /opt/fintual-sheet-sync-venv/bin/python || true)"
+            echo G8_VENV_MOUNT="$(findmnt -n -T /opt/fintual-sheet-sync-venv -o TARGET,OPTIONS || true)"
+            echo G8_VENV_PATH_PERMISSIONS="$(namei -l /opt/fintual-sheet-sync-venv/bin/python | tail -n 12 | tr '\n' ' ' || true)"
+            echo G8_VENV_AS_FINTUAL_PY="$(sudo -n -H -u fintual sh -c 'cd /tmp && /opt/fintual-sheet-sync-venv/bin/python -V' 2>&1 || true)"
+            echo G8_VENV_AS_UBUNTU_PY="$(cd /tmp && /opt/fintual-sheet-sync-venv/bin/python -V 2>&1 || true)"
+            echo G8_VENV_DIAGNOSIS_READONLY=TRUE
