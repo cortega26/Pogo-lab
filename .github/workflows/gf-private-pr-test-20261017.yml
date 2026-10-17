@@ -48,7 +48,7 @@ jobs:
               git@github.com:cortega26/fintual-executor.git "$RUN/source"
             echo GF_TEST_GATE=BRANCH_FETCHED
             got="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
-            test "$got" = 3f9cfb905a565363c6b2a4f2c53f29cf38712093 || { echo GF_TEST_SOURCE_SHA=WRONG; exit 8; }
+            test "$got" = 26f78c82cf74e07ed50f0deb65e2bec5a8656cdf || { echo GF_TEST_SOURCE_SHA=WRONG; exit 8; }
             echo GF_TEST_SOURCE_SHA=EXACT
             sudo -n env UV_NO_CONFIG=1 "$UV" venv --python /opt/fintual-gf-mirror-venv/bin/python "$RUN/venv" --quiet
             sudo -n env UV_NO_CONFIG=1 "$UV" pip install --quiet --python "$RUN/venv/bin/python" \
