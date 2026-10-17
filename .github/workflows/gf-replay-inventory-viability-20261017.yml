@@ -1,0 +1,70 @@
+name: GF replay chronological inventory feasibility (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-replay-inventory-viability-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Independently validate chronological shares across 1178 canonical fills
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 100s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3,collections
+            from pathlib import Path
+            from decimal import Decimal
+            path=Path("/var/lib/fintual-gf-mirror/parallel-replay/parallel-replay-ledger.sqlite3")
+            with sqlite3.connect(path.as_uri()+"?mode=ro",uri=True,timeout=15) as db:
+                db.execute("PRAGMA query_only=ON")
+                assert db.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+                rows=db.execute("SELECT source_id,payload_json,state,attempts FROM pushed_transactions").fetchall()
+            assert len(rows)==1178
+            txs=sorted(((source,json.loads(payload),state,attempt) for source,payload,state,attempt in rows),
+                key=lambda x:(x[1]["date"],x[0]))
+            assert txs[0][1]["ticker"]=="SPY" and txs[0][1]["action"]=="BUY"
+            assert txs[0][2]=="VERIFIED" and txs[0][3]==1
+            assert txs[1][1]["ticker"]=="NVDA" and txs[1][1]["action"]=="BUY"
+            assert txs[2][1]["ticker"]=="SPY" and txs[2][1]["action"]=="SELL"
+            qty=collections.defaultdict(Decimal)
+            minbalance=collections.defaultdict(lambda:Decimal("0"))
+            negatives=[]
+            prior=collections.Counter()
+            for index,(source,p,state,attempt) in enumerate(txs):
+                symbol=p["ticker"].upper()
+                shares=Decimal(p["quantity"])
+                if p["action"]=="BUY":qty[symbol]+=shares
+                elif p["action"]=="SELL":qty[symbol]-=shares
+                else:raise AssertionError("unexpected event type")
+                if qty[symbol] < minbalance[symbol]:
+                    minbalance[symbol]=qty[symbol]
+                if qty[symbol] < Decimal("-0.0000001"):
+                    negatives.append((index+1,symbol,p["date"],str(qty[symbol])))
+                prior[(symbol,p["action"])]+=1
+                if index==2:
+                    print("GF_INVENTORY_FIRST_SPY_BALANCE_AFTER_SALE="+str(qty["SPY"]),flush=True)
+                    print("GF_INVENTORY_FIRST_SPY_SALE_QUANTITY="+str(shares),flush=True)
+            count_neg=collections.Counter(n[1] for n in negatives)
+            print("GF_INVENTORY_CANONICAL_COUNT="+str(len(txs)),flush=True)
+            print("GF_INVENTORY_SYMBOLS="+str(len({p["ticker"] for _,p,_,_ in txs})),flush=True)
+            print("GF_INVENTORY_FIRST_BUY_VERIFIED=TRUE",flush=True)
+            print("GF_INVENTORY_FIRST_SELL_NONNEGATIVE="+str(not any(i<=3 for i,_,_,_ in negatives)),flush=True)
+            print("GF_INVENTORY_NEGATIVE_STEPS="+str(len(negatives)),flush=True)
+            print("GF_INVENTORY_SYMBOLS_WITH_NEGATIVES="+str(len(count_neg)),flush=True)
+            print("GF_INVENTORY_NEGATIVE_SYMBOL_SUMMARY="+json.dumps(count_neg.most_common(12)),flush=True)
+            print("GF_INVENTORY_SOURCE_UNMODIFIED=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-sheet-sync.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_INVENTORY_FINANCIAL_SERVICES_INTACT=PASS
