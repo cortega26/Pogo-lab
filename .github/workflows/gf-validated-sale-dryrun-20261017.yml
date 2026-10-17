@@ -131,7 +131,13 @@ jobs:
             if p.returncode!=0:
                 print("GF_DRYRUN_RESULT=BLOCKED",flush=True)
                 # Never disclose private financial values or account information.
-                print("GF_DRYRUN_ERROR_TYPE="+("ASSERTION_OR_UI" if "AssertionError" in p.stderr else "RUNTIME"),flush=True)
+                import re
+                errors=re.findall(r"\\b([A-Za-z_][A-Za-z_0-9]*(?:Error|Exception))(?::|\\b)",p.stderr)
+                frames=re.findall(r"\\bin ([A-Za-z_][A-Za-z_0-9]*)\\s*\\n",p.stderr)
+                print("GF_DRYRUN_EXCEPTION_CLASS="+(errors[-1] if errors else "UNKNOWN"),flush=True)
+                print("GF_DRYRUN_EXCEPTION_FRAMES="+",".join(frames[-5:]),flush=True)
+                for word in ("Timeout","Target closed","Element is not attached","strict mode violation","assistant","auth","not clickable","proposal","date","portfolio"):
+                    print("GF_DRYRUN_ERROR_FLAG_"+word.upper().replace(" ","_")+"="+str(word.lower() in p.stderr.lower()),flush=True)
                 raise SystemExit(2)
             print("GF_DRYRUN_RESULT=PASS",flush=True)
             PY
