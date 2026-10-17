@@ -1,0 +1,69 @@
+name: GF sandbox outcome observe CDP current DOM (no navigation)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-empty-sandbox-cdp-observe-20261017.yml]
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Observe current authenticated CDP DOM; never navigate submit or refresh
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 150s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import os,json
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            v={}
+            for l in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                if "=" in l and not l.lstrip().startswith("#"):
+                    k,p=l.split("=",1)
+                    if k.strip().isidentifier():v[k.strip()]=p.strip().strip("'").strip('"')
+            assert not v.get("GF_MIRROR_WRITES")
+            os.environ.update(v)
+            cfg=load_config()
+            assert not cfg.writes_armed
+            with _browser(cfg) as b:
+                p=b.page
+                p.set_default_timeout(9500)
+                print("GF_CDP_CURRENT_PATH="+urlparse(p.url).path,flush=True)
+                try:
+                    o=p.evaluate("""() => {
+                      const label=e=>(e.getAttribute('aria-label')||e.innerText||'').trim();
+                      const names=['Fintual Historical Replay Sandbox 2026','New Portfolio','Portafolio Actualizado'];
+                      const btn=[...document.querySelectorAll('[role=button],button')].map(label);
+                      const t=(document.body.innerText||'');
+                      const item='Fintual Historical Replay Sandbox 2026';
+                      const at=t.lastIndexOf(item);
+                      return {
+                        pageReady:document.readyState,path:location.pathname,title:document.title.slice(0,85),
+                        detected:names.map(x=>({name:x,exactMatches:btn.filter(y=>y===x).length})),
+                        hasAssistantReply:/no puedo crear|can't create|no es posible|created|cread[ao]|cartera vacía|empty portfolio/i.test(t.slice(-850)),
+                        contextNearRequestedName:at>=0?t.slice(Math.max(0,at-70),at+185).replace(/\\n/g,' '):null,
+                        bodyLength:t.length
+                      };
+                    }""")
+                    print("GF_CDP_CURRENT_DOM="+json.dumps(o,sort_keys=True,ensure_ascii=False),flush=True)
+                except Exception as exc:
+                    print("GF_CDP_DOM_ERROR="+type(exc).__name__,flush=True)
+                    raise
+            print("GF_CDP_NO_NAVIGATION_NO_SUBMISSION=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            echo GF_CDP_PRODUCTION_UNCHANGED=PASS
