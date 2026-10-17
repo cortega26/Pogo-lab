@@ -1,0 +1,68 @@
+name: GF mirror post-canary one-row reconciliation preview (read-only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-mirror-postcanary-reconcile-preview-20261017.yml
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare ambiguous submitted signature against authenticated Google Finance history
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 185s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3,subprocess
+            from pathlib import Path
+            from urllib.parse import urlparse
+            cf=Path("/etc/fintual-executor/gf-mirror.env")
+            cfg={}
+            for line in cf.read_text().splitlines():
+                s=line.strip()
+                if s.startswith("#") or "=" not in s:continue
+                k,v=s.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            assert not cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target=urlparse(cfg.get("GF_MIRROR_PORTFOLIO_URL","")).path.rstrip("/").split("/")[-1]
+            assert target and target!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            db=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=10) as con:
+                con.execute("PRAGMA query_only=ON")
+                assert con.execute("PRAGMA quick_check").fetchone()==("ok",)
+                bound=con.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()
+                assert bound and bound[0]==target
+                counts=dict(con.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                print("GF_POSTCANARY_COUNTS="+json.dumps(counts,sort_keys=True),flush=True)
+                assert counts.get("SUBMITTED")==1
+            env=[f"{k}={v}" for k,v in cfg.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
+            env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            cmd=["sudo","-n","-u","fintual","env",*env,
+              "/opt/fintual-gf-mirror-venv/bin/python","-m","gf_mirror","--json","tx-reconcile","--dry-run"]
+            p=subprocess.run(cmd,capture_output=True,text=True,timeout=145)
+            print("GF_POSTCANARY_RECONCILE_EXIT="+str(p.returncode),flush=True)
+            try:
+                out=json.loads(p.stdout)
+                print("GF_POSTCANARY_OUTCOME="+str(out.get("outcome")),flush=True)
+                rc=out.get("settled") or {}
+                for x in ("submitted","verified","retryable"):
+                    print("GF_POSTCANARY_WOULD_"+x.upper()+"="+str(rc.get(x,"UNKNOWN")),flush=True)
+            except ValueError:print("GF_POSTCANARY_JSON_UNREADABLE=TRUE",flush=True)
+            assert p.returncode==0
+            print("GF_POSTCANARY_DESTINATION_READONLY_COMPLETE=TRUE",flush=True)
+            PY
