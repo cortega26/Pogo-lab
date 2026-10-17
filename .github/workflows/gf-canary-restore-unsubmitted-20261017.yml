@@ -1,0 +1,96 @@
+name: GF canary restore unsubmitted row after verified absence
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+    paths:
+      - .github/workflows/gf-canary-restore-unsubmitted-20261017.yml
+permissions:
+  contents: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: WAL-safe push-ledger backup then reconcile one absent, never submit
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 145s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-browser.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            test "$(systemctl is-active fintual-gf-tx-bootstrap.service || true)" = inactive
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,sqlite3,subprocess,json
+            from pathlib import Path
+            from datetime import datetime,timezone
+            from urllib.parse import urlparse
+            cfg={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                l=line.strip()
+                if l.startswith("#") or "=" not in l:continue
+                k,v=l.split("=",1)
+                if k.strip().isidentifier():cfg[k.strip()]=v.strip().strip("'").strip('"')
+            assert not cfg.get("GF_MIRROR_WRITES")
+            assert not cfg.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            id=urlparse(cfg["GF_MIRROR_PORTFOLIO_URL"]).path.rstrip("/").split("/")[-1]
+            assert id and id!="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            db=Path(cfg.get("GF_MIRROR_PUSH_LEDGER","/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3"))
+            with sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=12) as src:
+                src.execute("PRAGMA query_only=ON")
+                assert src.execute("PRAGMA integrity_check").fetchone()==("ok",)
+                bind=src.execute("SELECT value FROM push_ledger_meta WHERE key='portfolio_id'").fetchone()
+                assert bind and bind[0]==id
+                state=dict(src.execute("SELECT state,count(*) FROM pushed_transactions GROUP BY state"))
+                assert state.get("SUBMITTED")==1 and state.get("VERIFIED")==58 and state.get("PENDING")==1119,state
+                root=Path("/var/lib/fintual-gf-mirror/reconcile-backups")
+                root.mkdir(parents=True,exist_ok=True,mode=0o700)
+                os.chmod(root,0o700)
+                dest=root/("pre-restore-"+datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")+".sqlite3")
+                fd=os.open(dest,os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600)
+                os.close(fd)
+                with sqlite3.connect(dest) as dst:src.backup(dst)
+            with sqlite3.connect(dest) as b: assert b.execute("PRAGMA integrity_check").fetchone()==("ok",)
+            print("GF_RESTORE_SQLITE_BACKUP=PASS",flush=True)
+            env=[f"{k}={v}" for k,v in cfg.items() if k.startswith("GF_MIRROR_") or k in ("FINTUAL_SHEET_SPREADSHEET_ID","GOOGLE_APPLICATION_CREDENTIALS")]
+            env+=["PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance","PYTHONDONTWRITEBYTECODE=1"]
+            code=r'''
+            import json
+            from gf_mirror.cli import _browser
+            from gf_mirror.config import load_config
+            from gf_mirror.txstore import PushLedger,exclusive_writer_lock
+            from gf_mirror.txwriter import TransactionWriter
+            cfg=load_config()
+            assert not cfg.writes_armed
+            ledger=PushLedger(cfg.push_ledger_path)
+            with exclusive_writer_lock(cfg.push_ledger_path) as held:
+                assert held,"OTHER_WRITER"
+                rows=ledger.by_state("SUBMITTED")
+                assert len(rows)==1
+                with _browser(cfg) as browser:
+                    observed=TransactionWriter(browser,cfg.portfolio_url,cfg.portfolio_name).observed_counts()
+                    r=rows[0]
+                    assert observed.get(tuple(json.loads(r.signature)),0) < r.required_ordinal,"MAYBE_ALREADY_SAVED"
+                    outcome=ledger.resolve_submitted(observed)
+                    assert outcome=={"verified":0,"retryable":1},outcome
+                after=ledger.counts()
+                assert after.get("PENDING")==1120 and after.get("VERIFIED")==58
+                assert after.get("SUBMITTED",0)==0 and after.get("FAILED",0)==0
+                print("GF_RESTORE=PASS",flush=True)
+                print("GF_RESTORE_STATES="+json.dumps(after,sort_keys=True),flush=True)
+                print("GF_RESTORE_GOOGLE_FINANCE_WRITES=0",flush=True)
+            '''
+            result=subprocess.run(["sudo","-n","-u","fintual","env",*env,
+              "/opt/fintual-gf-mirror-venv/bin/python","-c",code],
+              capture_output=True,text=True,timeout=120)
+            for line in result.stdout.splitlines():
+                if line.startswith("GF_RESTORE"):print(line,flush=True)
+            assert result.returncode==0,"RESTORE_FAILED_SAFE_STOP"
+            PY
