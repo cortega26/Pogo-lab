@@ -1,0 +1,81 @@
+name: One-shot Google Finance mirror and Sheets diagnostic (read-only)
+on:
+  push:
+    branches:
+      - ops/gf-mirror-readonly-status-20261017
+permissions:
+  contents: read
+concurrency:
+  group: gf-mirror-one-shot-readonly-20261017
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspect Oracle mirror and Sheet services (no writes)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,os,sqlite3,subprocess,urllib.request
+            from pathlib import Path
+            def cmd(*args):
+                try:
+                    p=subprocess.run(args,capture_output=True,text=True,timeout=9)
+                    return p.stdout.strip() or ("EXIT_"+str(p.returncode))
+                except Exception as e:
+                    return "UNREADABLE_"+type(e).__name__
+            services=[
+              "fintual-executor.service","fintual-browser.service",
+              "fintual-xvfb.service","fintual-sheet-sync.service",
+              "fintual-gf-xvfb.service","fintual-gf-mirror-browser.service",
+              "fintual-gf-tx-bootstrap.service","fintual-gf-tx.service",
+              "fintual-gf-tx.timer",
+            ]
+            print("GF_DIAG_BEGIN",flush=True)
+            for unit in services:
+                print("UNIT="+unit+" ACTIVE="+cmd("systemctl","is-active",unit)+" ENABLED="+cmd("systemctl","is-enabled",unit),flush=True)
+            mem=Path("/proc/meminfo").read_text().splitlines()
+            kv={k.strip(":"):int(v.split()[0]) for line in mem for k,v in [line.split(":",1)] if k in ("MemAvailable","MemTotal","SwapTotal","SwapFree")}
+            for k in ("MemAvailable","MemTotal","SwapTotal","SwapFree"):
+                print(k.upper()+"_KIB="+str(kv.get(k,-1)),flush=True)
+            for dbpath in ("/var/lib/fintual-gf-mirror/gf-push-ledger.sqlite3","/var/lib/fintual-gf-mirror/gf-mirror.sqlite3"):
+                p=Path(dbpath); label="PUSH" if "gf-push" in dbpath else "MIRROR"
+                print(label+"_DB_EXISTS="+str(p.is_file()),flush=True)
+                if not p.is_file():continue
+                try:
+                    conn=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True,timeout=4)
+                    conn.execute("PRAGMA query_only=ON")
+                    print(label+"_DB_INTEGRITY="+str(conn.execute("PRAGMA quick_check").fetchone()[0]),flush=True)
+                    tables={str(r[0]) for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                    if "pushed_transactions" in tables:
+                        counts=list(conn.execute("SELECT state,COUNT(*) FROM pushed_transactions GROUP BY state"))
+                        print("PUSH_COUNTS="+json.dumps({str(k):v for k,v in counts},sort_keys=True),flush=True)
+                        print("PUSH_TOTAL="+str(sum(n for _,n in counts)),flush=True)
+                    conn.close()
+                except Exception as e:
+                    print(label+"_DB_ERROR="+type(e).__name__,flush=True)
+            # Check local CDP health only, never send credentials or visit websites.
+            try:
+                request=urllib.request.Request("http://127.0.0.1:9223/json/version")
+                with urllib.request.urlopen(request,timeout=2) as response:
+                    ok=response.status==200
+                print("GF_CDP_9223_HEALTHY="+str(ok),flush=True)
+            except Exception as e:
+                print("GF_CDP_9223_HEALTHY=FALSE "+type(e).__name__,flush=True)
+            # Process count for the dedicated profile only. Do not print process args or cookies.
+            count=0
+            for proc in Path("/proc").iterdir():
+                if not proc.name.isdecimal():continue
+                try:args=(proc/"cmdline").read_bytes()
+                except OSError:continue
+                if b"--user-data-dir=/var/lib/fintual-gf-mirror/profile" in args:count+=1
+            print("GF_MIRROR_PROFILE_PROCESSES="+str(count),flush=True)
+            print("GF_DIAG_END",flush=True)
+            PY
