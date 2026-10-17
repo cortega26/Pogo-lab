@@ -1,4 +1,5 @@
 name: GF full history vs ledger audit (read only)
+# Revalidation after isolated 290-test idempotency certification (read-only).
 on:
   push:
     branches: [ops/gf-mirror-readonly-status-20261017]
