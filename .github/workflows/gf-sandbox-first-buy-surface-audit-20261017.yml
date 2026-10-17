@@ -1,4 +1,5 @@
 name: GF empty sandbox first-buy UI surface audit (no submit)
+# Retest after isolated browser recovery; no trade entry or submission.
 on:
   push:
     branches: [ops/gf-mirror-readonly-status-20261017]
