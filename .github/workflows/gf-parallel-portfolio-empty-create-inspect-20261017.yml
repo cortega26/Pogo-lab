@@ -1,0 +1,87 @@
+name: GF parallel portfolio empty-create UI audit (read-only)
+on:
+  push:
+    branches: [ops/gf-mirror-readonly-status-20261017]
+    paths: [.github/workflows/gf-parallel-portfolio-empty-create-inspect-20261017.yml]
+permissions:
+  contents: read
+concurrency:
+  group: gf-parallel-empty-create-readonly-20261017
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect only creation entry points in dedicated authenticated browser
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 155s
+          script: |
+            set -euo pipefail
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-mirror-browser.service)" = active
+            for unit in fintual-gf-tx-bootstrap.service fintual-gf-tx.service fintual-gf-tx.timer; do
+              test "$(systemctl is-active "$unit" || true)" = inactive
+            done
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-gf-mirror/integrations/google-finance PYTHONDONTWRITEBYTECODE=1 \
+              /opt/fintual-gf-mirror-venv/bin/python - <<'PY'
+            import json,os
+            from pathlib import Path
+            from urllib.parse import urlparse
+            from gf_mirror.config import load_config
+            from gf_mirror.cli import _browser
+            env={}
+            for line in Path("/etc/fintual-executor/gf-mirror.env").read_text().splitlines():
+                line=line.strip()
+                if line.startswith("#") or "=" not in line: continue
+                k,v=line.split("=",1)
+                if k.strip().isidentifier(): env[k.strip()]=v.strip().strip("'").strip('"')
+            assert not env.get("GF_MIRROR_WRITES")
+            assert not env.get("GF_MIRROR_ALLOW_PROTECTED_PORTFOLIO")
+            target="86a77e49-9ac1-432e-8d3b-645b8cda19a2"
+            protected="d6dca42c-4cfb-4ecd-b1cd-c0f585ca609f"
+            u=urlparse(env.get("GF_MIRROR_PORTFOLIO_URL",""))
+            assert u.hostname=="www.google.com" and u.path=="/finance/portfolio/"+target
+            assert target!=protected
+            os.environ.update(env)
+            cfg=load_config()
+            assert not cfg.writes_armed
+            with _browser(cfg) as browser:
+                page=browser.page
+                try:
+                    page.goto(cfg.portfolio_url,wait_until="domcontentloaded")
+                    assert urlparse(page.url).path=="/finance/portfolio/"+target
+                    print("GF_EMPTY_PRECHECK_TARGET=EXACT",flush=True)
+                    page.goto("https://www.google.com/finance/",wait_until="domcontentloaded")
+                    page.wait_for_timeout(1800)
+                    result=page.evaluate(r"""() => {
+                        const visible=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+                        const select='button,[role="button"],a[href],[role="menuitem"],[role="tab"]';
+                        const keywords=/portfolio|portafolio|cartera|crear|create|nuevo|nueva|new|invest|beta/i;
+                        const controls=[...document.querySelectorAll(select)].filter(visible)
+                          .map(e=>({tag:e.tagName,role:e.getAttribute('role')||'',
+                            label:(e.getAttribute('aria-label')||e.getAttribute('title')||
+                              (e.innerText||'').replace(/\s+/g,' ').trim()).slice(0,90)}))
+                          .filter(e=>keywords.test(e.label)).slice(0,36);
+                        const hasCreationText=/crear una cartera|nueva cartera|crear portafolio|new portfolio|create portfolio|create a portfolio/i.test(document.body.innerText||'');
+                        const dialogs=[...document.querySelectorAll('[role=dialog]')].filter(visible).length;
+                        return {urlPath:location.pathname,creationTextVisible:hasCreationText,
+                          candidateControls:controls,visibleDialogs:dialogs};
+                    }""")
+                    assert urlparse(page.url).hostname=="www.google.com"
+                    print("GF_EMPTY_CREATE_UI="+json.dumps(result,sort_keys=True,ensure_ascii=False),flush=True)
+                    print("GF_EMPTY_CREATE_NO_CLICK_NO_FORM_NO_SUBMIT=TRUE",flush=True)
+                finally:
+                    page.goto(cfg.portfolio_url,wait_until="domcontentloaded")
+                    assert urlparse(page.url).path=="/finance/portfolio/"+target
+                    print("GF_EMPTY_CREATE_RESTORED_EXACT_TARGET=TRUE",flush=True)
+            print("GF_EMPTY_CREATE_NO_GOOGLE_OR_LEDGER_WRITES=TRUE",flush=True)
+            PY
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(systemctl is-active fintual-gf-tx.timer || true)" = inactive
+            echo GF_EMPTY_CREATE_PRODUCTION_UNCHANGED=PASS
