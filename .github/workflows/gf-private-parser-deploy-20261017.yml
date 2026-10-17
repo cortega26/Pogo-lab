@@ -41,7 +41,7 @@ jobs:
               git clone --quiet --single-branch --depth 1 --branch feat/google-finance-mirror \
               git@github.com:cortega26/fintual-executor.git "$RUN/source"
             SHA="$(sudo -n git -C "$RUN/source" rev-parse HEAD)"
-            test "$SHA" = 99c2bd5390f96924be21a1efc4ba5ea8a3506a8a || { echo GF_DEPLOY_SOURCE=NOT_REVIEWED; exit 6; }
+            test "$SHA" = c952972ede6a9e0b3876a49dd8f83d402267cfa5 || { echo GF_DEPLOY_SOURCE=NOT_REVIEWED; exit 6; }
             echo GF_DEPLOY_SOURCE=EXACT_VALIDATED_SHA
             sudo -n /usr/bin/python3 - "$RUN/source" <<'PY'
             import sys,os,hashlib,stat,shutil,tempfile,sqlite3,json
@@ -53,8 +53,8 @@ jobs:
             name="txwriter.py"
             dst=base/name
             src=root/"integrations/google-finance/gf_mirror"/name
-            old="c361e2b91073595b19817ad08bac863115b808ce"
-            new="a106f9a10fbe73a43028c059bf07cabef8197e57"
+            old="a106f9a10fbe73a43028c059bf07cabef8197e57"
+            new="b617d0b5723c5cdde234ffe01fe18bafcab24aa8"
             def digest(p):
                 b=p.read_bytes()
                 return hashlib.sha1(b"blob "+str(len(b)).encode()+bytes([0])+b).hexdigest()
