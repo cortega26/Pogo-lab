@@ -47,3 +47,24 @@ jobs:
             output("RECENT_FAILURES","SELECT created_at,event_type,substr(payload_json,1,500) AS payload FROM audit_events WHERE created_at >= ? AND event_type IN ('CONFIRMATION_ERROR','MARKET_DATA_SOURCE_FAILED','MARKET_DATA_ALL_SOURCES_FAILED','AUTH_REQUIRED','SYMBOL_DATA_SILENCE_FAILOVER') ORDER BY event_id DESC LIMIT 25",(since,))
             con.close()
             PY
+      - name: Confirm real broker investable USD via production allowlisted read-only IPC
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 50s
+          script: |
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-httpx-current/src \
+              /opt/fintual-httpx-current/.venv/bin/python - <<'PY'
+            from pathlib import Path
+            from fintual_executor.client import ASSET_BUY_INPUT_QUERY
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            sock=Path("/var/lib/fintual-executor/cash-ipc/cash.sock")
+            client=IpcReadOnlyBrokerHandle(sock)
+            wallet=client.gql("AssetBuyInputAmount", ASSET_BUY_INPUT_QUERY)["stocksWallet"]
+            print("BROKER_BALANCE="+str(wallet["balance"]["amount"])+" "+str(wallet["balance"]["currency"]),flush=True)
+            print("BROKER_INVESTABLE="+str(wallet["investableAmount"]["amount"])+" "+str(wallet["investableAmount"]["currency"]),flush=True)
+            client.close()
+            PY
