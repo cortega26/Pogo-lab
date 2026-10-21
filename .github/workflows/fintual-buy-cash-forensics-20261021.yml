@@ -1,0 +1,49 @@
+name: Fintual Oct 21 cash/buy ledger forensics (read only)
+on:
+  push:
+    branches:
+      - forensics/fintual-buy-cash-20261021
+    paths:
+      - .github/workflows/fintual-buy-cash-forensics-20261021.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query production SQLite in read-only mode (no broker or mutation)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          script: |
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json, sqlite3, subprocess
+            from pathlib import Path
+            from datetime import datetime,timezone
+            since="2026-10-21 00:00:00"
+            print("FORENSICS_UTC="+datetime.now(timezone.utc).isoformat(),flush=True)
+            for unit in ("fintual-executor.service","fintual-browser.service"):
+                p=subprocess.run(["systemctl","is-active",unit],capture_output=True,text=True,timeout=4)
+                print("UNIT_"+unit+"="+p.stdout.strip(),flush=True)
+            db=Path("/var/lib/fintual-executor/state.sqlite3")
+            con=sqlite3.connect(db.as_uri()+"?mode=ro",uri=True,timeout=8)
+            con.row_factory=sqlite3.Row
+            con.execute("PRAGMA query_only=ON")
+            def output(name,sql,params=()):
+                records=[dict(row) for row in con.execute(sql,params).fetchall()]
+                print(name+"="+json.dumps(records,sort_keys=True,separators=(",",":")),flush=True)
+            print("DB_INTEGRITY="+str(con.execute("PRAGMA quick_check").fetchone()[0]),flush=True)
+            output("TODAY_FILLS","SELECT symbol,side,capital_usd,fulfilled_at,recorded_at,intent_id FROM fills WHERE recorded_at >= ? ORDER BY recorded_at",(since,))
+            output("TODAY_INTENTS","SELECT symbol,side,action,state,created_at,updated_at,submitted_amount_usd FROM order_intents WHERE created_at >= ? ORDER BY created_at",(since,))
+            output("OPEN_INTENTS","SELECT symbol,side,state,created_at,updated_at FROM order_intents WHERE state IN ('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN') ORDER BY created_at")
+            output("DECISION_COUNTS","SELECT symbol,signal_side,action,reason,COUNT(*) AS count,MIN(recorded_at) AS first,MAX(recorded_at) AS last FROM decisions WHERE recorded_at >= ? GROUP BY symbol,signal_side,action,reason ORDER BY symbol,reason",(since,))
+            output("RECENT_DECISIONS","SELECT recorded_at,symbol,signal_side,action,reason,order_amount_usd,decision_amount_usd,market_open,quote_age_seconds FROM decisions WHERE recorded_at >= ? ORDER BY decision_id DESC LIMIT 65",(since,))
+            output("AUDIT_COUNTS","SELECT event_type,COUNT(*) AS count,MAX(created_at) AS last FROM audit_events WHERE created_at >= ? GROUP BY event_type ORDER BY count DESC",(since,))
+            output("RECENT_FAILURES","SELECT created_at,event_type,substr(payload_json,1,500) AS payload FROM audit_events WHERE created_at >= ? AND event_type IN ('CONFIRMATION_ERROR','MARKET_DATA_SOURCE_FAILED','MARKET_DATA_ALL_SOURCES_FAILED','AUTH_REQUIRED','SYMBOL_DATA_SILENCE_FAILOVER') ORDER BY event_id DESC LIMIT 25",(since,))
+            con.close()
+            PY
