@@ -36,6 +36,10 @@ jobs:
             sudo install -d -m 0700 -o root -g root "$RUN"
             cleanup() { sudo rm -rf -- "$RUN"; }
             trap cleanup EXIT
+            if sudo test -s "$KEY/github_ed25519"; then echo "READONLY_DEPLOY_KEY_PRESENT=YES"; else echo "READONLY_DEPLOY_KEY_PRESENT=NO"; fi
+            if sudo test -s "$KEY/known_hosts"; then echo "HOST_KEYS_PRESENT=YES"; else echo "HOST_KEYS_PRESENT=NO"; fi
+            if sudo test -x "$PY"; then echo "PINNED_PYTHON_PRESENT=YES"; else echo "PINNED_PYTHON_PRESENT=NO"; fi
+            if sudo test -x "$UV"; then echo "UV_PRESENT=YES"; else echo "UV_PRESENT=NO"; fi
             test -s "$KEY/github_ed25519"
             test -s "$KEY/known_hosts"
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
