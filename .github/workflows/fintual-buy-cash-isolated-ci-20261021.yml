@@ -1,0 +1,99 @@
+name: Fintual cash incident full isolated regression CI
+on:
+  push:
+    branches:
+      - forensics/fintual-buy-cash-20261021
+    paths:
+      - .github/workflows/fintual-buy-cash-isolated-ci-20261021.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Clone exact reviewed financial source in disposable isolated sandbox and run full tests
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 11m
+          script: |
+            set -euo pipefail
+            RUN=/opt/fintual-buy-cash-isolated-ci-20261021
+            KEY=/var/lib/fintual-ci-source-readonly
+            PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
+            UV=/home/fintual/.uv-bootstrap/bin/uv
+            EXPECTED=8c2ed1503295650ecd64fbe93ffe60574ecd7d2f
+            PRODUCT=/opt/fintual-httpx-current
+            echo "GATE0_EXECUTOR_ACTIVE=$(systemctl is-active fintual-executor.service)"
+            test "$(systemctl is-active fintual-executor.service)" = active
+            BEFORE="$(readlink -f "$PRODUCT")"
+            echo "GATE0_RELEASE=$BEFORE"
+            test ! -e "$RUN"
+            sudo install -d -m 0700 -o root -g root "$RUN"
+            cleanup() { sudo rm -rf -- "$RUN"; }
+            trap cleanup EXIT
+            test -s "$KEY/github_ed25519"
+            test -s "$KEY/known_hosts"
+            if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
+              git clone --quiet --depth 1 --single-branch \
+              --branch observability/buy-cash-fact-20261021 \
+              git@github.com:cortega26/fintual-executor.git "$RUN/repo"; then
+              echo "PRIVATE_FEATURE_CLONE=FAIL"
+              exit 9
+            fi
+            GOT="$(sudo git -C "$RUN/repo" rev-parse HEAD)"
+            echo "TESTED_SHA=$GOT"
+            test "$GOT" = "$EXPECTED"
+            test "$(sudo "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
+            sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home"
+            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
+              --python "$PY" --target "$RUN/vendor" \
+              'pytest>=8' 'ruff>=0.13' 'httpx==0.28.1' \
+              'playwright==1.58.0' 'websockets==17.1' \
+              > "$RUN/install.log" 2>&1 || {
+                echo "DEPENDENCIES=FAIL"
+                sudo tail -n 12 "$RUN/install.log"
+                exit 11
+              }
+            sudo chown -R nobody:nogroup "$RUN"
+            sudo chmod 0700 "$RUN"
+            sudo systemd-run --collect --wait --pipe --quiet \
+              -p User=nobody -p Group=nogroup \
+              -p "WorkingDirectory=$RUN/repo" \
+              -p "Environment=STAGE=$RUN" \
+              -p "Environment=PY_EXEC=$PY" \
+              -p "Environment=HOME=$RUN/home" \
+              -p "Environment=PYTHONPATH=$RUN/vendor:$RUN/repo/src" \
+              -p "Environment=PYTHONDONTWRITEBYTECODE=1" \
+              -p MemoryMax=512M -p CPUQuota=50% -p TasksMax=64 \
+              -p NoNewPrivileges=yes -p ProtectHome=yes -p ProtectSystem=strict \
+              -p PrivateTmp=yes -p IPAddressDeny=any \
+              -p "InaccessiblePaths=/opt/fintual-executor /etc/fintual-executor /var/lib/fintual-executor /var/lib/fintual-browser /etc/fintual-executor" \
+              -p RestrictAddressFamilies=AF_UNIX \
+              -p "ReadWritePaths=$RUN" \
+              /usr/bin/bash -c '
+                set -eu
+                "$PY_EXEC" -m compileall -q src && echo "COMPILE=PASS" || exit 21
+                if "$STAGE/vendor/bin/ruff" check src tests > "$STAGE/ruff.log" 2>&1; then
+                  echo "RUFF=PASS"
+                else
+                  echo "RUFF=FAIL"
+                  cat "$STAGE/ruff.log" | head -n 50
+                  exit 22
+                fi
+                if "$PY_EXEC" -m pytest -q -p no:cacheprovider > "$STAGE/pytest.log" 2>&1; then
+                  echo "PYTEST=PASS"
+                  tail -n 5 "$STAGE/pytest.log"
+                else
+                  echo "PYTEST=FAIL"
+                  tail -n 90 "$STAGE/pytest.log"
+                  exit 23
+                fi
+              '
+            test "$(systemctl is-active fintual-executor.service)" = active
+            test "$(readlink -f "$PRODUCT")" = "$BEFORE"
+            echo "POSTFLIGHT_EXECUTOR_RELEASE_UNCHANGED=PASS"
