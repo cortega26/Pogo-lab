@@ -40,8 +40,8 @@ jobs:
             if sudo test -s "$KEY/known_hosts"; then echo "HOST_KEYS_PRESENT=YES"; else echo "HOST_KEYS_PRESENT=NO"; fi
             if sudo test -x "$PY"; then echo "PINNED_PYTHON_PRESENT=YES"; else echo "PINNED_PYTHON_PRESENT=NO"; fi
             if sudo test -x "$UV"; then echo "UV_PRESENT=YES"; else echo "UV_PRESENT=NO"; fi
-            test -s "$KEY/github_ed25519"
-            test -s "$KEY/known_hosts"
+            sudo test -s "$KEY/github_ed25519"
+            sudo test -s "$KEY/known_hosts"
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
               git clone --quiet --depth 1 --single-branch \
               --branch observability/buy-cash-fact-20261021 \
