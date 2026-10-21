@@ -54,15 +54,15 @@ jobs:
             test "$GOT" = "$EXPECTED"
             test "$(sudo "$PY" -c 'import sys; print(".".join(map(str,sys.version_info[:3])))')" = 3.14.8
             sudo mkdir -p "$RUN/vendor" "$RUN/cache" "$RUN/home"
-            sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
+            if ! sudo env UV_NO_CONFIG=1 UV_CACHE_DIR="$RUN/cache" "$UV" pip install \
               --python "$PY" --target "$RUN/vendor" \
               'pytest>=8' 'ruff>=0.13' 'httpx==0.28.1' \
               'playwright==1.58.0' 'websockets==17.1' \
-              > "$RUN/install.log" 2>&1 || {
-                echo "DEPENDENCIES=FAIL"
-                sudo tail -n 12 "$RUN/install.log"
-                exit 11
-              }
+              2>&1 | sudo tee "$RUN/install.log" >/dev/null; then
+              echo "DEPENDENCIES=FAIL"
+              sudo tail -n 12 "$RUN/install.log"
+              exit 11
+            fi
             sudo chown -R nobody:nogroup "$RUN"
             sudo chmod 0700 "$RUN"
             sudo systemd-run --collect --wait --pipe --quiet \
