@@ -1,8 +1,8 @@
-name: Fintual event-driven capital isolated full regression CI
+name: Fintual sell-fill cash wake isolated full regression CI
 on:
   push:
     branches:
-      - forensics/fintual-buy-cash-20261021
+      - forensics/fintual-sell-fill-wake-20261026
     paths:
       - .github/workflows/fintual-event-driven-isolated-ci-20261021.yml
 permissions:
@@ -22,15 +22,16 @@ jobs:
           command_timeout: 11m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-event-driven-isolated-ci-20261021
+            RUN=/opt/fintual-event-driven-isolated-ci-20261026
             KEY=/var/lib/fintual-ci-source-readonly
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             UV=/home/fintual/.uv-bootstrap/bin/uv
-            EXPECTED=1195c58c407de4fd68ffc1534d9bcbb008062f88
+            EXPECTED=b6acaef441e91d4db5dabc413aca3fdcd1101305
             PRODUCT=/opt/fintual-httpx-current
             echo "GATE0_EXECUTOR_ACTIVE=$(systemctl is-active fintual-executor.service)"
             test "$(systemctl is-active fintual-executor.service)" = active
             BEFORE="$(readlink -f "$PRODUCT")"
+            PID_BEFORE="$(systemctl show -P MainPID fintual-executor.service)"
             echo "GATE0_RELEASE=$BEFORE"
             test ! -e "$RUN"
             sudo install -d -m 0700 -o root -g root "$RUN"
@@ -44,7 +45,7 @@ jobs:
             sudo test -s "$KEY/known_hosts"
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
               git clone --quiet --depth 1 --single-branch \
-              --branch fix/event-driven-capital-only-20261021 \
+              --branch fix/reevaluate-cash-blocked-buys-on-fill-20261026 \
               git@github.com:cortega26/fintual-executor.git "$RUN/repo"; then
               echo "PRIVATE_FEATURE_CLONE=FAIL"
               exit 9
@@ -100,4 +101,5 @@ jobs:
               '
             test "$(systemctl is-active fintual-executor.service)" = active
             test "$(readlink -f "$PRODUCT")" = "$BEFORE"
-            echo "POSTFLIGHT_EXECUTOR_RELEASE_UNCHANGED=PASS"
+            test "$(systemctl show -P MainPID fintual-executor.service)" = "$PID_BEFORE"
+            echo "POSTFLIGHT_EXECUTOR_RELEASE_AND_PID_UNCHANGED=PASS"
