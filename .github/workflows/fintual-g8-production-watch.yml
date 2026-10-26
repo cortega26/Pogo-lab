@@ -28,7 +28,7 @@ jobs:
             sudo -n /usr/bin/python3 - <<'PY'
             import json,os,sqlite3,stat,subprocess
             from pathlib import Path
-            SHA="e922e0d153f32c8319bc4ec8b9165f39c7dfeac8"
+            SHA="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
             def run(*cmd):
                 p=subprocess.run(cmd,capture_output=True,text=True,timeout=12)
                 return p.stdout.strip()
