@@ -1,0 +1,158 @@
+name: Fintual NVDA first market-open acceptance 2026-10-27
+on:
+  schedule:
+    # NYSE opens 13:30 UTC on 2026-10-27; check 35 minutes later.
+    - cron: "5 14 27 10 *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: fintual-nvda-opening-20261027
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Observe exact deployed code and market-open NVDA decision, READ ONLY
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3,subprocess
+            from datetime import datetime,timezone
+            from pathlib import Path
+            from zoneinfo import ZoneInfo
+            target_sha="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            window_start="2026-10-27 13:30:00" # UTC at 09:30 New York
+            now=datetime.now(timezone.utc)
+            local=now.astimezone(ZoneInfo("America/New_York"))
+            assert local.date().isoformat()=="2026-10-27" and local.hour>=9, "OUT_OF_WINDOW"
+            def command(*args):
+                p=subprocess.run(args,capture_output=True,text=True,timeout=10)
+                return p.stdout.strip()
+            release=str(Path("/opt/fintual-httpx-current").resolve())
+            service_ok=command("systemctl","is-active","fintual-executor.service")=="active"
+            release_ok=release=="/opt/fintual-httpx-releases/"+target_sha
+            print("NVDA_EXECUTOR_ACTIVE="+str(service_ok).lower(),flush=True)
+            print("NVDA_EXPECTED_RELEASE="+str(release_ok).lower(),flush=True)
+            uri=Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro"
+            with sqlite3.connect(uri,uri=True,timeout=10) as db:
+                db.execute("PRAGMA query_only=ON")
+                db.row_factory=sqlite3.Row
+                assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+                wakes=db.execute(
+                    "SELECT created_at,payload_json FROM audit_events "
+                    "WHERE event_type='CASH_BLOCKED_BUY_SESSION_WAKE' "
+                    "AND created_at>=? ORDER BY event_id DESC LIMIT 10",
+                    (window_start,),
+                ).fetchall()
+                wake_found=any(
+                    json.loads(row["payload_json"]).get("session_date")=="2026-10-27"
+                    for row in wakes
+                )
+                print("NVDA_SESSION_WAKE="+str(wake_found).lower(),flush=True)
+                rechecks=db.execute(
+                    "SELECT created_at,payload_json FROM audit_events "
+                    "WHERE event_type='CASH_BLOCKED_BUY_RECHECK' "
+                    "AND created_at>=? ORDER BY event_id DESC LIMIT 100",
+                    (window_start,),
+                ).fetchall()
+                nvda_rechecks=[
+                    json.loads(row["payload_json"]) for row in rechecks
+                    if json.loads(row["payload_json"]).get("symbol")=="NVDA"
+                    and json.loads(row["payload_json"]).get("trigger")
+                        in ("market_open","startup_recovery")
+                ]
+                print("NVDA_OPEN_RECHECK="+str(bool(nvda_rechecks)).lower(),flush=True)
+                if nvda_rechecks:
+                    recent=nvda_rechecks[0]
+                    # Only audit fields: no balance, share quantity, tokens or identity.
+                    print("NVDA_RECHECK_ACTION="+str(recent.get("action","UNKNOWN")),flush=True)
+                    print("NVDA_RECHECK_REASON="+str(recent.get("reason","UNKNOWN")),flush=True)
+                buy_intents=db.execute(
+                    "SELECT state FROM order_intents WHERE symbol='NVDA' AND side='BUY' "
+                    "AND created_at>=? ORDER BY created_at DESC LIMIT 5",
+                    (window_start,),
+                ).fetchall()
+                print("NVDA_NEW_BUY_INTENTS="+str(len(buy_intents)),flush=True)
+                if buy_intents:
+                    print("NVDA_NEW_BUY_STATE="+str(buy_intents[0]["state"]),flush=True)
+                fills=db.execute(
+                    "SELECT COUNT(*) FROM fills WHERE symbol='NVDA' AND side='BUY' "
+                    "AND recorded_at>=?",(window_start,),
+                ).fetchone()[0]
+                print("NVDA_NEW_BUY_FILLS="+str(fills),flush=True)
+                last=db.execute(
+                    "SELECT action,reason,signal_side FROM decisions "
+                    "WHERE symbol='NVDA' AND recorded_at>=? "
+                    "ORDER BY decision_id DESC LIMIT 1",
+                    (window_start,),
+                ).fetchone()
+                if last:
+                    print("NVDA_LATEST_ACTION="+str(last["action"]),flush=True)
+                    print("NVDA_LATEST_REASON="+str(last["reason"]),flush=True)
+                    print("NVDA_LATEST_SIGNAL="+str(last["signal_side"]),flush=True)
+            if service_ok and release_ok and wake_found and (
+                nvda_rechecks or buy_intents
+            ):
+                print("NVDA_ACCEPTANCE_STATUS=OBSERVED",flush=True)
+            else:
+                print("NVDA_ACCEPTANCE_STATUS=INVESTIGATE",flush=True)
+                raise SystemExit(3)
+            PY
+      - name: Publish owner-facing first-opening evidence and alert on missing wake
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROBE: ${{ steps.probe.outputs.stdout }}
+          PROBE_RESULT: ${{ steps.probe.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          evidence=os.getenv("PROBE","")
+          def line(key):
+              hits=re.findall(r"(?m)^"+re.escape(key)+r"=([A-Za-z0-9_.-]+)$",evidence)
+              return hits[-1] if hits else "UNVERIFIED"
+          ok=os.getenv("PROBE_RESULT")=="success" and line("NVDA_ACCEPTANCE_STATUS")=="OBSERVED"
+          title="Fintual NVDA — verificación de apertura 27-oct-2026"
+          repo=os.environ["GH_REPO"]
+          fields=("NVDA_EXECUTOR_ACTIVE","NVDA_EXPECTED_RELEASE","NVDA_SESSION_WAKE",
+                  "NVDA_OPEN_RECHECK","NVDA_RECHECK_ACTION","NVDA_RECHECK_REASON",
+                  "NVDA_NEW_BUY_INTENTS","NVDA_NEW_BUY_STATE","NVDA_NEW_BUY_FILLS",
+                  "NVDA_LATEST_ACTION","NVDA_LATEST_REASON","NVDA_LATEST_SIGNAL",
+                  "NVDA_ACCEPTANCE_STATUS")
+          body=("**Resultado:** "+("observado" if ok else "requiere revisión")
+                +"\n**Fuente:** "+os.environ["GH_RUN"]
+                +"\n**Naturaleza:** lectura de solo lectura, sin órdenes de prueba.\n\n"
+                +"\n".join("- `"+name+"`: `"+line(name)+"`" for name in fields)
+                +"\n\nSi no hubo BUY, determinar si la revalidación rechazó justificadamente"
+                +" la señal, el capital, mercado o riesgo. No forzar órdenes retroactivas.")
+          def gh(*args):
+              p=subprocess.run(["gh","api",*args],capture_output=True,text=True,timeout=25)
+              if p.returncode:
+                  raise RuntimeError("Could not publish NVDA acceptance evidence")
+              return json.loads(p.stdout)
+          items=gh(f"repos/{repo}/issues?state=all&per_page=100")
+          previous=next((i for i in items if i.get("title")==title),None)
+          if previous is not None:
+              gh("-X","PATCH",f"repos/{repo}/issues/{previous['number']}",
+                 "-f","body="+body)
+          else:
+              gh("-X","POST",f"repos/{repo}/issues","-f","title="+title,
+                 "-f","body="+body,"-f","assignees[]=cortega26")
+          print("NVDA_FIRST_OPEN_EVIDENCE_RECORDED="+("PASS" if ok else "ALERT"))
+          if not ok:
+              raise SystemExit(1)
+          PY
