@@ -1,8 +1,8 @@
-name: Fintual sell-fill cash wake isolated full regression CI
+name: Fintual market-open cash BUY isolated full regression CI
 on:
   push:
     branches:
-      - forensics/fintual-sell-fill-wake-20261026
+      - forensics/fintual-market-open-buy-20261026
     paths:
       - .github/workflows/fintual-event-driven-isolated-ci-20261021.yml
 permissions:
@@ -22,11 +22,11 @@ jobs:
           command_timeout: 11m
           script: |
             set -euo pipefail
-            RUN=/opt/fintual-event-driven-isolated-ci-20261026
+            RUN=/opt/fintual-market-open-ci-20261026
             KEY=/var/lib/fintual-ci-source-readonly
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             UV=/home/fintual/.uv-bootstrap/bin/uv
-            EXPECTED=4b2e33b7a7aefffea55a1b26081c6d400ffa81a8
+            EXPECTED=b641cd1adf5d8befe796778bd112f08723f2d151
             PRODUCT=/opt/fintual-httpx-current
             echo "GATE0_EXECUTOR_ACTIVE=$(systemctl is-active fintual-executor.service)"
             test "$(systemctl is-active fintual-executor.service)" = active
@@ -45,7 +45,7 @@ jobs:
             sudo test -s "$KEY/known_hosts"
             if ! sudo env GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KEY/known_hosts -i $KEY/github_ed25519" \
               git clone --quiet --depth 1 --single-branch \
-              --branch fix/reevaluate-cash-blocked-buys-on-fill-20261026 \
+              --branch fix/market-open-cash-buy-recheck-20261026 \
               git@github.com:cortega26/fintual-executor.git "$RUN/repo"; then
               echo "PRIVATE_FEATURE_CLONE=FAIL"
               exit 9
