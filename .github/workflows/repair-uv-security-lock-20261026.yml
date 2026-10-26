@@ -1,0 +1,63 @@
+name: Repair vulnerable uv lock dependencies (one-shot)
+
+on:
+  push:
+    branches:
+      - fix/security-upgrades-pogolab-20261026
+    paths:
+      - .github/workflows/repair-uv-security-lock-20261026.yml
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+          ref: fix/security-upgrades-pogolab-20261026
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Resolve patched packages with uv, without changing Django series
+        run: |
+          set -euo pipefail
+          uv lock --upgrade-package certifi --upgrade-package filelock --upgrade-package virtualenv --upgrade-package packaging
+          uv sync --group dev --frozen
+          uv run --frozen python - <<'PY'
+          from importlib.metadata import version
+          from packaging.version import Version
+          minimum = {"certifi": "2026.10.19", "filelock": "4.2.1", "virtualenv": "21.14.13"}
+          for package, floor in minimum.items():
+              got = version(package)
+              assert Version(got) >= Version(floor), (package, got, floor)
+              print(f"SAFE_DEPENDENCY={package}=={got}")
+          assert Version(version("django")).major == 5, "Unexpected major Django upgrade"
+          print(f"DJANGO_SERIES_RETAINED={version('django')}")
+          PY
+
+      - name: Audit final resolved dependencies
+        run: uv run --frozen pip-audit
+
+      - name: Commit only uv.lock to the dedicated repair branch
+        run: |
+          set -euo pipefail
+          git status --short
+          git diff --check
+          git add uv.lock
+          if git diff --cached --quiet; then
+            echo "LOCK_ALREADY_CURRENT=PASS"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "fix: lock patched certifi filelock virtualenv and packaging"
+            git push origin HEAD:fix/security-upgrades-pogolab-20261026
+            echo "PATCHED_LOCK_COMMITTED=PASS"
+          fi
