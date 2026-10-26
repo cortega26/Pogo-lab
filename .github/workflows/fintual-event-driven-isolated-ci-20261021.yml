@@ -26,7 +26,7 @@ jobs:
             KEY=/var/lib/fintual-ci-source-readonly
             PY=/opt/fintual-python-runtimes/cpython-3.14.8-abf4db0/venv/bin/python
             UV=/home/fintual/.uv-bootstrap/bin/uv
-            EXPECTED=8924730e48505a3e1ac3275f873e553de5e8b089
+            EXPECTED=4b2e33b7a7aefffea55a1b26081c6d400ffa81a8
             PRODUCT=/opt/fintual-httpx-current
             echo "GATE0_EXECUTOR_ACTIVE=$(systemctl is-active fintual-executor.service)"
             test "$(systemctl is-active fintual-executor.service)" = active
