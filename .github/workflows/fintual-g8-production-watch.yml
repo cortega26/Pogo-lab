@@ -84,6 +84,7 @@ jobs:
                     if parts and parts[0] and (b"chrome" in parts[0].lower() or b"chromium" in parts[0].lower()) and b"--user-data-dir=/var/lib/fintual-browser/profile" in parts:
                         chrome+=1
             fills=0
+            recent_fills=0
             unknown=-1
             integrity=False
             try:
@@ -94,6 +95,11 @@ jobs:
                     integrity=conn.execute("PRAGMA integrity_check").fetchone()==("ok",)
                     unknown=conn.execute("SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')").fetchone()[0]
                     fills=conn.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                    # Only fills newly recorded within the current watch window;
+                    # historical count >10 is NOT a perpetual new-fill signal.
+                    recent_fills=conn.execute(
+                        "SELECT COUNT(*) FROM fills WHERE recorded_at>=datetime('now','-75 minutes')"
+                    ).fetchone()[0]
                 finally:conn.close()
             except sqlite3.Error:pass
             mem=int(next(row.split()[1] for row in Path("/proc/meminfo").read_text().splitlines() if row.startswith("MemAvailable:")))
@@ -106,7 +112,7 @@ jobs:
             print("G8_CHECKS="+",".join(k for k,v in signals.items() if not v) if not all(signals.values()) else "PASS",flush=True)
             print("G8_RESIDENT_CHROME_COUNT="+str(chrome),flush=True)
             print("G8_UNKNOWN_SUBMISSIONS="+str(unknown),flush=True)
-            print("G8_NEW_HTTPX_FILLS="+("TRUE" if fills>10 else "FALSE"),flush=True)
+            print("G8_NEW_HTTPX_FILLS="+("TRUE" if recent_fills>0 else "FALSE"),flush=True)
             print("G8_TOTAL_LOCAL_FILLS="+str(fills),flush=True)
             print("G8_MEM_AVAILABLE_KIB="+str(mem),flush=True)
             raise SystemExit(0 if all(signals.values()) else 3)
@@ -132,9 +138,9 @@ jobs:
               print("G8_STATUS_HEALTHY_NO_NEW_FINANCIAL_FILLS")
               raise SystemExit(0)
           title=("Fintual G8 ALERTA — ejecución HTTPX o Chrome residente" if bad
-                 else "Fintual G8 — primera operación HTTPX: revisar paridad financiera")
+                 else "Fintual G8 — nuevos fills HTTPX (total local "+value("G8_TOTAL_LOCAL_FILLS")+")")
           description=("Revisar estado de Oracle, sistema y ledger; NO restaurar una copia histórica sobre fills recientes."
-              if bad else "Una operación nueva fue registrada por el ejecutor HTTPX. Confirmar paridad con el historial real de Fintual mediante consulta autenticada de solo lectura; NO colocar una orden de prueba.")
+              if bad else "Se registraron fills locales recientes (ventana de 75 minutos). Confirmar paridad con el historial real de Fintual mediante consulta autenticada de solo lectura; NO colocar una orden de prueba.")
           def gh(*args):
               p=subprocess.run(["gh","api",*args],capture_output=True,text=True,timeout=30)
               if p.returncode:raise RuntimeError("Could not publish owner alert")
