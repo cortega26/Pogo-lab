@@ -103,3 +103,10 @@ jobs:
             test "$(readlink -f "$PRODUCT")" = "$BEFORE"
             test "$(systemctl show -P MainPID fintual-executor.service)" = "$PID_BEFORE"
             echo "POSTFLIGHT_EXECUTOR_RELEASE_AND_PID_UNCHANGED=PASS"
+            # A read-only query on the existing live owner. No credentials,
+            # cookie export, order mutation, new browser or printed balances.
+            sudo -n -u fintual env PYTHONPATH=/opt/fintual-httpx-current/src \
+              /opt/fintual-httpx-current/.venv/bin/python -c 'from decimal import Decimal; from pathlib import Path; from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle; from fintual_executor.client import get_buy_state; h=IpcReadOnlyBrokerHandle(Path("/var/lib/fintual-executor/cash-ipc/cash.sock")); assert h.health()["order_capability"] is False; cash=Decimal(str(get_buy_state(h)["stocksWallet"]["investableAmount"]["amount"])); assert cash.is_finite() and cash >= 0; print("LIVE_CASH_IPC_AUTHENTICATED_READ=PASS")'
+            test "$(readlink -f "$PRODUCT")" = "$BEFORE"
+            test "$(systemctl show -P MainPID fintual-executor.service)" = "$PID_BEFORE"
+            echo "POST_AUTH_READ_EXECUTOR_STILL_UNCHANGED=PASS"
