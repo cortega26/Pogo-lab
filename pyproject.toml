@@ -23,6 +23,15 @@ dependencies = [
     "numpy>=2.0.0",
 ]
 
+# Prevent vulnerable transitive dependencies from re-entering uv.lock.
+# Fix versions verified in October 2026 pip-audit and Dependabot advisories.
+[tool.uv]
+constraint-dependencies = [
+    "certifi>=2026.10.19",
+    "filelock>=4.2.1",
+    "virtualenv>=21.14.13",
+]
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
