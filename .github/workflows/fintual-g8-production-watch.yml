@@ -109,7 +109,7 @@ jobs:
                 "no_uncertain_orders":unknown==0,
             }
             print("G8_STATUS="+("HEALTHY" if all(signals.values()) else "ALERT"),flush=True)
-            print("G8_CHECKS="+",".join(k for k,v in signals.items() if not v) if not all(signals.values()) else "PASS",flush=True)
+            print("G8_CHECKS="+(",".join(k for k,v in signals.items() if not v) if not all(signals.values()) else "PASS"),flush=True)
             print("G8_RESIDENT_CHROME_COUNT="+str(chrome),flush=True)
             print("G8_UNKNOWN_SUBMISSIONS="+str(unknown),flush=True)
             print("G8_NEW_HTTPX_FILLS="+("TRUE" if recent_fills>0 else "FALSE"),flush=True)
