@@ -1,0 +1,382 @@
+name: Fintual v1 production recovery (manual, guarded, read-only broker gates)
+# P0 recovery of the original 93c03b5 release after the 2026-10-27
+# fail-closed cutover. Never places an order. Preflight and resume are
+# separate dispatches; resume requires exact owner confirmation text.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'preflight is read-only; resume starts the verified v1 service once'
+        required: true
+        type: choice
+        default: preflight
+        options:
+          - preflight
+          - resume
+      confirmation:
+        description: 'For resume type exactly RESUME_VERIFIED_V1'
+        required: false
+        type: string
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: fintual-v1-production-recovery
+  cancel-in-progress: false
+jobs:
+  recover:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (inputs.mode == 'preflight' ||
+       (inputs.mode == 'resume' && inputs.confirmation == 'RESUME_VERIFIED_V1'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Broker/ledger preflight, then one guarded v1 start and functional readiness
+        uses: appleboy/ssh-action@v1
+        env:
+          RECOVERY_MODE: ${{ inputs.mode }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: RECOVERY_MODE
+          timeout: 12s
+          command_timeout: 720s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            exec 9>/tmp/fintual-v1-recovery.lock
+            flock -n 9 || { echo 'RECOVERY=STOP_ANOTHER_RECOVERY_IN_PROGRESS'; exit 42; }
+            sudo -n env RECOVERY_MODE="$RECOVERY_MODE" /usr/bin/python3 - <<'ROOT'
+            from __future__ import annotations
+            import datetime, hashlib, json, os, pwd, re, sqlite3, stat, subprocess, time
+            from pathlib import Path
+            from textwrap import dedent
+            from zoneinfo import ZoneInfo
+
+            BASE = "93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            unit = "fintual-executor.service"
+            sheet_unit = "fintual-sheet-sync.service"
+            browser_unit = "fintual-browser.service"
+            xvfb_unit = "fintual-xvfb.service"
+            alias = Path("/opt/fintual-httpx-current")
+            release = Path("/opt/fintual-httpx-releases") / BASE
+            sqlite_path = Path("/var/lib/fintual-executor/state.sqlite3")
+            recovery_dir = Path("/var/lib/fintual-executor/recovery")
+            mode = os.environ.get("RECOVERY_MODE", "")
+
+            def out(k, v):
+                print("RECOVERY_" + k + "=" + str(v), flush=True)
+
+            def fail(code):
+                out("GATE", code)
+                raise SystemExit(2)
+
+            def cmd(*argv, timeout=30):
+                try:
+                    return subprocess.run(argv, capture_output=True, text=True,
+                                          timeout=timeout, check=False)
+                except (OSError, subprocess.SubprocessError):
+                    return None
+
+            def service(name):
+                p = cmd("systemctl", "is-active", name, timeout=10)
+                return (p.stdout.strip() if p else "UNKNOWN")
+
+            def sha(path):
+                return hashlib.sha256(path.read_bytes()).hexdigest()
+
+            def ledger():
+                con = sqlite3.connect(sqlite_path.as_uri() + "?mode=ro", uri=True, timeout=15)
+                try:
+                    con.execute("PRAGMA query_only=ON")
+                    if con.execute("PRAGMA integrity_check").fetchone() != ("ok",):
+                        fail("LEDGER_INTEGRITY")
+                    open_n = con.execute(
+                        "SELECT COUNT(*) FROM order_intents WHERE state IN "
+                        "('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')"
+                    ).fetchone()[0]
+                    unknown_n = con.execute(
+                        "SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')"
+                    ).fetchone()[0]
+                    fills_n = con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                    pending_outbox = con.execute(
+                        "SELECT COUNT(*) FROM sheet_sync_outbox WHERE state='PENDING'"
+                    ).fetchone()[0]
+                    return int(open_n), int(unknown_n), int(fills_n), int(pending_outbox)
+                finally:
+                    con.close()
+
+            def runtime_gate():
+                if not alias.is_symlink() or alias.resolve() != release:
+                    fail("ACTIVE_ALIAS_NOT_V1")
+                if not release.is_dir() or not (release / "HTTPX_RUNTIME_READY.json").is_file():
+                    fail("V1_RELEASE_NOT_PRESENT")
+                marker = json.loads((release / "HTTPX_RUNTIME_READY.json").read_text())
+                if marker.get("source_sha") != BASE or marker.get("runtime_imports_verified") is not True:
+                    fail("V1_RUNTIME_NOT_ATTESTED")
+                user = cmd("systemctl", "show", "-P", "User", unit, timeout=10)
+                user = user.stdout.strip() if user else ""
+                if not user or user == "root":
+                    fail("SERVICE_IDENTITY_UNSAFE")
+                return user
+
+            # Broker-only read gate. Runs as the service user, unarmed, with
+            # an explicit sys.path insertion (sudo resets PYTHONPATH).
+            def broker_gate(source: Path, user: str, home: str):
+                script = dedent(r"""
+            from pathlib import Path
+            import sys
+            sys.path.insert(0, sys.argv[1])
+            from decimal import Decimal
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_pending, get_market_info, get_buy_state
+            from fintual_executor.g8_history import audit_history_against_ledger
+            with HttpOrderSessionOwner(requested_execution=False, config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(owner, profile=Path(sys.argv[2]), chrome_binary=Path(sys.argv[3]))
+                handle = owner.borrow(armed=False)
+                assert handle.execution_enabled is False
+                pending = get_pending(handle)
+                buys = pending.get("stocksPendingAssetMarketBuys")
+                sells = pending.get("stocksPendingAssetMarketSells")
+                assert isinstance(buys, list) and isinstance(sells, list)
+                print("RECOVERY_BROKER_PENDING_BUYS=" + str(len(buys)), flush=True)
+                print("RECOVERY_BROKER_PENDING_SELLS=" + str(len(sells)), flush=True)
+                assert len(buys) == 0 and len(sells) == 0
+                market = get_market_info(handle)
+                assert isinstance(market.get("isMarketOpen"), bool)
+                print("RECOVERY_BROKER_MARKET_OPEN=" + str(market["isMarketOpen"]).upper(), flush=True)
+                assert market["isMarketOpen"] is False
+                wallet = get_buy_state(handle)["stocksWallet"]
+                for field in ("balance", "investableAmount"):
+                    value = Decimal(str(wallet[field]["amount"]))
+                    assert value.is_finite() and value >= 0
+                print("RECOVERY_BROKER_WALLET_VALID=true", flush=True)
+                audit = audit_history_against_ledger(
+                    handle, Path(sys.argv[4]), ["NVDA", "TSLA", "STX"],
+                    page_size=20, max_pages=15,
+                )
+                print("RECOVERY_BROKER_HISTORY_STATUS=" + str(audit.get("status")), flush=True)
+                print("RECOVERY_BROKER_HISTORY_LOCAL_OPEN=" + str(audit.get("local_open_intents")), flush=True)
+                print("RECOVERY_BROKER_HISTORY_LOCAL_UNMATCHED=" + str(audit.get("local_fills_unmatched")), flush=True)
+                print("RECOVERY_BROKER_HISTORY_ORPHAN=" + str(audit.get("broker_fulfilled_without_local_fill")), flush=True)
+                assert audit.get("status") == "BOUNDED_READ_ONLY_LEDGER_PARITY_PASS"
+                assert audit.get("local_open_intents") == 0
+                assert audit.get("local_fills_unmatched") == 0
+                assert audit.get("broker_fulfilled_without_local_fill") == 0
+                print("RECOVERY_BROKER_GATE=PASS", flush=True)
+                """)
+                env = {"PATH": "/usr/bin:/bin", "DISPLAY": ":99", "HOME": home,
+                       "PYTHONDONTWRITEBYTECODE": "1"}
+                p = subprocess.run(
+                    ["sudo", "-n", "-u", user, str(source / ".venv/bin/python"), "-B",
+                     "-c", script, str(source / "src"), "/var/lib/fintual-browser/profile",
+                     "/var/lib/fintual-browser/chrome", str(sqlite_path)],
+                    capture_output=True, text=True, env=env, timeout=300,
+                )
+                for line in p.stdout.splitlines():
+                    if re.fullmatch(r"RECOVERY_BROKER_[A-Z_]+=[A-Za-z0-9_.-]+", line):
+                        print(line, flush=True)
+                if p.returncode != 0 or "RECOVERY_BROKER_GATE=PASS" not in p.stdout:
+                    klass = "NONE"
+                    for line in reversed(p.stderr.splitlines()):
+                        m = re.search(r"\b([A-Za-z_]+(?:Error|Exception|Required|Violation))\b", line)
+                        if m:
+                            klass = m.group(1)
+                            break
+                    out("BROKER_FAILURE_CLASS", klass)
+                    fail("BROKER_READ_GATE_FAILED")
+                if service(browser_unit) != "inactive":
+                    fail("TRANSIENT_CHROME_NOT_CLOSED")
+
+            def socket_probe(user: str, home: str):
+                script = dedent(r"""
+            from pathlib import Path
+            import sys
+            sys.path.insert(0, sys.argv[1])
+            from decimal import Decimal
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            from fintual_executor.client import get_buy_state
+            stage = "HEALTH"
+            try:
+                h = IpcReadOnlyBrokerHandle(Path(sys.argv[2]))
+                v = h.health()
+                assert v.get("status") == "READY" and v.get("order_capability") is False
+                stage = "CASH"
+                wallet = get_buy_state(h)["stocksWallet"]
+                b = Decimal(str(wallet["balance"]["amount"]))
+                assert b.is_finite() and b >= 0
+            except Exception as exc:
+                print("RECOVERY_IPC_FAILURE_STAGE=" + stage, flush=True)
+                print("RECOVERY_IPC_FAILURE_CLASS=" + type(exc).__name__, flush=True)
+                raise SystemExit(2)
+            print("RECOVERY_IPC_HEALTH=PASS", flush=True)
+                """)
+                p = subprocess.run(
+                    ["sudo", "-n", "-u", user, str(release / ".venv/bin/python"), "-B",
+                     "-c", script, str(release / "src"),
+                     "/var/lib/fintual-executor/cash-ipc/cash.sock"],
+                    capture_output=True, text=True,
+                    env={"PATH": "/usr/bin:/bin", "HOME": home, "PYTHONDONTWRITEBYTECODE": "1"},
+                    timeout=45,
+                )
+                return p
+
+            now_ny = datetime.datetime.now(ZoneInfo("America/New_York"))
+            now_cl = datetime.datetime.now(ZoneInfo("America/Santiago"))
+            out("UTC", datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            out("NY", now_ny.strftime("%Y-%m-%dT%H:%M:%S%z"))
+            out("CHILE", now_cl.strftime("%Y-%m-%dT%H:%M:%S%z"))
+            if now_ny.date() != datetime.date(2026, 10, 27) or now_ny.time() < datetime.time(16, 15):
+                fail("OUTSIDE_APPROVED_US_AFTER_HOURS_WINDOW")
+            out("MARKET_WINDOW", "US_REGULAR_MARKET_CLOSED_AFTER_1615_ET")
+
+            user = runtime_gate()
+            home = pwd.getpwnam(user).pw_dir
+            if service(unit) != "inactive":
+                fail("EXECUTOR_NOT_INACTIVE_BEFORE_RECOVERY")
+            if service(browser_unit) != "inactive":
+                fail("RESIDENT_BROWSER_NOT_INACTIVE")
+            if service(xvfb_unit) != "active":
+                fail("XVFB_NOT_ACTIVE")
+            if service(sheet_unit) != "active":
+                fail("SHEET_SYNC_NOT_ACTIVE")
+            out("SERVICES", "PASS")
+
+            config = {}
+            expected_modes = {"config.json": 0o640, "market-data.env": 0o640, "httpx-order.env": 0o600}
+            for name, mode_bits in expected_modes.items():
+                p = Path("/etc/fintual-executor") / name
+                if not p.is_file():
+                    fail("CONFIG_ABSENT_" + name.replace(".", "_").upper())
+                if stat.S_IMODE(p.stat().st_mode) != mode_bits:
+                    fail("CONFIG_MODE_" + name.replace(".", "_").upper())
+                config[name] = sha(p)
+            out("CONFIG_HASHES", ",".join(sorted(config.values())))
+            out("CONFIG_MODES", "PASS")
+
+            before_open, before_unknown, before_fills, before_outbox = ledger()
+            out("LEDGER_OPEN", before_open)
+            out("LEDGER_UNKNOWN", before_unknown)
+            out("LEDGER_FILLS", before_fills)
+            out("OUTBOX_PENDING", before_outbox)
+            if before_open or before_unknown:
+                fail("LOCAL_ORDER_STATE_NOT_CLEAR")
+            out("LEDGER", "PASS")
+
+            sock = Path("/var/lib/fintual-executor/cash-ipc/cash.sock")
+            if sock.exists():
+                st = sock.lstat()
+                parent = sock.parent.stat()
+                if (not stat.S_ISSOCK(st.st_mode) or stat.S_IMODE(st.st_mode) != 0o600
+                        or stat.S_IMODE(parent.st_mode) != 0o700 or st.st_uid != parent.st_uid):
+                    fail("STALE_SOCKET_PERMISSIONS_UNSAFE")
+                out("STALE_SOCKET", "PRIVATE_NO_LISTENER_EXPECTED")
+            else:
+                out("STALE_SOCKET", "ABSENT")
+
+            broker_gate(release, user, home)
+            out("BROKER_PREFLIGHT", "PASS")
+            if ledger()[2] != before_fills:
+                fail("FILL_COUNT_CHANGED_DURING_PREFLIGHT")
+            if [sha(Path("/etc/fintual-executor") / n) for n in config] != list(config.values()):
+                fail("CONFIG_CHANGED_DURING_PREFLIGHT")
+            out("PREFLIGHT", "PASS")
+
+            if mode == "preflight":
+                out("RESULT", "PREFLIGHT_PASS_NO_SERVICE_STARTED")
+                raise SystemExit(0)
+            if mode != "resume":
+                fail("UNEXPECTED_MODE")
+
+            # Resume: one start attempt only. Never retry a failing promotion.
+            start = cmd("systemctl", "start", unit, timeout=40)
+            if start is None or start.returncode != 0:
+                fail("SYSTEMCTL_START_FAILED")
+            deadline = time.monotonic() + 150
+            last_stage = "SERVICE_NOT_ACTIVE"
+            last_class = "UNVERIFIED"
+            pid = 0
+            ipc_ok = False
+            while time.monotonic() < deadline:
+                if service(unit) == "active":
+                    pid_text = cmd("systemctl", "show", "-P", "MainPID", unit, timeout=10)
+                    try:
+                        pid = int(pid_text.stdout.strip()) if pid_text else 0
+                    except ValueError:
+                        pid = 0
+                    if pid > 1:
+                        probe = socket_probe(user, home)
+                        if probe.returncode == 0 and "RECOVERY_IPC_HEALTH=PASS" in probe.stdout:
+                            ipc_ok = True
+                            break
+                        for line in probe.stdout.splitlines():
+                            if line.startswith("RECOVERY_IPC_FAILURE_STAGE="):
+                                last_stage = line.split("=", 1)[1]
+                            if re.fullmatch(r"RECOVERY_IPC_FAILURE_CLASS=[A-Za-z_]{1,70}", line):
+                                last_class = line.split("=", 1)[1]
+                time.sleep(2)
+            out("START_PID", pid)
+            if service(unit) != "active" or pid <= 1:
+                out("RESULT", "FAILED_CLOSED_SERVICE_NOT_ACTIVE")
+                raise SystemExit(2)
+            # Require a stable PID for at least 10 seconds.
+            time.sleep(10)
+            pid2_text = cmd("systemctl", "show", "-P", "MainPID", unit, timeout=10)
+            pid2 = int(pid2_text.stdout.strip()) if pid2_text and pid2_text.stdout.strip().isdigit() else 0
+            if service(unit) != "active" or pid2 != pid:
+                out("RESULT", "FAILED_CLOSED_RESTART_LOOP")
+                raise SystemExit(2)
+            out("SERVICE_STABLE", "PASS")
+
+            # The executor is allowed to keep running even if the downstream
+            # cash IPC is unhealthy: that boundary must never take trading down.
+            if not ipc_ok:
+                out("IPC_FAILURE_STAGE", last_stage)
+                out("IPC_FAILURE_CLASS", last_class)
+                out("IPC_HEALTH", "DEGRADED")
+                out("RESULT", "TRADING_RECOVERED_SHEETS_CASH_IPC_DEGRADED")
+            else:
+                out("IPC_HEALTH", "PASS")
+
+            journal = cmd("journalctl", "-u", unit, "--since", "-3 min", "--no-pager", "-o", "cat", timeout=30)
+            text = journal.stdout if journal else ""
+            if "Traceback (most recent call last)" in text:
+                out("RESULT", "FAILED_CLOSED_JOURNAL_TRACEBACK")
+                raise SystemExit(2)
+            if "MARKET_DATA_SOURCE_CONNECTED" not in text:
+                out("RESULT", "FAILED_CLOSED_MARKET_DATA_NOT_CONNECTED")
+                raise SystemExit(2)
+            if "FINTUAL_CONFIRMED" not in text and "MARKET_DATA_HEARTBEAT" not in text:
+                out("RESULT", "FAILED_CLOSED_RUNTIME_NOT_OBSERVED")
+                raise SystemExit(2)
+            out("RUNTIME_OBSERVABILITY", "PASS")
+
+            # Postflight broker gate while the executor is live. It uses a
+            # short-lived browser and leaves the executor's HTTPX session alone.
+            broker_gate(release, user, home)
+            out("BROKER_POSTFLIGHT", "PASS")
+            after_open, after_unknown, after_fills, after_outbox = ledger()
+            out("LEDGER_OPEN_AFTER", after_open)
+            out("LEDGER_UNKNOWN_AFTER", after_unknown)
+            out("LEDGER_FILLS_AFTER", after_fills)
+            out("OUTBOX_PENDING_AFTER", after_outbox)
+            if after_open or after_unknown:
+                fail("POSTFLIGHT_LOCAL_ORDER_STATE_NOT_CLEAR")
+            if after_fills != before_fills:
+                fail("POSTFLIGHT_FILL_COUNT_CHANGED")
+            if [sha(Path("/etc/fintual-executor") / n) for n in config] != list(config.values()):
+                fail("POSTFLIGHT_CONFIG_CHANGED")
+            if alias.resolve() != release:
+                fail("POSTFLIGHT_ALIAS_CHANGED")
+            if service(sheet_unit) != "active":
+                fail("POSTFLIGHT_SHEET_SYNC_INACTIVE")
+            out("CONFIG_UNCHANGED", "true")
+            out("NEW_TRADE_ORDERS_SUBMITTED", "false")
+            if ipc_ok:
+                out("RESULT", "V1_RESTORED_AND_FUNCTIONALLY_READY")
+            else:
+                out("RESULT", "V1_TRADING_RESTORED_SHEETS_CASH_IPC_DEGRADED")
+            ROOT
