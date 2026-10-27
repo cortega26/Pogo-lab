@@ -21,6 +21,7 @@ jobs:
             set -euo pipefail
             sudo -n /usr/bin/python3 - <<'ROOT'
             import json, os, pwd, subprocess
+            from decimal import Decimal
             from pathlib import Path
 
             release = Path("/opt/fintual-httpx-current").resolve()
