@@ -20,7 +20,7 @@ jobs:
           script: |
             set -euo pipefail
             sudo -n /usr/bin/python3 - <<'ROOT'
-            import json, os, pwd, subprocess
+            import json, os, pwd, sqlite3, subprocess
             from decimal import Decimal
             from pathlib import Path
 
@@ -76,7 +76,8 @@ jobs:
                 range="Cash_Fintual!A2:I5000", valueRenderOption="UNFORMATTED_VALUE",
                 dateTimeRenderOption="SERIAL_NUMBER").execute().get("values", [])
             today = "2026-10-27"
-            values = []
+            all_rows = []
+            today_count = 0
             for index, row in enumerate(rows, start=2):
                 if len(row) < 9 or row[8] in ("", None):
                     continue
@@ -85,9 +86,12 @@ jobs:
                     key = (date(1899, 12, 30) + __import__("datetime").timedelta(days=int(raw_date))).isoformat()
                 else:
                     key = str(raw_date)[:10]
+                if not key:
+                    continue
+                all_rows.append({"date": key, "value": str(row[8]), "index": index})
                 if key == today:
-                    values.append(str(row[8]))
-            print("SHEET_JSON=" + json.dumps({"today_count": len(values), "values": values}))
+                    today_count += 1
+            print("SHEET_JSON=" + json.dumps({"today_count": today_count, "rows": all_rows}))
             """
             p = subprocess.run(
                 ["/opt/fintual-sheet-sync-venv/bin/python", "-B", "-c", sheet_script],
@@ -98,14 +102,37 @@ jobs:
                 print("CHECKPOINT_DIAG=sheet_read_failed", flush=True)
                 raise SystemExit(1)
             data = json.loads(sheet_line.split("=", 1)[1])
-            vals = [Decimal(v) for v in data["values"]]
+            rows = [(item["date"], Decimal(item["value"]), item["index"]) for item in data["rows"]]
             print("CHECKPOINT_TODAY_ROWS=" + str(data["today_count"]), flush=True)
-            if not vals:
-                print("CHECKPOINT_DIAG=no_today_rows", flush=True)
+            if not rows:
+                print("CHECKPOINT_DIAG=no_cash_rows", flush=True)
                 raise SystemExit(2)
-            print("CHECKPOINT_FIRST_LAST_EQUAL=" + str(vals[0] == vals[-1]).lower(), flush=True)
-            print("CHECKPOINT_BROKER_MATCHES_FIRST=" + str(abs(balance - vals[0]) <= Decimal("0.005")).lower(), flush=True)
-            print("CHECKPOINT_BROKER_MATCHES_LAST=" + str(abs(balance - vals[-1]) <= Decimal("0.005")).lower(), flush=True)
-            print("CHECKPOINT_DISTINCT_VALUES=" + str(len(set(vals))), flush=True)
+            selected = max(rows, key=lambda item: item[0])
+            last = rows[-1]
+            print("CHECKPOINT_SELECTED_DATE=" + selected[0], flush=True)
+            print("CHECKPOINT_LAST_DATE=" + last[0], flush=True)
+            print("CHECKPOINT_SELECTED_LAST_EQUAL=" + str(selected[1] == last[1]).lower(), flush=True)
+            print("CHECKPOINT_BROKER_MATCHES_SELECTED=" + str(abs(balance - selected[1]) <= Decimal("0.005")).lower(), flush=True)
+            print("CHECKPOINT_BROKER_MATCHES_LAST=" + str(abs(balance - last[1]) <= Decimal("0.005")).lower(), flush=True)
+            print("CHECKPOINT_SELECTED_INDEX=" + str(selected[2]), flush=True)
+            print("CHECKPOINT_LAST_INDEX=" + str(last[2]), flush=True)
+            print("CHECKPOINT_DISTINCT_VALUES=" + str(len({r[1] for r in rows})), flush=True)
+            con=sqlite3.connect("file:/var/lib/fintual-executor/state.sqlite3?mode=ro",uri=True,timeout=10)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                ev=con.execute("SELECT event_type,created_at,payload_json FROM audit_events WHERE event_type IN ('SHEET_CASH_EVENT_SYNCED','SHEET_CASH_CHECKPOINT_MISMATCH') ORDER BY event_id DESC LIMIT 6").fetchall()
+            finally:
+                con.close()
+            for i,(kind,at,payload) in enumerate(ev):
+                try: obj=json.loads(payload)
+                except ValueError: obj={}
+                print("CHECKPOINT_EVENT_"+str(i)+"_TYPE="+kind,flush=True)
+                print("CHECKPOINT_EVENT_"+str(i)+"_AT="+str(at),flush=True)
+                if kind=="SHEET_CASH_EVENT_SYNCED":
+                    print("CHECKPOINT_EVENT_"+str(i)+"_CASH_TYPE="+str(obj.get("event_type","UNKNOWN"))[:20],flush=True)
+                else:
+                    try: d=abs(Decimal(str(obj.get("reconciliation_delta"))))
+                    except Exception: d=None
+                    print("CHECKPOINT_EVENT_"+str(i)+"_DELTA_EQ_CENT="+str(d==Decimal("0.01")).lower(),flush=True)
             print("CHECKPOINT_DIAG=complete", flush=True)
             ROOT
