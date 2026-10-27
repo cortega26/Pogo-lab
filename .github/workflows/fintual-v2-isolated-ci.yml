@@ -238,8 +238,57 @@ jobs:
                assert _detector_zone(Decimal("0.031"), lower, trigger, upper) == "signal_band"
                assert _detector_zone(Decimal("0.033"), lower, trigger, upper) == "beyond_signal_band"
           PATCH_END_V2
+          cat > sheet-sync-startup.patch <<'PATCH_END_CASH'
+          diff --git a/src/fintual_executor/sheet_sync.py b/src/fintual_executor/sheet_sync.py
+          index abd837c..23ac117 100644
+          --- a/src/fintual_executor/sheet_sync.py
+          +++ b/src/fintual_executor/sheet_sync.py
+          @@ -304,7 +304,9 @@ def run_worker(
+                       "Google Sheet sync credentials are required for the sync worker"
+                   )
+               store = StateStore(Path(state_path))
+          -    last_cash_event_poll = 0.0
+          +    # None guarantees the first cash IPC check runs immediately, even when
+          +    # the host's monotonic clock has not yet reached the 300s poll interval.
+          +    last_cash_event_poll: float | None = None
+               cash_state = "DEGRADED_CASH_SYNC" if fills_only else "CASH_UNVERIFIED"
+               while True:
+                   # This explicit mode must not create, attach to, or authenticate a
+          @@ -313,7 +315,7 @@ def run_worker(
+                   fill_results = drain_sheet_sync_outbox(store, settings)
+                   if not fills_only:
+                       now_monotonic = time.monotonic()
+          -            if now_monotonic - last_cash_event_poll >= cash_event_poll_seconds:
+          +            if last_cash_event_poll is None or now_monotonic - last_cash_event_poll >= cash_event_poll_seconds:
+                           try:
+                               if cash_ipc_socket is not None:
+                                   from .session_ipc import IpcReadOnlyBrokerHandle
+          diff --git a/tests/test_sheet_sync.py b/tests/test_sheet_sync.py
+          index 05690c7..77b78f5 100644
+          --- a/tests/test_sheet_sync.py
+          +++ b/tests/test_sheet_sync.py
+          @@ -350,6 +350,8 @@ def poll(*_args, client=None, **_kwargs):
+               class EndOneCycle(Exception):
+                   pass
+           
+          +    # A fresh host can have monotonic uptime < the 300-second poll interval.
+          +    monkeypatch.setattr(sync.time, "monotonic", lambda: 1.0)
+               monkeypatch.setattr(sync.time, "sleep", lambda _: (_ for _ in ()).throw(EndOneCycle))
+               with pytest.raises(EndOneCycle):
+                   sync.run_worker(str(store.path), cash_ipc_socket=socket)
+          @@ -387,6 +389,8 @@ def update_runtime_status(self, pending, state="RUNNING"):
+               class EndOneCycle(Exception):
+                   pass
+           
+          +    # A fresh host can have monotonic uptime < the 300-second poll interval.
+          +    monkeypatch.setattr(sync.time, "monotonic", lambda: 1.0)
+               monkeypatch.setattr(sync.time, "sleep", lambda _: (_ for _ in ()).throw(EndOneCycle))
+               with pytest.raises(EndOneCycle):
+                   sync.run_worker(str(store.path), cash_ipc_socket=tmp_path / "socket")
+          PATCH_END_CASH
           cd isolated
           patch --batch --fuzz=0 --forward -p1 < ../strategy.patch
+          patch --batch --fuzz=0 --forward -p1 < ../sheet-sync-startup.patch
           python -m compileall -q src tests
           printf '%s\n' "V2_PATCH_EXACT_AND_COMPILE=PASS" > ../patch-status.txt
       - name: Install tools and execute all repository tests (no broker config)
@@ -288,7 +337,7 @@ jobs:
           from pathlib import Path
           log=Path("ci-v2-log.txt").read_text(errors="replace") if Path("ci-v2-log.txt").exists() else "Test log not created; source/patch/setup failure."
           log=log[-10000:]
-          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\nSource: deployed immutable v1 release 93c03b51...\nPatch: exact four code/test diffs of fintual-executor PR #87\nRun: "+os.environ["GH_RUN"]+"\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\n\n```\n"+log+"\n```"
+          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\nSource: deployed immutable v1 release 93c03b51...\nPatches: exact code/test diffs of fintual-executor PR #87 + independent cash-worker startup fix PR #88\nRun: "+os.environ["GH_RUN"]+"\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\n\n```\n"+log+"\n```"
           p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual strategy v2 — isolated full regression evidence","-f","body="+body],capture_output=True,text=True,timeout=30)
           if p.returncode:raise SystemExit("Could not publish CI evidence")
           PY
