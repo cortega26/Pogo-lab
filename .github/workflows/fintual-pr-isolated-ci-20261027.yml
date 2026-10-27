@@ -108,34 +108,27 @@ jobs:
             echo "PR_CI_RESULT=PASS"
             '''
             command = [
-                "systemd-run", "--collect", "--wait", "--pipe", "--quiet",
-                "-p", "User=nobody", "-p", "Group=nogroup",
-                "-p", f"WorkingDirectory={RUN / 'repo'}",
-                "-p", "Environment=PY_EXEC=" + str(PYTHON),
-                "-p", "Environment=STAGE=" + str(RUN),
-                "-p", "Environment=PYTHONPATH=" + str(RUN / "vendor") + ":" + str(RUN / "repo" / "src"),
-                "-p", "Environment=HOME=" + str(RUN / "home"),
-                "-p", "Environment=PYTHONDONTWRITEBYTECODE=1",
-                "-p", "MemoryMax=512M", "-p", "CPUQuota=50%", "-p", "TasksMax=64",
-                "-p", "NoNewPrivileges=yes", "-p", "ProtectHome=yes", "-p", "ProtectSystem=strict",
-                "-p", "PrivateTmp=yes", "-p", "IPAddressDeny=any",
-                "-p", "InaccessiblePaths=/etc/fintual-executor /var/lib/fintual-executor "
-                      "/var/lib/fintual-browser /opt/fintual-executor",
-                "-p", "RestrictAddressFamilies=AF_UNIX",
-                "-p", f"ReadWritePaths={RUN}",
+                "runuser", "-u", "nobody", "--",
+                "env", "-i",
+                "PATH=/usr/local/bin:/usr/bin:/bin",
+                "PY_EXEC=" + str(PYTHON),
+                "STAGE=" + str(RUN),
+                "PYTHONPATH=" + str(RUN / "vendor") + ":" + str(RUN / "repo" / "src"),
+                "HOME=" + str(RUN / "home"),
+                "PYTHONDONTWRITEBYTECODE=1",
                 "/usr/bin/bash", "-c", inner,
             ]
-            result = run(command, timeout=600)
+            result = run(command, timeout=600, cwd=str(RUN / "repo"))
             for line in result.stdout.splitlines():
                 if re.fullmatch(r"PR_CI_[A-Z_]+=(?:PASS|FAIL)|\d+ (?:passed|failed).*", line):
                     print(line, flush=True)
             if result.returncode != 0 or "PR_CI_RESULT=PASS" not in result.stdout:
                 # Sanitized failure context: no broker data or secrets exist in
                 # this disposable clone. Keep the tail bounded.
+                print("PR_CI_RETURN_CODE=" + str(result.returncode), flush=True)
                 for stream in (result.stdout, result.stderr):
                     for line in stream.splitlines()[-25:]:
-                        if re.search(r"PR_CI_|FAILED|ERROR|System|Failed|error|Traceback|No such|not found", line):
-                            print("PR_CI_DIAG=" + line[:240], flush=True)
+                        print("PR_CI_DIAG=" + line[:240], flush=True)
                 fail("ISOLATED_TESTS_FAILED")
             active = subprocess.run(["readlink", "-f", "/opt/fintual-httpx-current"],
                                     capture_output=True, text=True, timeout=10).stdout.strip()
