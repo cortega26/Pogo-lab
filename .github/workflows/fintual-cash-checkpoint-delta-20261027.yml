@@ -1,0 +1,49 @@
+name: Fintual cash checkpoint delta classification (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Classify the latest checkpoint delta without publishing balances
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 60s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3
+            from decimal import Decimal,InvalidOperation
+            con=sqlite3.connect("file:/var/lib/fintual-executor/state.sqlite3?mode=ro",uri=True,timeout=10)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                row=con.execute("SELECT payload_json,created_at FROM audit_events WHERE event_type='SHEET_CASH_CHECKPOINT_MISMATCH' ORDER BY event_id DESC LIMIT 1").fetchone()
+            finally:
+                con.close()
+            if not row:
+                print("DELTA_DIAG=NO_EVENT",flush=True)
+                raise SystemExit(0)
+            payload,created=row
+            try:
+                obj=json.loads(payload)
+                delta=Decimal(str(obj.get("reconciliation_delta")))
+            except (ValueError,TypeError,InvalidOperation):
+                print("DELTA_DIAG=UNPARSEABLE",flush=True)
+                raise SystemExit(0)
+            a=abs(delta)
+            bucket="ZERO" if a<Decimal("0.005") else "SUB_CENT" if a<Decimal("0.01") else "CENT" if a<Decimal("0.02") else "SUB_DIME" if a<Decimal("0.1") else "SUB_DOLLAR" if a<Decimal("1") else "LARGE"
+            print("DELTA_DIAG_AT="+str(created),flush=True)
+            print("DELTA_DIAG_BUCKET="+bucket,flush=True)
+            print("DELTA_DIAG_EQ_0_01="+str(a==Decimal("0.01")).lower(),flush=True)
+            print("DELTA_DIAG_EQ_0_005="+str(a==Decimal("0.005")).lower(),flush=True)
+            print("DELTA_DIAG_SIGN="+("POS" if delta>0 else "NEG" if delta<0 else "ZERO"),flush=True)
+            print("DELTA_DIAG_REMOTE_STATUS="+str(obj.get("remote_status","UNKNOWN"))[:20],flush=True)
+            PY
