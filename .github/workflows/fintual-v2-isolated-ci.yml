@@ -276,14 +276,33 @@ jobs:
           cd isolated
           patch --batch --fuzz=0 --forward -p1 < ../strategy.patch
           patch --batch --fuzz=0 --forward -p1 < ../sheet-sync-startup.patch
+          # Apply only two exact PR #92 changes. Source stays inside ephemeral CI.
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("src/fintual_executor/sheet_sync.py")
+          old='    balance = buy_state["stocksWallet"]["investableAmount"]'
+          new=('    # A cash checkpoint compares accounting cash, not available buying power.\n'
+               '    # Reservations/settlement can make investableAmount lower than balance.\n'
+               '    balance = buy_state["stocksWallet"]["balance"]')
+          s=p.read_text()
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          p=Path("tests/test_sheet_sync.py")
+          old='                "investableAmount": {"amount": 73.78, "currency": "USD"}'
+          new=('                "balance": {"amount": 73.78, "currency": "USD"},\n'
+               '                "investableAmount": {"amount": 73.65, "currency": "USD"}')
+          s=p.read_text()
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          PY
           test "$(git hash-object src/fintual_executor/domain.py)" = "61e6471235c71956d4030dc00cc4d359479dea4d" || { echo "BLOB_MISMATCH_src_fintual_executor_domain.py"; exit 1; }
           test "$(git hash-object src/fintual_executor/runner.py)" = "fee95e3f11f5811f14220c31a29d2dbb7702054e" || { echo "BLOB_MISMATCH_src_fintual_executor_runner.py"; exit 1; }
           test "$(git hash-object tests/test_domain.py)" = "9dd38c45dabc5011c20be2277aeb9dcd6a4715c2" || { echo "BLOB_MISMATCH_tests_test_domain.py"; exit 1; }
           test "$(git hash-object tests/test_market_data.py)" = "ba560bae4b7c72f3b5a1f4d3ae5c2385e43f7fff" || { echo "BLOB_MISMATCH_tests_test_market_data.py"; exit 1; }
-          test "$(git hash-object src/fintual_executor/sheet_sync.py)" = "23ac11703aa8af10d0ebb0e0cec283980f177aa0" || { echo "BLOB_MISMATCH_src_fintual_executor_sheet_sync.py"; exit 1; }
-          test "$(git hash-object tests/test_sheet_sync.py)" = "77b78f585714258642de074819b0373a79243e6f" || { echo "BLOB_MISMATCH_tests_test_sheet_sync.py"; exit 1; }
+          test "$(git hash-object src/fintual_executor/sheet_sync.py)" = "3333342afc01a54ad47abcd1e9560221683c87fb" || { echo "BLOB_MISMATCH_src_fintual_executor_sheet_sync.py"; exit 1; }
+          test "$(git hash-object tests/test_sheet_sync.py)" = "b6b94385e8f03e94e649af1e30b78d3d7d830f1e" || { echo "BLOB_MISMATCH_tests_test_sheet_sync.py"; exit 1; }
           python -m compileall -q src tests
-          printf '%s\n' "V2_SIX_FILES_MATCH_PR87_GIT_BLOBS=PASS" "V2_PATCH_EXACT_AND_COMPILE=PASS" > ../patch-status.txt
+          printf '%s\n' "V2_SIX_FILES_MATCH_MERGED_V2_PLUS_PR92=PASS" "V2_PATCH_EXACT_AND_COMPILE=PASS" > ../patch-status.txt
       - name: Install tools and execute all repository tests (no broker config)
         id: verify
         run: |
@@ -323,7 +342,7 @@ jobs:
           log=Path("ci-v2-log.txt").read_text(errors="replace") if Path("ci-v2-log.txt").exists() else "Test log not created; source/patch/setup failure."
           selected=[line for line in log.splitlines() if line.startswith(("INSTALL_RC=","LINT_RC=","PYTEST_RC=","FULL_CI_EXIT=")) or "passed, " in line or " failed, " in line or "ERROR " in line or "FAILED " in line or "ERROR:" in line]
           summary="\\n".join(selected[-25:]) if selected else "No test summary: see run failure"
-          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\\nSource: pinned read-only Oracle release 93c03b51...; ephemeral CI filesystem\\nPatch: six PR #87 code/test files, SHA-verified before test\\nRun: "+os.environ["GH_RUN"]+"\\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\\n\\n```\\n"+summary+"\\n```"
+          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\\nSource: pinned read-only Oracle release 93c03b51...; ephemeral CI filesystem\\nPatch: four merged-v2 files plus the two exact PR #92 cash checkpoint/test blobs, SHA-verified\\nRun: "+os.environ["GH_RUN"]+"\\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\\n\\n```\\n"+summary+"\\n```"
           p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual strategy v2 — isolated full regression evidence","-f","body="+body],capture_output=True,text=True,timeout=30)
           if p.returncode:raise SystemExit("Could not publish CI evidence")
           PY
