@@ -90,30 +90,40 @@ jobs:
                 print("SHEETS_UPDATE=NO_BACKUP_MANIFEST", flush=True)
                 raise SystemExit(4)
             manifest = json.loads(manifests[-1].read_text())
+            # The read-only audit captured the exact six operative v1 formulas
+            # before any write. They are the rollback source. The hidden tab
+            # stores v1 formulas in B2:B7 and v2 candidates in D2:D7.
             backup = {}
-            for cell, text in manifest.get("backup_tab_formulas", {}).items():
-                formula = str(text).strip()
+            for cell in ("AL3", "AO3", "AX3", "BA3", "BB3", "BE3"):
+                formula = str(manifest.get("formulas", {}).get(cell, "")).strip()
                 if formula.startswith("'"):
                     formula = formula[1:]
                 if not formula.startswith("="):
                     print("SHEETS_UPDATE=BACKUP_NOT_FORMULA", flush=True)
                     raise SystemExit(5)
-                target = None
-                for row_key, cells in pair.items():
-                    if f"Positions!$I${rows[row_key]}" not in formula:
-                        continue
-                    if "*(1-ROUND" in formula:
-                        target = cells[0]
-                    elif "/(1-ROUND" in formula:
-                        target = cells[1]
-                if target is None or target in backup:
-                    print("SHEETS_UPDATE=BACKUP_CLASSIFICATION_FAILED", flush=True)
-                    raise SystemExit(6)
-                backup[target] = formula
+                backup[cell] = formula
             if set(backup) != set(expected):
                 print("SHEETS_UPDATE=BACKUP_INCOMPLETE", flush=True)
                 raise SystemExit(7)
             print("SHEETS_UPDATE_BACKUP_CELLS=" + str(len(backup)), flush=True)
+            hidden_v1 = values.get(
+                spreadsheetId=spreadsheet, range="Strategy_v1_rollback_20261027!B2:B7",
+                valueRenderOption="FORMULA",
+            ).execute().get("values", [])
+            hidden_v1_flat = [str(row[0]).lstrip("'").strip() if row else "" for row in hidden_v1]
+            if hidden_v1_flat != [backup[c] for c in ("AL3", "AO3", "AX3", "BA3", "BB3", "BE3")]:
+                print("SHEETS_UPDATE=HIDDEN_V1_MISMATCH", flush=True)
+                raise SystemExit(12)
+            print("SHEETS_UPDATE_HIDDEN_V1_MATCH=true", flush=True)
+            hidden_v2 = values.get(
+                spreadsheetId=spreadsheet, range="Strategy_v1_rollback_20261027!D2:D7",
+                valueRenderOption="FORMULA",
+            ).execute().get("values", [])
+            hidden_v2_flat = [str(row[0]).lstrip("'").strip() if row else "" for row in hidden_v2]
+            if hidden_v2_flat != [expected[c] for c in ("AL3", "AO3", "AX3", "BA3", "BB3", "BE3")]:
+                print("SHEETS_UPDATE=HIDDEN_V2_MISMATCH", flush=True)
+                raise SystemExit(13)
+            print("SHEETS_UPDATE_HIDDEN_V2_MATCH=true", flush=True)
 
             current = {cell: get("Stocks!" + cell) for cell in expected}
             if current != backup:
