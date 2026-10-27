@@ -1,0 +1,45 @@
+name: Fintual recovery backup evidence (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: List latest cutover and sheet-sync backups with hashes only
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 60s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,json,stat
+            from pathlib import Path
+            root=Path("/var/lib/fintual-g8-backups")
+            for label,pattern in (("CUTOVER","v2-cutover-corrected-*"),("SHEETSYNC","sheet-sync-v2-*")):
+                dirs=sorted((p for p in root.glob(pattern) if p.is_dir()),key=lambda p:p.stat().st_mtime)
+                if not dirs:
+                    print("BACKUP_EVIDENCE_"+label+"=MISSING",flush=True)
+                    continue
+                d=dirs[-1]
+                db=d/"state.sqlite3"
+                print("BACKUP_EVIDENCE_"+label+"_DIR="+d.name,flush=True)
+                if db.is_file():
+                    st=db.stat()
+                    print("BACKUP_EVIDENCE_"+label+"_SIZE="+str(st.st_size),flush=True)
+                    print("BACKUP_EVIDENCE_"+label+"_MODE="+oct(stat.S_IMODE(st.st_mode)),flush=True)
+                    print("BACKUP_EVIDENCE_"+label+"_SHA256="+hashlib.sha256(db.read_bytes()).hexdigest(),flush=True)
+                manifest=d/"recovery-manifest.json"
+                if manifest.is_file():
+                    info=json.loads(manifest.read_text())
+                    for key in ("utc","source","target","backup_sha256","fills_at_snapshot"):
+                        print("BACKUP_EVIDENCE_"+label+"_"+key.upper()+"="+str(info.get(key))[:80],flush=True)
+            print("BACKUP_EVIDENCE_READ_ONLY=true",flush=True)
+            PY
