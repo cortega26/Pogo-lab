@@ -1,0 +1,142 @@
+name: Fintual v2 inactive runtime attestation and honest marker
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-inactive-runtime-attestation-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify immutable overlay and runtime; emit source-provenance marker in inactive release only
+        id: attestation
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 70s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,subprocess,stat
+            from pathlib import Path
+            BASE="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            TARGET="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            root=Path("/opt/fintual-httpx-releases")
+            base=root/BASE
+            staged=root/TARGET
+            current=Path("/opt/fintual-httpx-current").resolve()
+            def fail(s):
+                print("ATTEST_GATE="+s)
+                raise SystemExit(1)
+            if current!=base or not staged.is_dir() or not (staged/".release-main-sha").is_file():
+                fail("ACTIVE_BASE_OR_TARGET_INVALID")
+            if (staged/".release-main-sha").read_text().strip()!=TARGET:
+                fail("TARGET_IDENT_MISMATCH")
+            manifest=staged/".release-source-manifest.json"
+            if not manifest.is_file():fail("MANIFEST_MISSING")
+            info=json.loads(manifest.read_text())
+            files=info["files"]
+            if info.get("base")!=BASE or info.get("target")!=TARGET or len(files)!=21:
+                fail("SOURCE_CONTRACT_INVALID")
+            for p,sha in files.items():
+                src=staged/p
+                if not src.is_file() or src.is_symlink():fail("SOURCE_FILE_INVALID")
+                buf=src.read_bytes()
+                current_sha=hashlib.sha1(b"blob "+str(len(buf)).encode()+b"\0"+buf).hexdigest()
+                if current_sha!=sha:fail("SOURCE_HASH_MISMATCH")
+            env={"PYTHONPATH":str(staged/"src"),
+                 "PATH":"/usr/bin:/bin","PYTHONDONTWRITEBYTECODE":"1"}
+            script=(
+                "import sys,pathlib,importlib.metadata as md; "
+                "from fintual_executor import runner,order_session,transient_auth,google_sheets,trade_fee_repair,sheet_sync; "
+                "root=pathlib.Path(sys.argv[1]).resolve(); "
+                "assert pathlib.Path(runner.__file__).resolve().is_relative_to(root/'src'); "
+                "assert pathlib.Path(sys.prefix).resolve()==root/'.venv'; "
+                "assert md.version('httpx')=='0.28.1'; "
+                "assert md.version('playwright')=='1.58.0'; "
+                "print('ATT_MARKER_PYTHON_IMPORTS=PASS')"
+            )
+            cp=subprocess.run([str(staged/".venv/bin/python"),"-B","-c",script,str(staged)],
+                              env=env,capture_output=True,text=True,timeout=25)
+            if cp.returncode:fail("RUNTIME_IMPORT_FAILED")
+            cm=subprocess.run([str(staged/".venv/bin/python"),"-B","-m","compileall","-q",
+                               str(staged/"src"),str(staged/"tests")],
+                              env=env,capture_output=True,text=True,timeout=20)
+            if cm.returncode:fail("RUNTIME_COMPILE_FAILED")
+            marker=staged/"HTTPX_RUNTIME_READY.json"
+            if not marker.is_file() or marker.is_symlink():fail("BASE_MARKER_MISSING")
+            old=json.loads(marker.read_text())
+            if old.get("source_sha") not in (BASE,TARGET):
+                fail("MARKER_UNEXPECTED_SOURCE")
+            # The original source-archive hash refers to the base runtime, not
+            # the complete newer source. Explicitly retain the provenance.
+            base_marker=json.loads((base/"HTTPX_RUNTIME_READY.json").read_text())
+            if base_marker.get("source_sha")!=BASE:
+                fail("BASE_RUNTIME_MARKER_MISMATCH")
+            attest={
+                "status":"HTTPX_RUNTIME_STAGED",
+                "source_sha":TARGET,
+                "runtime_imports_verified":True,
+                "frozen_shadow_dependencies":True,
+                "production_modified":False,
+                "services_modified":False,
+                "orders_enabled":False,
+                "current_alias_modified":False,
+                "release_derivation":"verified_sha_pinned_source_overlay_of_frozen_runtime",
+                "base_runtime_sha":BASE,
+                "base_runtime_source_archive_sha256":base_marker.get("source_archive_sha256"),
+                "source_overlay_sha256":hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                "source_overlay_blobs_verified":len(files),
+                "notes":"runtime overlay attested; this is not live broker authorization"
+            }
+            # Repeated attempts must not rewrite a good proof.
+            if old.get("source_sha")==TARGET:
+                if old!=attest:fail("ATT_MARKER_CONFLICT")
+                print("ATTEST_GATE=ALREADY_VERIFIED")
+            else:
+                p=staged/"HTTPX_RUNTIME_READY.base.json"
+                if p.exists():fail("BASE_MARKER_BACKUP_EXISTS_UNVERIFIED")
+                p.write_text(json.dumps(base_marker,sort_keys=True)+"\n")
+                p.chmod(0o644)
+                tmp=staged/"HTTPX_RUNTIME_READY.json.next"
+                with tmp.open("x") as f:
+                    json.dump(attest,f,sort_keys=True)
+                    f.write("\n")
+                tmp.chmod(0o644)
+                os.replace(tmp,marker)
+                print("ATTEST_GATE=PASS")
+            assert json.loads(marker.read_text())["source_sha"]==TARGET
+            assert Path("/opt/fintual-httpx-current").resolve()==base
+            print("ATTEST_RUNTIME_IMPORTS=PASS")
+            print("ATTEST_RUNTIME_COMPILE=PASS")
+            print("ATTEST_SOURCE_BLOBS=21")
+            print("ATTEST_MARKER_SOURCE_SHA="+TARGET)
+            print("ATTEST_ACTIVE_SHA="+BASE)
+            print("ATTEST_NO_PRODUCTION_MUTATIONS=true")
+            PY
+      - name: Publish sanitized artifact attestation
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUT: ${{ steps.attestation.outputs.stdout }}
+          STATUS: ${{ steps.attestation.outcome }}
+        run: |
+          python3 - <<'PY'
+          import re,subprocess,os
+          facts=[x for x in os.getenv("OUT","").splitlines() if re.fullmatch(r"ATT(?:EST)?_[A-Z0-9_]+=[A-Za-z0-9_.-]+",x)]
+          body="Read-only-on-production, proof-marker update on INACTIVE SHA release only. No service or order changes.\nRun: "+os.environ["RUN"]+"\nOutcome: "+os.environ["STATUS"]+"\n\n"+"\n".join(facts)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+                "-f","title=Fintual v2 inactive runtime attestation",
+                "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Attestation evidence publication failed")
+          PY
