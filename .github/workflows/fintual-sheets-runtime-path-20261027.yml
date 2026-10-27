@@ -1,0 +1,53 @@
+name: Fintual Sheets runtime path audit (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Locate the installed Sheets projector interpreter and credentials
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 60s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,re,subprocess
+            from pathlib import Path
+            def run(*a,timeout=15):
+                return subprocess.run(a,capture_output=True,text=True,timeout=timeout,check=False)
+            for unit in ("fintual-sheet-sync.service",):
+                p=run("systemctl","show",unit,"-p","ExecStart","-p","EnvironmentFiles","-p","User","-p","Group","-p","WorkingDirectory")
+                for line in p.stdout.splitlines():
+                    key,_,value=line.partition("=")
+                    print("SHEETS_RT_"+key.upper()+"="+re.sub(r"[^A-Za-z0-9_./:=-]","",value)[:300])
+            for path in ("/opt/fintual-sheet-sync-venv/bin/python","/opt/fintual-sheet-sync-current/.venv/bin/python","/opt/fintual-sheet-sync-current/bin/python"):
+                p=Path(path)
+                print("SHEETS_RT_PATH_"+path.replace("/","_")+"_EXISTS="+str(p.exists()))
+                if p.exists():
+                    print("SHEETS_RT_PATH_"+path.replace("/","_")+"_RESOLVED="+str(p.resolve()))
+                    cp=run(str(p),"-c","import google,googleapiclient; print('GOOGLE_OK')",timeout=20)
+                    print("SHEETS_RT_PATH_"+path.replace("/","_")+"_GOOGLE_RC="+str(cp.returncode))
+                    if cp.returncode==0 and "GOOGLE_OK" in cp.stdout:
+                        print("SHEETS_RT_PATH_"+path.replace("/","_")+"_GOOGLE_OK=true")
+            for root in ("/opt/fintual-sheet-sync-venv/lib","/opt/fintual-sheet-sync-current/.venv/lib"):
+                p=Path(root)
+                if p.is_dir():
+                    count=sum(1 for _ in p.rglob("googleapiclient"))
+                    print("SHEETS_RT_SITE_"+root.replace("/","_")+"_GOOGLEAPICLIENT="+str(count))
+            cred=Path("/etc/fintual-executor/google-sheet-sync.json")
+            print("SHEETS_RT_CREDENTIALS_EXISTS="+str(cred.is_file()))
+            if cred.is_file():
+                import stat
+                st=cred.stat()
+                print("SHEETS_RT_CREDENTIALS_MODE="+oct(stat.S_IMODE(st.st_mode)))
+            print("SHEETS_RT_READ_ONLY=true")
+            PY
