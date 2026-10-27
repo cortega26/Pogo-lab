@@ -218,14 +218,15 @@ jobs:
             """
                 last_stage="SERVICE_NOT_ACTIVE"
                 last_class="UNVERIFIED"
-                for attempt in range(7):
+                deadline=time.monotonic()+90
+                while time.monotonic()<deadline:
                     if service(unit)=="active":
                         try:
                             verified=subprocess.run(["sudo","-n","-u",user,
                                 str(release/".venv/bin/python"),"-B","-c",healthscript],
                                 capture_output=True,text=True,
                                 env={"PATH":"/usr/bin:/bin","PYTHONPATH":str(release/"src"),
-                                     "HOME":home},timeout=26)
+                                     "HOME":home},timeout=min(26,max(1,deadline-time.monotonic())))
                             if verified.returncode==0 and "LIVE_READ_ONLY_HEALTH=PASS" in verified.stdout:
                                 return True
                             for line in verified.stdout.splitlines():
@@ -239,7 +240,7 @@ jobs:
                         except OSError:
                             last_stage="PROBE_SPAWN_FAILED"
                             last_class="OSError"
-                    time.sleep(2)
+                    time.sleep(min(2,max(0,deadline-time.monotonic())))
                 out("IPC_FAILURE_STAGE",last_stage)
                 out("IPC_FAILURE_CLASS",last_class)
                 return False
