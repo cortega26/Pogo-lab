@@ -46,7 +46,9 @@ jobs:
             for r,row in enumerate(hidden,start=1):
                 for col,val in enumerate(row,start=1):
                     text=str(val).strip()
-                    if "IFERROR" in text and "Positions!$I$" in text:
+                    if (text.startswith("=") or text.startswith("'=") or
+                            "Datos!" in text or "INDEX(" in text or "IFERROR" in text or
+                            "Positions!$I$" in text):
                         print("SHEETS_DIAG_HIDDEN_R"+str(r)+"C"+str(col)+"="+repr(text)[:500],flush=True)
             print("SHEETS_DIAG_READ_ONLY=true",flush=True)
             PY
