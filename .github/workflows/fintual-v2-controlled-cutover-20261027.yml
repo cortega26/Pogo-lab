@@ -1,8 +1,6 @@
 name: Fintual v2 one-time code-only cutover (gated, no test orders)
+# Manual-only after the 2026-10-27 incident: never auto-run this financial release on merge.
 on:
-  push:
-    branches: [main]
-    paths: [.github/workflows/fintual-v2-controlled-cutover-20261027.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,12 +30,12 @@ jobs:
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
           command_timeout: 700s
-          capture_stdout: true
+          capture_stdout: false
           script: |
             set -euo pipefail
             sudo -n /usr/bin/python3 - <<'ROOT'
             from __future__ import annotations
-            import datetime,fcntl,hashlib,json,os,pwd,sqlite3,stat,subprocess,time
+            import datetime,fcntl,hashlib,json,os,pwd,re,sqlite3,stat,subprocess,time
             from pathlib import Path
             from types import SimpleNamespace
             from zoneinfo import ZoneInfo
@@ -193,32 +191,58 @@ jobs:
             if alias.resolve()!=candidate:fail("ATOMIC_PROMOTION_FAILED")
             out("ALIAS_PROMOTED","true")
             def live_ipc_health(release):
-                healthscript=(
-                    "from pathlib import Path;"
-                    "from decimal import Decimal;"
-                    "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle;"
-                    "from fintual_executor.client import get_buy_state;"
-                    "p=Path('/var/lib/fintual-executor/cash-ipc/cash.sock');"
-                    "h=IpcReadOnlyBrokerHandle(p);v=h.health();"
-                    "assert v.get('status')=='READY' and v.get('order_capability') is False;"
-                    "wallet=get_buy_state(h)['stocksWallet'];"
-                    "b=Decimal(str(wallet['balance']['amount']));"
-                    "assert b.is_finite() and b>=0;"
-                    "print('LIVE_READ_ONLY_HEALTH=PASS')"
-                )
-                for attempt in range(35):
+                # IPC uses a 10-second timeout PER request. The original verifier
+                # incorrectly imposed a 5-second timeout on TWO requests, and
+                # concealed all subprocess exceptions (2026-10-27 outage).
+                # Keep all diagnostics class/stage only; never expose broker data.
+                healthscript=r"""
+            from pathlib import Path
+            from decimal import Decimal
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            from fintual_executor.client import get_buy_state
+            stage='HEALTH'
+            try:
+                p=Path('/var/lib/fintual-executor/cash-ipc/cash.sock')
+                h=IpcReadOnlyBrokerHandle(p)
+                v=h.health()
+                assert v.get('status')=='READY' and v.get('order_capability') is False
+                stage='CASH'
+                wallet=get_buy_state(h)['stocksWallet']
+                b=Decimal(str(wallet['balance']['amount']))
+                assert b.is_finite() and b>=0
+            except Exception as e:
+                print('HEALTH_FAILURE_STAGE='+stage,flush=True)
+                print('HEALTH_FAILURE_CLASS='+type(e).__name__,flush=True)
+                raise SystemExit(2)
+            print('LIVE_READ_ONLY_HEALTH=PASS',flush=True)
+            """
+                last_stage="SERVICE_NOT_ACTIVE"
+                last_class="UNVERIFIED"
+                deadline=time.monotonic()+90
+                while time.monotonic()<deadline:
                     if service(unit)=="active":
                         try:
                             verified=subprocess.run(["sudo","-n","-u",user,
                                 str(release/".venv/bin/python"),"-B","-c",healthscript],
                                 capture_output=True,text=True,
                                 env={"PATH":"/usr/bin:/bin","PYTHONPATH":str(release/"src"),
-                                     "HOME":home},timeout=5)
+                                     "HOME":home},timeout=min(26,max(1,deadline-time.monotonic())))
                             if verified.returncode==0 and "LIVE_READ_ONLY_HEALTH=PASS" in verified.stdout:
                                 return True
-                        except (OSError,subprocess.TimeoutExpired):
-                            pass
-                    time.sleep(2)
+                            for line in verified.stdout.splitlines():
+                                if line in ("HEALTH_FAILURE_STAGE=HEALTH","HEALTH_FAILURE_STAGE=CASH"):
+                                    last_stage=line.split("=",1)[1]
+                                if re.fullmatch(r"HEALTH_FAILURE_CLASS=[A-Za-z_]{1,70}",line):
+                                    last_class=line.split("=",1)[1]
+                        except subprocess.TimeoutExpired:
+                            last_stage="PROBE_TIMEOUT"
+                            last_class="TimeoutExpired"
+                        except OSError:
+                            last_stage="PROBE_SPAWN_FAILED"
+                            last_class="OSError"
+                    time.sleep(min(2,max(0,deadline-time.monotonic())))
+                out("IPC_FAILURE_STAGE",last_stage)
+                out("IPC_FAILURE_CLASS",last_class)
                 return False
             def safe_rollback(reason):
                 out("POSTFLIGHT",reason)
