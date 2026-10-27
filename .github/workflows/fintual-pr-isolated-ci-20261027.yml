@@ -1,0 +1,139 @@
+name: Fintual private PR isolated CI (Oracle, no financial access)
+# Independent hosted-CI substitute when private GitHub-hosted minutes are
+# unavailable. Clones an exact private branch into a disposable directory and
+# runs compile/ruff/pytest as nobody with no financial paths or network.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact private branch to test
+        required: true
+        type: string
+      expected_sha:
+        description: Exact commit SHA expected after clone
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Run isolated compile, ruff and full pytest
+        uses: appleboy/ssh-action@v1
+        env:
+          REF: ${{ inputs.ref }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: REF,EXPECTED_SHA
+          timeout: 15s
+          command_timeout: 900s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n env REF="$REF" EXPECTED_SHA="$EXPECTED_SHA" /usr/bin/python3 - <<'PY'
+            import os, re, subprocess
+            from pathlib import Path
+
+            RUN = Path("/opt/fintual-pr-ci-isolated-20261027")
+            KEY = Path("/var/lib/fintual-ci-source-readonly")
+            UV = Path("/home/fintual/.uv-bootstrap/bin/uv")
+            REF = os.environ["REF"]
+            EXPECTED = os.environ["EXPECTED_SHA"]
+
+            def run(argv, **kwargs):
+                return subprocess.run(argv, capture_output=True, text=True, check=False, **kwargs)
+
+            def fail(code):
+                print("PR_CI_RESULT=" + code, flush=True)
+                raise SystemExit(1)
+
+            if not re.fullmatch(r"[A-Za-z0-9._/-]{1,120}", REF):
+                fail("REF_INVALID")
+            if not re.fullmatch(r"[0-9a-f]{40}", EXPECTED):
+                fail("SHA_INVALID")
+            if not (KEY / "github_ed25519").is_file() or not (KEY / "known_hosts").is_file():
+                fail("SOURCE_KEY_OR_KNOWN_HOSTS_MISSING")
+            PYTHON = Path("/opt/fintual-httpx-current/.venv/bin/python")
+            if not PYTHON.is_file():
+                fail("RUNTIME_PYTHON_MISSING")
+            run(["rm", "-rf", str(RUN)])
+            RUN.mkdir(mode=0o700)
+            env = os.environ.copy()
+            env["GIT_SSH_COMMAND"] = (
+                "ssh -o BatchMode=yes -o IdentitiesOnly=yes "
+                "-o StrictHostKeyChecking=yes "
+                f"-o UserKnownHostsFile={KEY / 'known_hosts'} "
+                f"-i {KEY / 'github_ed25519'}"
+            )
+            clone = run(["git", "clone", "--quiet", "--depth", "1", "--single-branch",
+                         "--branch", REF, "git@github.com:cortega26/fintual-executor.git",
+                         str(RUN / "repo")], env=env, timeout=180)
+            if clone.returncode:
+                fail("PRIVATE_CLONE_FAILED")
+            got = run(["git", "-C", str(RUN / "repo"), "rev-parse", "HEAD"]).stdout.strip()
+            if got != EXPECTED:
+                fail("SOURCE_SHA_MISMATCH")
+            print("PR_CI_SOURCE_SHA=" + got, flush=True)
+
+            for sub in ("vendor", "cache", "home"):
+                (RUN / sub).mkdir(mode=0o700)
+            install = run(["env", "UV_NO_CONFIG=1", f"UV_CACHE_DIR={RUN / 'cache'}",
+                           str(UV), "pip", "install", "--python", str(PYTHON),
+                           "--target", str(RUN / "vendor"),
+                           "pytest>=8", "ruff>=0.13", "httpx==0.28.1",
+                           "playwright==1.58.0", "websockets==17.1"], timeout=300)
+            if install.returncode:
+                print(install.stderr[-1200:], flush=True)
+                fail("DEPENDENCY_INSTALL_FAILED")
+            for path in RUN.rglob("*"):
+                try:
+                    os.chown(path, 65534, 65534)
+                except OSError:
+                    pass
+            os.chmod(RUN, 0o700)
+
+            inner = r'''
+            set -eu
+            "$PY_EXEC" -m compileall -q src || { echo "PR_CI_COMPILE=FAIL"; exit 21; }
+            echo "PR_CI_COMPILE=PASS"
+            "$STAGE/vendor/bin/ruff" check src tests || { echo "PR_CI_RUFF=FAIL"; exit 22; }
+            echo "PR_CI_RUFF=PASS"
+            "$PY_EXEC" -m pytest -q -p no:cacheprovider || { echo "PR_CI_PYTEST=FAIL"; exit 23; }
+            echo "PR_CI_PYTEST=PASS"
+            echo "PR_CI_RESULT=PASS"
+            '''
+            command = [
+                "systemd-run", "--collect", "--wait", "--pipe", "--quiet",
+                "-p", "User=nobody", "-p", "Group=nogroup",
+                "-p", f"WorkingDirectory={RUN / 'repo'}",
+                "-p", "Environment=PY_EXEC=" + str(PYTHON),
+                "-p", "Environment=STAGE=" + str(RUN),
+                "-p", "Environment=PYTHONPATH=" + str(RUN / "vendor") + ":" + str(RUN / "repo" / "src"),
+                "-p", "Environment=HOME=" + str(RUN / "home"),
+                "-p", "Environment=PYTHONDONTWRITEBYTECODE=1",
+                "-p", "MemoryMax=512M", "-p", "CPUQuota=50%", "-p", "TasksMax=64",
+                "-p", "NoNewPrivileges=yes", "-p", "ProtectHome=yes", "-p", "ProtectSystem=strict",
+                "-p", "PrivateTmp=yes", "-p", "IPAddressDeny=any",
+                "-p", "InaccessiblePaths=/etc/fintual-executor /var/lib/fintual-executor "
+                      "/var/lib/fintual-browser /opt/fintual-executor",
+                "-p", "RestrictAddressFamilies=AF_UNIX",
+                "-p", f"ReadWritePaths={RUN}",
+                "/usr/bin/bash", "-c", inner,
+            ]
+            result = run(command, timeout=600)
+            for line in result.stdout.splitlines():
+                if re.fullmatch(r"PR_CI_[A-Z_]+=(?:PASS|FAIL)|\d+ (?:passed|failed).*", line):
+                    print(line, flush=True)
+            if result.returncode != 0 or "PR_CI_RESULT=PASS" not in result.stdout:
+                fail("ISOLATED_TESTS_FAILED")
+            active = subprocess.run(["readlink", "-f", "/opt/fintual-httpx-current"],
+                                    capture_output=True, text=True, timeout=10).stdout.strip()
+            print("PR_CI_ACTIVE_RELEASE_UNCHANGED=" + str(active.endswith("93c03b51d69f55ee4103e59d39b1550362bfe3ae")), flush=True)
+            print("PR_CI_NO_FINANCIAL_ACCESS=true", flush=True)
+            run(["rm", "-rf", str(RUN)])
+            PY
