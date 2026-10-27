@@ -58,10 +58,14 @@ jobs:
                 child=(
                     "import sys; sys.path.insert(0,sys.argv[1]); "
                     "from pathlib import Path; "
-                    "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle; "
-                    "h=IpcReadOnlyBrokerHandle(Path(sys.argv[2])).health(); "
-                    "assert h.get('status')=='READY' and h.get('order_capability') is False; "
-                    "print('READY_READ_ONLY')"
+                    "try:\\n"
+                    " from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle\\n"
+                    " h=IpcReadOnlyBrokerHandle(Path(sys.argv[2])).health()\\n"
+                    " assert h.get('status')=='READY' and h.get('order_capability') is False\\n"
+                    " print('READY_READ_ONLY')\\n"
+                    "except Exception as exc:\\n"
+                    " print('IPC_ERROR_CLASS='+type(exc).__name__)\\n"
+                    " sys.exit(3)"
                 )
                 try:
                     cp=subprocess.run([str(release/".venv/bin/python"),"-c",child,
@@ -71,6 +75,11 @@ jobs:
                 except (OSError,subprocess.TimeoutExpired):
                     result="UNVERIFIED"
                 print("V2_BROKER_IPC_HEALTH="+result,flush=True)
+                if result!="READY_READ_ONLY":
+                    classes={"AuthRequired","PermissionError","OSError","TimeoutError","ConnectionError","ShadowTransportError","ModuleNotFoundError","AssertionError","ValueError","FileNotFoundError","ImportError","SyntaxError"}
+                    observed=[line.split("=",1)[1] for line in cp.stdout.splitlines() if line.startswith("IPC_ERROR_CLASS=")] if "cp" in locals() else []
+                    klass=observed[-1] if observed and observed[-1] in classes else "UNCLASSIFIED"
+                    print("V2_BROKER_IPC_ERROR_CLASS="+klass,flush=True)
             else:
                 print("V2_BROKER_IPC_HEALTH=NOT_AVAILABLE",flush=True)
             PY
@@ -85,7 +94,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import re,os,subprocess
-          allowed=("V2_ACTIVE_RELEASE_SHA","V2_EXECUTOR_SERVICE","V2_SHEET_SYNC_SERVICE","V2_LEGACY_BROWSER_SERVICE","V2_LEDGER_QUICK_CHECK","V2_INTENT_STATE_COLUMN","V2_UNKNOWN_INTENTS","V2_OPEN_INTENTS","V2_READ_ONLY_IPC_SOCKET","V2_BROKER_IPC_HEALTH")
+          allowed=("V2_ACTIVE_RELEASE_SHA","V2_EXECUTOR_SERVICE","V2_SHEET_SYNC_SERVICE","V2_LEGACY_BROWSER_SERVICE","V2_LEDGER_QUICK_CHECK","V2_INTENT_STATE_COLUMN","V2_UNKNOWN_INTENTS","V2_OPEN_INTENTS","V2_READ_ONLY_IPC_SOCKET","V2_BROKER_IPC_HEALTH","V2_BROKER_IPC_ERROR_CLASS")
           evidence=[]
           for s in os.getenv("OUTPUT","").splitlines():
               if "=" not in s:continue
