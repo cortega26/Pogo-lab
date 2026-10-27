@@ -1,0 +1,74 @@
+name: Fintual NVDA cash decision forensic (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  forensic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Inspect NVDA decision and cash evidence on Oracle (read only)
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json,sqlite3
+            from decimal import Decimal,InvalidOperation
+            from pathlib import Path
+            uri=Path("/var/lib/fintual-executor/state.sqlite3").as_uri()+"?mode=ro"
+            with sqlite3.connect(uri,uri=True,timeout=10) as db:
+                db.execute("PRAGMA query_only=ON")
+                db.row_factory=sqlite3.Row
+                assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+                def cols(table):
+                    return {r["name"] for r in db.execute("PRAGMA table_info("+table+")")}
+                dc=cols("decisions")
+                selected=[c for c in ("decision_id","recorded_at","symbol","action","reason","signal_side","order_amount_usd","target_usd","investable_cash_usd","fintual_investable_cash_usd") if c in dc]
+                rows=db.execute("SELECT "+",".join(selected)+" FROM decisions WHERE symbol=? AND recorded_at>=? ORDER BY decision_id DESC LIMIT 8",("NVDA","2026-10-27 13:30:00")).fetchall()
+                print("NVDA_DECISION_COUNT="+str(len(rows)),flush=True)
+                for i,row in enumerate(rows[:3]):
+                    print("NVDA_DECISION_"+str(i)+"="+json.dumps(dict(row),default=str,separators=(",",":")),flush=True)
+                ac=cols("audit_events")
+                assert {"event_type","payload_json","created_at"}.issubset(ac)
+                events=db.execute("SELECT event_type,created_at,payload_json FROM audit_events WHERE created_at>=? AND event_type IN ('FINTUAL_SIGNAL_CONFIRMATION','CASH_BLOCKED_BUY_RECHECK','CASH_BLOCKED_BUY_SESSION_WAKE') ORDER BY event_id DESC LIMIT 400",("2026-10-27 13:30:00",)).fetchall()
+                allowed={"symbol","action","reason","signal_side","side","trigger","target_usd","order_amount_usd","fintual_investable_cash_usd","investable_cash_usd","investable_usd","shortfall_ratio","shortage_ratio","signal_order_amount_usd","session_date"}
+                matched=0
+                for row in events:
+                    try: payload=json.loads(row["payload_json"])
+                    except (ValueError,TypeError): continue
+                    if not isinstance(payload,dict):continue
+                    if payload.get("symbol")!="NVDA":continue
+                    if matched>=8:break
+                    safe={k:v for k,v in payload.items() if k in allowed and isinstance(v,(str,int,float,bool,type(None)))}
+                    print("NVDA_AUDIT_"+str(matched)+"="+json.dumps({"event_type":row["event_type"],"created_at":row["created_at"],"fields":safe},separators=(",",":")),flush=True)
+                    matched+=1
+                print("NVDA_AUDIT_MATCHES="+str(matched),flush=True)
+                print("NVDA_CASH_DIAGNOSTIC=READ_ONLY_COMPLETE",flush=True)
+            PY
+      - name: Publish redacted evidence to issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROBE: ${{ steps.probe.outputs.stdout }}
+          PROBE_RESULT: ${{ steps.probe.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess
+          lines=[line for line in os.getenv("PROBE","").splitlines() if line.startswith(("NVDA_DECISION_","NVDA_AUDIT_","NVDA_CASH_DIAGNOSTIC="))]
+          body="**Read-only NVDA cash decision diagnostic**\n\nRun: "+os.environ["GH_RUN"]+"\nProbe: "+os.getenv("PROBE_RESULT","unknown")+"\n\n"+("\n".join("- `"+line.replace("`","")+" `" for line in lines) if lines else "No evidence returned.")
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=NVDA cash decision forensic 2026-10-27","-f","body="+body],capture_output=True,text=True,timeout=30)
+          if p.returncode:raise SystemExit("Failed to publish forensic evidence")
+          print("NVDA_FORENSIC_ISSUE="+json.loads(p.stdout)["html_url"])
+          PY
