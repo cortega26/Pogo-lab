@@ -59,7 +59,8 @@ jobs:
                 for key in ("status","pages_read","local_fills_checked","local_fills_unmatched","broker_fulfilled_without_local_fill","broker_legacy_fills_before_bot","local_open_intents","offset_traversal_complete","all_known_fills_match","error"):
                     value=report.get(key)
                     if isinstance(value,(bool,str,int)) or value is None:
-                        print("HISTORY_PARITY_"+key.upper()+"="+str(value).replace("None","NULL").lower() if isinstance(value,bool) else "HISTORY_PARITY_"+key.upper()+"="+str(value or "NULL"),flush=True)
+                        encoded=("true" if value else "false") if isinstance(value,bool) else ("NULL" if value is None else str(value))
+                        print("HISTORY_PARITY_"+key.upper()+"="+encoded,flush=True)
                 print("HISTORY_PARITY_BROKER_PENDING_ZERO="+str(len(buys)==0 and len(sells)==0).lower(),flush=True)
                 if report["status"]!="BOUNDED_READ_ONLY_LEDGER_PARITY_PASS" or buys or sells:
                     raise SystemExit(3)
