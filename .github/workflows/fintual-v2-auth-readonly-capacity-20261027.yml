@@ -1,0 +1,85 @@
+name: Fintual v2 independent read-only broker readiness prerequisites
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-auth-readonly-capacity-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect production owner/browser prerequisites without reading tokens
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 50s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,pwd,grp,stat,subprocess
+            from pathlib import Path
+            def emit(key,val):
+                print("BROKER_PRE_"+key+"="+str(val).lower() if isinstance(val,bool) else "BROKER_PRE_"+key+"="+str(val),flush=True)
+            target="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            active=Path("/opt/fintual-httpx-current").resolve()
+            staged=Path("/opt/fintual-httpx-releases")/target
+            emit("ACTIVE_SHA",active.name)
+            emit("STAGED_SOURCE",staged.is_dir() and (staged/".release-main-sha").is_file())
+            emit("ACTIVE_SERVICE",subprocess.run(["systemctl","is-active","fintual-executor.service"],capture_output=True,text=True,timeout=5).stdout.strip())
+            emit("BROWSER_SERVICE",subprocess.run(["systemctl","is-active","fintual-browser.service"],capture_output=True,text=True,timeout=5).stdout.strip())
+            emit("XVFB_SERVICE",subprocess.run(["systemctl","is-active","fintual-xvfb.service"],capture_output=True,text=True,timeout=5).stdout.strip())
+            def prop(k):
+                return subprocess.run(["systemctl","show","-P",k,"fintual-executor.service"],capture_output=True,text=True,timeout=5).stdout.strip()
+            user=prop("User")
+            emit("SERVICE_NONROOT",bool(user and user!="root"))
+            profile=Path("/var/lib/fintual-browser/profile")
+            chrome=Path("/var/lib/fintual-browser/chrome")
+            emit("PROFILE_EXISTS",profile.is_dir())
+            emit("CHROME_EXECUTABLE",chrome.is_file() and os.access(chrome,os.X_OK))
+            if profile.is_dir() and user:
+                st=profile.lstat()
+                emit("PROFILE_OWNED",st.st_uid==pwd.getpwnam(user).pw_uid)
+                emit("PROFILE_PRIVATE",stat.S_IMODE(st.st_mode)&0o027==0)
+                emit("CHROME_SINGLETON",os.path.lexists(profile/"SingletonLock"))
+            m={}
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if ":" in line:
+                    k,v=line.split(":",1)
+                    if k in ("MemAvailable","SwapFree"):m[k]=int(v.strip().split()[0])
+            emit("MEM_AVAILABLE_MB",m.get("MemAvailable",0)//1024)
+            emit("SWAP_FREE_MB",m.get("SwapFree",0)//1024)
+            marker=staged/"HTTPX_RUNTIME_READY.json"
+            if marker.is_file():
+                import json
+                try:
+                    obj=json.loads(marker.read_text())
+                    emit("READY_MARKER_SHA_MATCH",obj.get("source_sha")==target)
+                except Exception:
+                    emit("READY_MARKER_SHA_MATCH",False)
+            else:
+                emit("READY_MARKER_SHA_MATCH",False)
+            PY
+      - name: Record sanitized readiness facts
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OUTPUT: ${{ steps.probe.outputs.stdout }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          facts=[x for x in os.getenv("OUTPUT","").splitlines() if re.fullmatch(r"BROKER_PRE_[A-Z0-9_]+=[A-Za-z0-9_.-]{1,75}",x)]
+          body="Fintual v2 independent authenticated read-only preflight prerequisites. No credentials or trading actions.\nRun: "+os.environ["RUN"]+"\n\n"+"\n".join(facts)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual v2 broker read-only preflight prerequisites","-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Readiness evidence publication failed.")
+          PY
