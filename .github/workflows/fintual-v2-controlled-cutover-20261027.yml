@@ -190,10 +190,15 @@ jobs:
             def live_ipc_health(release):
                 healthscript=(
                     "from pathlib import Path;"
+                    "from decimal import Decimal;"
                     "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle;"
+                    "from fintual_executor.client import get_buy_state;"
                     "p=Path('/var/lib/fintual-executor/cash-ipc/cash.sock');"
-                    "v=IpcReadOnlyBrokerHandle(p).health();"
+                    "h=IpcReadOnlyBrokerHandle(p);v=h.health();"
                     "assert v.get('status')=='READY' and v.get('order_capability') is False;"
+                    "wallet=get_buy_state(h)['stocksWallet'];"
+                    "b=Decimal(str(wallet['balance']['amount']));"
+                    "assert b.is_finite() and b>=0;"
                     "print('LIVE_READ_ONLY_HEALTH=PASS')"
                 )
                 for attempt in range(35):
@@ -255,6 +260,8 @@ jobs:
                 broker_gate(candidate,user,home,history=True)
             except BaseException:
                 safe_rollback("POSTFLIGHT_BROKER_UNVERIFIED")
+            if not live_ipc_health(candidate):
+                safe_rollback("BROKER_SESSION_LOST_AFTER_POSTFLIGHT")
             final_open,final_fills=state()
             if final_open or final_fills!=before_fills:
                 safe_rollback("POSTFLIGHT_LEDGER_CHANGED")
