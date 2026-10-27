@@ -21,7 +21,7 @@ jobs:
           capture_stdout: false
           script: |
             set -euo pipefail
-            sudo -n /usr/bin/python3 - <<'PY'
+            sudo -n /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
             import datetime, hashlib, json, os, re, sqlite3, stat, sys
             from decimal import Decimal, InvalidOperation
             from pathlib import Path
