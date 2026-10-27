@@ -130,6 +130,12 @@ jobs:
                 if re.fullmatch(r"PR_CI_[A-Z_]+=(?:PASS|FAIL)|\d+ (?:passed|failed).*", line):
                     print(line, flush=True)
             if result.returncode != 0 or "PR_CI_RESULT=PASS" not in result.stdout:
+                # Sanitized failure context: no broker data or secrets exist in
+                # this disposable clone. Keep the tail bounded.
+                for stream in (result.stdout, result.stderr):
+                    for line in stream.splitlines()[-25:]:
+                        if re.search(r"PR_CI_|FAILED|ERROR|System|Failed|error|Traceback|No such|not found", line):
+                            print("PR_CI_DIAG=" + line[:240], flush=True)
                 fail("ISOLATED_TESTS_FAILED")
             active = subprocess.run(["readlink", "-f", "/opt/fintual-httpx-current"],
                                     capture_output=True, text=True, timeout=10).stdout.strip()
