@@ -1,0 +1,135 @@
+name: Fintual v2 independent authorized broker pending/history preflight (read only)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-authenticated-owner-preflight-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  broker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Probe authenticated read-only Fintual through a separate unarmed transient session
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 180s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'ROOT'
+            import pwd,stat,subprocess,re,json,os
+            from pathlib import Path
+            BASE="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            active=Path("/opt/fintual-httpx-current").resolve()
+            assert active.name==BASE,"active release unexpected"
+            def svc(name):
+                return subprocess.run(["systemctl","is-active",name],capture_output=True,text=True,timeout=6).stdout.strip()
+            assert svc("fintual-executor.service")=="active","executor unavailable"
+            assert svc("fintual-browser.service")=="inactive","browser already running"
+            assert svc("fintual-xvfb.service")=="active","display unavailable"
+            user=subprocess.run(["systemctl","show","-P","User","fintual-executor.service"],capture_output=True,text=True,timeout=6).stdout.strip()
+            assert user and user!="root","service identity not safe"
+            pw=pwd.getpwnam(user)
+            profile=Path("/var/lib/fintual-browser/profile")
+            assert profile.is_dir() and profile.stat().st_uid==pw.pw_uid
+            assert not os.path.lexists(profile/"SingletonLock")
+            assert not (stat.S_IMODE(profile.stat().st_mode)&0o027)
+            mem_kb=next(int(line.split()[1]) for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:"))
+            assert mem_kb>=2_500_000,"insufficient RAM for transient bootstrap"
+            child=r"""
+            import sys,json
+            from pathlib import Path
+            from decimal import Decimal
+            sys.path.insert(0,sys.argv[1])
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_pending,get_market_info,get_buy_state
+            from fintual_executor.engine import latest_reference
+            from fintual_executor.g8_history import scan_broker_history
+            # Explicitly disabled at construction and borrower level. There
+            # are zero mutation-capable handles or real-execution env latches.
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(owner,profile=Path(sys.argv[2]),chrome_binary=Path(sys.argv[3]))
+                handle=owner.borrow(armed=False)
+                assert handle.execution_enabled is False
+                pending=get_pending(handle)
+                buys=pending.get("stocksPendingAssetMarketBuys")
+                sells=pending.get("stocksPendingAssetMarketSells")
+                assert isinstance(buys,list) and isinstance(sells,list)
+                print("PENDING_READ_AUTHENTICATED=true",flush=True)
+                print("PENDING_BUYS_COUNT="+str(len(buys)),flush=True)
+                print("PENDING_SELLS_COUNT="+str(len(sells)),flush=True)
+                market=get_market_info(handle)
+                assert isinstance(market["isMarketOpen"],bool)
+                print("MARKET_INFO_READ=PASS",flush=True)
+                wallet=get_buy_state(handle)["stocksWallet"]
+                balance=Decimal(str(wallet["balance"]["amount"]))
+                buying_power=Decimal(str(wallet["investableAmount"]["amount"]))
+                assert balance.is_finite() and balance>=0 and buying_power.is_finite() and buying_power>=0
+                print("BROKER_CASH_DATA_VALID=true",flush=True)
+                for sym in ("NVDA","TSLA","STX"):
+                    history=scan_broker_history(handle,sym,page_size=20,max_pages=15)
+                    assert history["complete_offset_traversal"] is True
+                    ref=latest_reference(handle,sym)
+                    assert ref.price.is_finite() and ref.price>0
+                    print("BROKER_HISTORY_"+sym+"=COMPLETE",flush=True)
+                    print("BROKER_REFERENCE_"+sym+"=VALID",flush=True)
+                print("BROKER_PREFLIGHT=PASS",flush=True)
+            """
+            env=os.environ.copy()
+            env.pop("FINTUAL_REAL_EXECUTION",None)
+            env.pop("FINTUAL_HTTP_MUTATIONS",None)
+            env["DISPLAY"]=":99"
+            env["HOME"]=pw.pw_dir
+            # No production ledger, lock, or credential values passed to probe.
+            cmd=["sudo","-n","-u",user,"env","-u","FINTUAL_REAL_EXECUTION","-u","FINTUAL_HTTP_MUTATIONS",
+                 "DISPLAY=:99","HOME="+pw.pw_dir,"PYTHONPATH="+str(active/"src"),
+                 str(active/".venv/bin/python"),"-B","-c",child,str(active/"src"),
+                 str(profile),"/var/lib/fintual-browser/chrome"]
+            try:
+                p=subprocess.run(cmd,capture_output=True,text=True,timeout=145,env=env)
+            except subprocess.TimeoutExpired:
+                print("OWNER_PREFLIGHT=TIMEOUT")
+                raise SystemExit(1)
+            allowed=r"(?:PENDING_READ_AUTHENTICATED|PENDING_BUYS_COUNT|PENDING_SELLS_COUNT|MARKET_INFO_READ|BROKER_CASH_DATA_VALID|BROKER_HISTORY_(?:NVDA|TSLA|STX)|BROKER_REFERENCE_(?:NVDA|TSLA|STX)|BROKER_PREFLIGHT)=[A-Za-z0-9_.-]+"
+            for line in p.stdout.splitlines():
+                if re.fullmatch(allowed,line):print(line,flush=True)
+            if p.returncode:
+                error_classes={"AuthRequired","TransientProfileUnavailable","ShadowTransportError","RuntimeError","HistoryIncomplete","AssertionError","ValueError","TimeoutError","OSError"}
+                for line in reversed(p.stderr.splitlines()):
+                    klass=line.split(":",1)[0].rsplit(".",1)[-1].strip()
+                    if klass in error_classes:
+                        print("OWNER_PREFLIGHT_ERROR_CLASS="+klass,flush=True)
+                        break
+            print("OWNER_PREFLIGHT="+("PASS" if p.returncode==0 else "BLOCKED"),flush=True)
+            assert svc("fintual-executor.service")=="active","live service affected"
+            assert svc("fintual-browser.service")=="inactive","transient browser retained"
+            if p.returncode:raise SystemExit(1)
+            ROOT
+      - name: Publish only sanitized order preflight evidence
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT: ${{ steps.probe.outputs.stdout }}
+          STATUS: ${{ steps.probe.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          fields=[s for s in os.getenv("OUTPUT","").splitlines()
+                  if re.fullmatch(r"(?:OWNER_PREFLIGHT(?:_ERROR_CLASS)?|PENDING_READ_AUTHENTICATED|PENDING_BUYS_COUNT|PENDING_SELLS_COUNT|MARKET_INFO_READ|BROKER_CASH_DATA_VALID|BROKER_HISTORY_(?:NVDA|TSLA|STX)|BROKER_REFERENCE_(?:NVDA|TSLA|STX)|BROKER_PREFLIGHT)=[A-Za-z0-9_.-]+",s)]
+          body=("Read-only independent Fintual broker owner preflight. No authenticated tokens, cash values, personal data, or order IDs published.\nRun: "+os.environ["RUN"]+"\nResult: "+os.getenv("STATUS","UNKNOWN")+"\n\n" + "\n".join(fields))
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+              "-f","title=Fintual independent authenticated broker pending and history",
+              "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Could not publish broker verification")
+          PY
