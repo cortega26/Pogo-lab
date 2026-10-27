@@ -1,0 +1,274 @@
+name: Fintual sheet-sync v2 checkpoint fix (guarded, rollback)
+# The live sheet-sync release b9d82a7 still compares broker investableAmount
+# against accounting cash, producing a persistent US$0.01 checkpoint drift.
+# The tested v2 release b9415c5 uses broker wallet balance. This workflow
+# switches only the sheet-sync alias, restarts one presentation service, and
+# automatically restores the old alias on failure. It does not touch the
+# executor, configuration, ledger rows or orders.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: preflight is read-only; apply switches and restarts sheet sync
+        required: true
+        type: choice
+        default: preflight
+        options:
+          - preflight
+          - apply
+permissions:
+  contents: read
+concurrency:
+  group: fintual-sheet-sync-v2-checkpoint-fix
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Preflight, atomic alias switch, one restart and functional rollback
+        uses: appleboy/ssh-action@v1
+        env:
+          MODE: ${{ inputs.mode }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: MODE
+          timeout: 15s
+          command_timeout: 600s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            exec 9>/tmp/fintual-sheet-sync-v2-fix.lock
+            flock -n 9 || { echo 'SHEETSYNC_FIX=ANOTHER_OPERATION_IN_PROGRESS'; exit 42; }
+            sudo -n env MODE="$MODE" /usr/bin/python3 - <<'ROOT'
+            from __future__ import annotations
+            import datetime, hashlib, json, os, pwd, re, sqlite3, stat, subprocess, time
+            from pathlib import Path
+
+            MODE = os.environ.get("MODE", "preflight")
+            unit = "fintual-sheet-sync.service"
+            executor = "fintual-executor.service"
+            current = Path("/opt/fintual-sheet-sync-current")
+            old_target = current.resolve() if current.is_symlink() else Path("/nonexistent")
+            target = Path("/opt/fintual-httpx-releases/b9415c5ae4df8336d98b4dd1b910b979075b6e8f")
+            sqlite_path = Path("/var/lib/fintual-executor/state.sqlite3")
+
+            def out(k, v):
+                print("SHEETSYNC_FIX_" + k + "=" + str(v), flush=True)
+
+            def fail(code):
+                out("GATE", code)
+                raise SystemExit(1)
+
+            def cmd(*argv, timeout=30):
+                try:
+                    return subprocess.run(argv, capture_output=True, text=True,
+                                          timeout=timeout, check=False)
+                except (OSError, subprocess.SubprocessError):
+                    return None
+
+            def service(name):
+                p = cmd("systemctl", "is-active", name, timeout=10)
+                return p.stdout.strip() if p else "UNKNOWN"
+
+            def sha(path):
+                return hashlib.sha256(path.read_bytes()).hexdigest()
+
+            def ledger():
+                con = sqlite3.connect(sqlite_path.as_uri() + "?mode=ro", uri=True, timeout=15)
+                try:
+                    con.execute("PRAGMA query_only=ON")
+                    if con.execute("PRAGMA integrity_check").fetchone() != ("ok",):
+                        fail("LEDGER_INTEGRITY")
+                    open_n = con.execute(
+                        "SELECT COUNT(*) FROM order_intents WHERE state IN "
+                        "('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')"
+                    ).fetchone()[0]
+                    pending = con.execute(
+                        "SELECT COUNT(*) FROM sheet_sync_outbox WHERE state='PENDING'"
+                    ).fetchone()[0]
+                    return int(open_n), int(pending)
+                finally:
+                    con.close()
+
+            out("UTC", datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            if MODE not in ("preflight", "apply"):
+                fail("UNEXPECTED_MODE")
+            if not current.is_symlink() or old_target.name != "b9d82a7668ea1ff67e9623499b0df6f778b50d1b":
+                fail("SHEET_SYNC_ALIAS_NOT_EXPECTED")
+            if service(unit) != "active" or service(executor) != "active":
+                fail("SERVICES_NOT_ACTIVE")
+            out("CURRENT_ALIAS", current.resolve().name)
+            if not target.is_dir() or not (target / "src/fintual_executor/sheet_sync.py").is_file():
+                fail("V2_TARGET_ABSENT")
+            old_code = (old_target / "src/fintual_executor/sheet_sync.py").read_text()
+            new_code = (target / "src/fintual_executor/sheet_sync.py").read_text()
+            out("OLD_USES_INVESTABLE", str("investableAmount" in old_code).lower())
+            out("NEW_USES_BALANCE", str('["balance"]' in new_code or "['balance']" in new_code).lower())
+            if "investableAmount" not in old_code or not ('["balance"]' in new_code or "['balance']" in new_code):
+                fail("CHECKPOINT_FIELD_EXPECTATION_MISMATCH")
+            py = Path("/opt/fintual-sheet-sync-venv/bin/python")
+            check = subprocess.run(
+                [str(py), "-B", "-c",
+                 "import sys; sys.path.insert(0, sys.argv[1]); "
+                 "from fintual_executor import sheet_sync, google_sheets; "
+                 "print('SHEETSYNC_IMPORT=PASS')", str(target / "src")],
+                capture_output=True, text=True,
+                env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1",
+                     "PYTHONPYCACHEPREFIX": "/tmp/fintual-sheet-sync-compile"},
+                timeout=30,
+            )
+            if check.returncode != 0 or "SHEETSYNC_IMPORT=PASS" not in check.stdout:
+                out("IMPORT_ERROR", next((re.search(r"\b([A-Za-z_]+(?:Error|Exception))\b", l).group(1)
+                                          for l in reversed(check.stderr.splitlines())
+                                          if re.search(r"\b([A-Za-z_]+(?:Error|Exception))\b", l)), "UNKNOWN"))
+                fail("V2_SHEET_SYNC_IMPORT_FAILED")
+            out("V2_IMPORT", "PASS")
+            compile_check = subprocess.run(
+                [str(py), "-B", "-m", "compileall", "-q", str(target / "src")],
+                capture_output=True, text=True, timeout=30,
+                env={"PATH": "/usr/bin:/bin", "PYTHONPYCACHEPREFIX": "/tmp/fintual-sheet-sync-compile"},
+            )
+            if compile_check.returncode != 0:
+                fail("V2_SHEET_SYNC_COMPILE_FAILED")
+            out("V2_COMPILE", "PASS")
+            open_n, pending = ledger()
+            out("LEDGER_OPEN", open_n)
+            out("OUTBOX_PENDING", pending)
+            if open_n or pending:
+                fail("FINANCIAL_STATE_NOT_CLEAR")
+            config = {}
+            for name, mode_bits in (("config.json", 0o640), ("market-data.env", 0o640),
+                                    ("httpx-order.env", 0o600),
+                                    ("sheet-sync.env", 0o640)):
+                p = Path("/etc/fintual-executor") / name
+                if not p.is_file() or stat.S_IMODE(p.stat().st_mode) != mode_bits:
+                    fail("CONFIG_UNSAFE_" + name.replace(".", "_").upper())
+                config[name] = sha(p)
+            out("CONFIG", "PASS")
+            if MODE == "preflight":
+                out("RESULT", "PREFLIGHT_PASS_NO_SERVICE_CHANGED")
+                raise SystemExit(0)
+
+            # Fresh online backup; the sheet worker writes audit/outbox only,
+            # but preserve a recoverable ledger point before the restart.
+            root = Path("/var/lib/fintual-g8-backups")
+            root.mkdir(mode=0o700, exist_ok=True)
+            stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup_dir = root / ("sheet-sync-v2-" + stamp)
+            backup_dir.mkdir(mode=0o700)
+            snapshot = backup_dir / "state.sqlite3"
+            src = sqlite3.connect(sqlite_path.as_uri() + "?mode=ro", uri=True, timeout=15)
+            with src, sqlite3.connect(snapshot, timeout=20) as dest:
+                src.backup(dest, pages=256, sleep=0.02)
+            src.close()
+            os.chmod(snapshot, 0o600)
+            out("BACKUP", "PASS")
+
+            stopped = cmd("systemctl", "stop", unit, timeout=40)
+            if stopped is None or stopped.returncode or service(unit) != "inactive":
+                fail("SHEET_SYNC_NOT_QUIESCED")
+            old_resolved = current.resolve()
+            if old_resolved != old_target:
+                fail("ALIAS_CHANGED_DURING_QUIESCE")
+            tmp = Path("/opt/fintual-sheet-sync-current.next")
+            if os.path.lexists(tmp):
+                fail("TEMP_ALIAS_EXISTS")
+            tmp.symlink_to(target)
+            os.replace(tmp, current)
+            if current.resolve() != target:
+                fail("ATOMIC_ALIAS_SWITCH_FAILED")
+            out("ALIAS_SWITCHED", "true")
+            start_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            started = cmd("systemctl", "start", unit, timeout=40)
+            if started is None or started.returncode or service(unit) != "active":
+                cmd("systemctl", "stop", unit, timeout=40)
+                current.unlink()
+                current.symlink_to(old_target)
+                cmd("systemctl", "start", unit, timeout=40)
+                out("ROLLBACK", "OLD_ALIAS_RESTORED_AFTER_START_FAILURE")
+                fail("SHEET_SYNC_V2_START_FAILED")
+            out("SHEET_SYNC_ACTIVE", "true")
+
+            # Wait for the first immediate cash poll and the displayed RUNNING
+            # state. The worker updates Sync_Status every 30 seconds.
+            deadline = time.monotonic() + 150
+            ready = False
+            while time.monotonic() < deadline:
+                if service(unit) != "active":
+                    break
+                status = subprocess.run(
+                    [str(py), "-B", "-c", r"""
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, "/opt/fintual-sheet-sync-current/src")
+            from fintual_executor.google_sheets import GoogleSheetConfig, GoogleSheetsProjector
+            env = {}
+            for line in Path("/etc/fintual-executor/sheet-sync.env").read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    env[k.strip()] = v.strip().strip('"').strip("'")
+            p = GoogleSheetsProjector.from_service_account(GoogleSheetConfig(
+                spreadsheet_id=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                credentials_file=Path(env["GOOGLE_APPLICATION_CREDENTIALS"])))
+            rows = p.service.spreadsheets().values().get(
+                spreadsheetId=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                range="Sync_Status!B7:B9", valueRenderOption="UNFORMATTED_VALUE"
+            ).execute().get("values", [])
+            flat = [str(row[0]) if row else "" for row in rows]
+            print("SHEETSYNC_STATUS=" + (flat[0] if flat else "MISSING"))
+            """],
+                    capture_output=True, text=True, timeout=45,
+                )
+                state = next((l.split("=", 1)[1] for l in status.stdout.splitlines()
+                              if l.startswith("SHEETSYNC_STATUS=")), "UNKNOWN")
+                if state == "RUNNING":
+                    ready = True
+                    break
+                time.sleep(10)
+            out("DISPLAY_STATE", "RUNNING" if ready else "NOT_RUNNING")
+            if not ready:
+                cmd("systemctl", "stop", unit, timeout=40)
+                current.unlink()
+                current.symlink_to(old_target)
+                cmd("systemctl", "start", unit, timeout=40)
+                out("ROLLBACK", "OLD_ALIAS_RESTORED_AFTER_NOT_RUNNING")
+                fail("SHEET_SYNC_V2_NOT_RUNNING")
+            # No new cash checkpoint mismatch after the switch. The worker's
+            # first immediate poll runs within the wait above.
+            con = sqlite3.connect(sqlite_path.as_uri() + "?mode=ro", uri=True, timeout=10)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                recent = con.execute(
+                    "SELECT COUNT(*) FROM audit_events WHERE event_type IN "
+                    "('SHEET_CASH_CHECKPOINT_MISMATCH','SHEET_CASH_EVENT_SYNC_FAILED') "
+                    "AND created_at >= ?", (start_utc,)
+                ).fetchone()[0]
+                pending = con.execute(
+                    "SELECT COUNT(*) FROM sheet_sync_outbox WHERE state='PENDING'"
+                ).fetchone()[0]
+            finally:
+                con.close()
+            out("RECENT_CASH_ERRORS", recent)
+            out("OUTBOX_PENDING_AFTER", pending)
+            if recent or pending:
+                cmd("systemctl", "stop", unit, timeout=40)
+                current.unlink()
+                current.symlink_to(old_target)
+                cmd("systemctl", "start", unit, timeout=40)
+                out("ROLLBACK", "OLD_ALIAS_RESTORED_AFTER_CASH_ERROR")
+                fail("SHEET_SYNC_V2_CASH_NOT_HEALTHY")
+            if service(executor) != "active" or current.resolve() != target:
+                fail("POSTFLIGHT_STATE_CHANGED")
+            if service(unit) != "active":
+                fail("SHEET_SYNC_SERVICE_NOT_ACTIVE")
+            for name, digest in config.items():
+                if sha(Path("/etc/fintual-executor") / name) != digest:
+                    fail("CONFIG_CHANGED_DURING_FIX")
+            out("EXECUTOR_UNCHANGED", "true")
+            out("CONFIG_UNCHANGED", "true")
+            out("RESULT", "SHEET_SYNC_V2_CHECKPOINT_FIXED")
+            ROOT
