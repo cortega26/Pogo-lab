@@ -1,0 +1,55 @@
+name: Fintual process readiness diagnostic (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verify the exact process/provenance logic used by the release gate
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 60s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,re,subprocess
+            from pathlib import Path
+            def run(*a,timeout=15):
+                return subprocess.run(a,capture_output=True,text=True,timeout=timeout,check=False)
+            unit="fintual-executor.service"
+            release=Path("/opt/fintual-httpx-current").resolve()
+            active=run("systemctl","is-active",unit).stdout.strip()
+            raw=run("systemctl","show","-P","MainPID",unit).stdout.strip()
+            print("PROC_DIAG_ACTIVE="+active)
+            print("PROC_DIAG_MAINPID_SET="+str(raw.isdigit() and int(raw)>1))
+            pid=int(raw) if raw.isdigit() else 0
+            if pid>1:
+                try:
+                    argv=(Path("/proc")/str(pid)/"cmdline").read_bytes().split(b"\0")
+                    cwd=(Path("/proc")/str(pid)/"cwd").resolve()
+                except OSError:
+                    argv=[];cwd=Path("/")
+                command=" ".join(os.fsdecode(x) for x in argv if x)
+                print("PROC_DIAG_CWD_MATCHES_RELEASE="+str(cwd==release))
+                print("PROC_DIAG_CMDLINE_RUNNER="+str("fintual_executor.runner" in command))
+                print("PROC_DIAG_CMDLINE_HTTP_ORDER="+str("--broker-transport" in command and "http-order" in command))
+                j=run("journalctl","-u",unit,"_PID="+str(pid),"--no-pager","-o","cat","-n","250",timeout=20)
+                text=j.stdout
+                print("PROC_DIAG_JOURNAL_STATES="+str(sum(1 for line in text.splitlines() if '"state":' in line)))
+                print("PROC_DIAG_MARKET_DATA_CONNECTED="+str("MARKET_DATA_SOURCE_CONNECTED" in text))
+                print("PROC_DIAG_TRACEBACK="+str("Traceback (most recent call last)" in text))
+                print("PROC_DIAG_READY="+str(
+                    active=="active" and cwd==release and "fintual_executor.runner" in command
+                    and "--broker-transport" in command and "http-order" in command
+                    and "MARKET_DATA_SOURCE_CONNECTED" in text
+                    and "Traceback (most recent call last)" not in text))
+            print("PROC_DIAG_READ_ONLY=true")
+            PY
