@@ -1,0 +1,125 @@
+name: Fintual build inactive SHA release (NO activation)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-inactive-release-build-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Copy immutable baseline and verified 21-file overlay; run isolated import and compile checks
+        id: build
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 15s
+          command_timeout: 240s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,json,os,pathlib,shutil,stat,subprocess,tempfile
+            from pathlib import Path
+            base_id="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            target_id="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            base=Path("/opt/fintual-httpx-current").resolve()
+            releases=Path("/opt/fintual-httpx-releases").resolve()
+            staged=Path("/var/lib/fintual-executor/secure-release-import-20261027")/("staged-"+target_id)
+            target=releases/target_id
+            def fail(s):
+                print("INACTIVE_RELEASE="+s,flush=True)
+                raise SystemExit(1)
+            if base.name!=base_id or base.parent!=releases or not staged.is_dir():
+                fail("BASE_OR_STAGE_UNVERIFIED")
+            info=json.loads((staged/"release-manifest.json").read_text())
+            blobs=info["files"]
+            if info["base"]!=base_id or info["target"]!=target_id or len(blobs)!=21:
+                fail("MANIFEST_CONTRACT_FAILED")
+            def gitsha(data):
+                return hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()
+            for p,sha in blobs.items():
+                inp=staged/p
+                if not inp.is_file() or inp.is_symlink() or gitsha(inp.read_bytes())!=sha:
+                    fail("STAGED_BLOB_MISMATCH")
+            if target.exists():
+                for p,sha in blobs.items():
+                    x=target/p
+                    if not x.is_file() or gitsha(x.read_bytes())!=sha:
+                        fail("EXISTING_RELEASE_CONFLICT")
+                print("INACTIVE_RELEASE=ALREADY_STAGED")
+            else:
+                temp=Path(tempfile.mkdtemp(dir=releases,prefix=".import-"+target_id[:8]+"-"))
+                try:
+                    cp=subprocess.run(["cp","-a","--reflink=auto",str(base)+"/.",str(temp)+"/"],
+                        capture_output=True,timeout=105)
+                    if cp.returncode:
+                        fail("COPY_BASELINE_FAILED")
+                    for p,sha in blobs.items():
+                        dst=temp/p
+                        if dst.exists() and dst.is_symlink():fail("UNSAFE_OVERLAY_SYMLINK")
+                        dst.parent.mkdir(mode=0o755,parents=True,exist_ok=True)
+                        owner=(dst if dst.exists() else dst.parent).stat()
+                        content=(staged/p).read_bytes()
+                        with open(dst,"wb") as f:f.write(content)
+                        os.chmod(dst,0o644)
+                        os.chown(dst,owner.st_uid,owner.st_gid)
+                        if gitsha(dst.read_bytes())!=sha:fail("OVERLAY_VERIFICATION_FAILED")
+                    (temp/".release-main-sha").write_text(target_id+"\n")
+                    (temp/".release-source-manifest.json").write_text(json.dumps(info,sort_keys=True))
+                    os.chmod(temp/".release-main-sha",0o644)
+                    os.chmod(temp/".release-source-manifest.json",0o644)
+                    py=temp/".venv/bin/python"
+                    if not py.is_file():fail("RUNTIME_PYTHON_MISSING")
+                    script=("import pathlib,sys,fintual_executor;"
+                      "root=pathlib.Path(sys.argv[1]).resolve();"
+                      "assert pathlib.Path(fintual_executor.__file__).resolve().is_relative_to(root/'src');"
+                      "assert pathlib.Path(sys.prefix).resolve()==root/'.venv';"
+                      "print('INACTIVE_RELEASE_IMPORTS=PASS')")
+                    env={"PATH":os.environ.get("PATH","/usr/bin:/bin"),"PYTHONPATH":str(temp/"src")}
+                    pcheck=subprocess.run([str(py),"-B","-c",script,str(temp)],
+                        env=env,capture_output=True,text=True,timeout=20)
+                    if pcheck.returncode:fail("VENV_RELOCATION_IMPORT_FAILED")
+                    pcomp=subprocess.run([str(py),"-B","-m","compileall","-q",
+                        str(temp/"src"),str(temp/"tests")],
+                        env=env,capture_output=True,text=True,timeout=30)
+                    if pcomp.returncode:fail("STAGED_COMPILE_FAILED")
+                    temp.rename(target)
+                except BaseException:
+                    if temp.exists():shutil.rmtree(temp,ignore_errors=True)
+                    raise
+                print("INACTIVE_RELEASE=STAGED_AND_COMPILED")
+            # Repeat post-stage blob validation to make an OK status meaningful.
+            for p,sha in blobs.items():
+                if gitsha((target/p).read_bytes())!=sha:fail("FINAL_BLOB_MISMATCH")
+            if Path("/opt/fintual-httpx-current").resolve()!=base:
+                fail("ACTIVE_RELEASE_CHANGED_DURING_STAGE")
+            print("INACTIVE_RELEASE_TARGET="+target_id)
+            print("INACTIVE_RELEASE_CHANGED_BLOBS=21")
+            print("INACTIVE_RELEASE_ACTIVE_UNCHANGED=true")
+            print("INACTIVE_RELEASE_ORDERS_SENT=false")
+            PY
+      - name: Publish deployment-neutral evidence
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OUT: ${{ steps.build.outputs.stdout }}
+          STEP: ${{ steps.build.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import re,os,subprocess
+          lines=[x for x in os.getenv("OUT","").splitlines() if re.fullmatch(r"INACTIVE_RELEASE(?:_[A-Z0-9_]+)?=[A-Za-z0-9_.-]+",x)]
+          body="Immutable inactive Fintual release build. No symlink/service/order changes.\nRun: "+os.environ["RUN_URL"]+"\nProbe: "+os.getenv("STEP","UNKNOWN")+"\n\n"+"\n".join(lines)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+                "-f","title=Fintual SHA-pinned inactive release build",
+                "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Unable to publish build evidence")
+          PY
