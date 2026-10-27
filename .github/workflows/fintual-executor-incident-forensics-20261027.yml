@@ -81,5 +81,25 @@ jobs:
                 m=re.search(r'File "[^"]*/(fintual_executor/[^"/]+\\.py)", line (\\d+), in ([A-Za-z_][A-Za-z_0-9]*)',line)
                 if m:
                     print('FORENSIC_STACK='+m.group(1)+':'+m.group(2)+':'+m.group(3),flush=True)
+            print('FORENSIC_EXECSTART_HTTP_ORDER='+str('--broker-transport http-order' in execstart),flush=True)
+            print('FORENSIC_EXECSTART_TRANSIENT_AUTH='+str('--auth-bootstrap transient-profile' in execstart),flush=True)
+            for i,line in enumerate(lines):
+                clean=line.strip()
+                try:
+                    import json
+                    obj=json.loads(clean)
+                    if isinstance(obj,dict):
+                        for key in ('state','status','event','error_type','error_class','reason','phase'):
+                            val=obj.get(key)
+                            if isinstance(val,str) and re.fullmatch(r'[A-Za-z0-9_.-]{1,100}',val):
+                                print('FORENSIC_JOURNAL_'+str(i)+'_'+key.upper()+'='+val,flush=True)
+                        print('FORENSIC_JOURNAL_'+str(i)+'_JSON_KEYS='+','.join(sorted(k for k in obj if re.fullmatch(r'[A-Za-z_]{1,35}',k)))[:180],flush=True)
+                    elif isinstance(obj,list):
+                        print('FORENSIC_JOURNAL_'+str(i)+'_LIST=true',flush=True)
+                except (ValueError,TypeError):
+                    if re.fullmatch(r'(?:Started|Stopping|Stopped|Starting|Failed|Deactivated|Consumed) [A-Za-z0-9 ._/-]{1,130}[.]?',clean):
+                        print('FORENSIC_JOURNAL_'+str(i)+'_SYSTEMD='+clean.replace(' ','_')[:150],flush=True)
+                    else:
+                        print('FORENSIC_JOURNAL_'+str(i)+'_UNSTRUCTURED=true',flush=True)
             print('FORENSIC_READ_ONLY=true',flush=True)
             PY
