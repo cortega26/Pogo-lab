@@ -1,0 +1,67 @@
+name: Fintual secure import key bootstrap (stage only)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-secure-release-import-key.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Generate one root-private Oracle import key and publish only public PEM
+        id: key
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 100s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import os,subprocess,stat
+            from pathlib import Path
+            os.umask(0o077)
+            d=Path("/var/lib/fintual-executor/secure-release-import-20261027")
+            d.mkdir(mode=0o700,parents=True,exist_ok=True)
+            assert d.stat().st_uid==0 and stat.S_IMODE(d.stat().st_mode)==0o700
+            key=d/"rsa-private.pem"
+            if not key.exists():
+                subprocess.run(["openssl","genpkey","-algorithm","RSA",
+                                "-pkeyopt","rsa_keygen_bits:3072","-out",str(key)],
+                               check=True,capture_output=True,timeout=80)
+            assert key.stat().st_uid==0 and stat.S_IMODE(key.stat().st_mode)==0o600
+            public=subprocess.check_output(
+                ["openssl","pkey","-in",str(key),"-pubout"],timeout=10,text=True)
+            assert "BEGIN PUBLIC KEY" in public and "END PUBLIC KEY" in public
+            print("IMPORT_PUBKEY_BEGIN")
+            print(public.strip())
+            print("IMPORT_PUBKEY_END")
+            print("IMPORT_PRIVATE_KEY_ROOT_ONLY=true")
+            PY
+      - name: Publish public encryption key for source artifact transport
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEY: ${{ steps.key.outputs.stdout }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          output=os.environ.get("KEY","")
+          if not all(k in output for k in
+             ("IMPORT_PUBKEY_BEGIN","-----BEGIN PUBLIC KEY-----","-----END PUBLIC KEY-----",
+              "IMPORT_PUBKEY_END","IMPORT_PRIVATE_KEY_ROOT_ONLY=true")):
+              raise SystemExit("Oracle key generation was not confirmed")
+          part=output.split("IMPORT_PUBKEY_BEGIN",1)[1].split("IMPORT_PUBKEY_END",1)[0].strip()
+          body="One-time encryption public key for Oracle staged Fintual release. **No private key, broker or account data.**\\n\\n```pem\\n"+part+"\\n```"
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+                            "-f","title=Fintual secure stage: import public key 2026-10-27",
+                            "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Unable to publish public import key")
+          PY
