@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   actions: write
+  issues: write
 jobs:
   purge:
     runs-on: ubuntu-latest
@@ -24,4 +25,8 @@ jobs:
             removed=$((removed+1))
           done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.name == "fintual-v1-source-allowlisted") | .id')
           echo "FINTUAL_SOURCE_ARTIFACTS_PURGED=$removed"
-          test "$removed" -ge 1
+          remaining=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.name == "fintual-v1-source-allowlisted") | .id' | grep -c '^[0-9]' || true)
+          echo "FINTUAL_SOURCE_ARTIFACTS_REMAINING=$remaining"
+          body="Public-repo private source artifact cleanup verified: remaining=$remaining; deleted_this_run=$removed; run=https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. No private source payloads published."
+          gh api -X POST "repos/$GITHUB_REPOSITORY/issues" -f "title=Fintual private source CI artifact cleanup" -f "body=$body" >/dev/null
+          test "$remaining" -eq 0
