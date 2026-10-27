@@ -1,0 +1,27 @@
+name: Purge Fintual private-source CI artifacts
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-purge-private-source-artifacts.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete only previously generated private Fintual source archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          removed=0
+          while IFS= read -r artifact_id; do
+            test -n "$artifact_id" || continue
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" >/dev/null
+            removed=$((removed+1))
+          done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.name == "fintual-v1-source-allowlisted") | .id')
+          echo "FINTUAL_SOURCE_ARTIFACTS_PURGED=$removed"
+          test "$removed" -ge 1
