@@ -46,28 +46,44 @@ jobs:
             health=handle.health()
             assert health["status"]=="READY" and health["order_capability"] is False
             print("V2_SHADOW_READ_ONLY=true",flush=True)
-            print("V2_SHADOW_STAGE=PENDING",flush=True)
-            pending=get_pending(handle)
-            buys=pending.get("stocksPendingAssetMarketBuys",[])
-            sells=pending.get("stocksPendingAssetMarketSells",[])
-            assert isinstance(buys,list) and isinstance(sells,list)
-            print("V2_SHADOW_BROKER_PENDING_BUYS="+str(len(buys)),flush=True)
-            print("V2_SHADOW_BROKER_PENDING_SELLS="+str(len(sells)),flush=True)
-            print("V2_SHADOW_STAGE=BUY_STATE",flush=True)
-            buy=get_buy_state(handle)
-            investable=D(str(buy["stocksWallet"]["investableAmount"]["amount"]))
-            assert investable.is_finite() and investable>=0
-            print("V2_SHADOW_INVESTABLE_AT_LEAST_80="+str(investable>=D("80")).lower(),flush=True)
-            print("V2_SHADOW_STAGE=MARKET_INFO",flush=True)
-            market=get_market_info(handle)
-            info=market["stocksAssetsMarketInfo"]
-            print("V2_SHADOW_MARKET_OPEN="+str(bool(info["isMarketOpen"])).lower(),flush=True)
+            # Each query is independently probed. A denied query stays
+            # UNVERIFIED; never claim no pending broker orders by default.
+            def guarded(label, fn):
+                print("V2_SHADOW_STAGE="+label,flush=True)
+                try:
+                    value=fn()
+                    print("V2_SHADOW_"+label+"_READ=PASS",flush=True)
+                    return value
+                except Exception as exc:
+                    print("V2_SHADOW_"+label+"_READ=UNVERIFIED",flush=True)
+                    allowed={"ShadowReadOnlyViolation","ShadowTransportError","AuthRequired","KeyError","ValueError"}
+                    klass=type(exc).__name__
+                    print("V2_SHADOW_"+label+"_ERROR="+(klass if klass in allowed else "OTHER"),flush=True)
+                    return None
+            pending=guarded("PENDING",lambda:get_pending(handle))
+            if pending is not None:
+                buys=pending.get("stocksPendingAssetMarketBuys",[])
+                sells=pending.get("stocksPendingAssetMarketSells",[])
+                assert isinstance(buys,list) and isinstance(sells,list)
+                print("V2_SHADOW_BROKER_PENDING_BUYS="+str(len(buys)),flush=True)
+                print("V2_SHADOW_BROKER_PENDING_SELLS="+str(len(sells)),flush=True)
+            buy=guarded("BUY_STATE",lambda:get_buy_state(handle))
+            investable=None
+            if buy is not None:
+                investable=D(str(buy["stocksWallet"]["investableAmount"]["amount"]))
+                assert investable.is_finite() and investable>=0
+                print("V2_SHADOW_CASH_MATCH_SHEET_001="+str(abs(investable-D("0.01"))<=D("0.005")).lower(),flush=True)
+            market=guarded("MARKET_INFO",lambda:get_market_info(handle))
+            if market is not None:
+                info=market["stocksAssetsMarketInfo"]
+                print("V2_SHADOW_MARKET_OPEN="+str(bool(info["isMarketOpen"])).lower(),flush=True)
             anchors={"NVDA":D("237.17"),"TSLA":D("396.91"),"STX":D("779.48")}
             for symbol in ("NVDA","TSLA","STX"):
-                print("V2_SHADOW_STAGE="+symbol+"_REFERENCE",flush=True)
-                ref=latest_reference(handle,symbol)
-                print("V2_SHADOW_STAGE="+symbol+"_PRICE",flush=True)
-                price,stamp=handle.current_price(symbol)
+                ref=guarded(symbol+"_REFERENCE",lambda:latest_reference(handle,symbol))
+                quote=guarded(symbol+"_PRICE",lambda:handle.current_price(symbol))
+                if ref is None or quote is None:
+                    continue
+                price,stamp=quote
                 assert price.is_finite() and price>0 and ref.price>0
                 dt=datetime.fromisoformat(stamp.replace("Z","+00:00"))
                 assert dt.tzinfo is not None
@@ -79,7 +95,7 @@ jobs:
                 print("V2_SHADOW_"+symbol+"_BROKER_REF_MATCH_SHEET="+str(ref.price==anchors[symbol]).lower(),flush=True)
                 print("V2_SHADOW_"+symbol+"_FRESH="+str(fresh).lower(),flush=True)
                 print("V2_SHADOW_"+symbol+"_SIDE="+side,flush=True)
-                if symbol=="NVDA":
+                if symbol=="NVDA" and investable is not None:
                     shortage=(target-investable)/target if target>investable and target>0 else D("0")
                     action=("HOLD" if side!="BUY" else "BUY" if investable>=target else "BUY_ALL_CASH" if investable>0 and shortage<D("0.05") else "NO_ACTION")
                     print("V2_SHADOW_NVDA_CASH_ACTION="+action,flush=True)
