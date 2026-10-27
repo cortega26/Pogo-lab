@@ -1,0 +1,90 @@
+name: Fintual v2 pre-promotion readiness baseline (read-only)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-readiness-baseline.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production release, broker IPC readiness and pending intent counts
+        id: baseline
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 45s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import sqlite3, subprocess, sys
+            from pathlib import Path
+            release=Path("/opt/fintual-httpx-current").resolve()
+            print("V2_ACTIVE_RELEASE_SHA="+release.name,flush=True)
+            def svc(unit):
+                cp=subprocess.run(["systemctl","is-active",unit],capture_output=True,text=True,timeout=8)
+                raw=cp.stdout.strip()[:30]
+                return raw if raw in {"active","inactive","failed","activating","deactivating","unknown"} else "UNKNOWN"
+            print("V2_EXECUTOR_SERVICE="+svc("fintual-executor.service"),flush=True)
+            print("V2_SHEET_SYNC_SERVICE="+svc("fintual-sheet-sync.service"),flush=True)
+            print("V2_LEGACY_BROWSER_SERVICE="+svc("fintual-browser.service"),flush=True)
+            dbfile=Path("/var/lib/fintual-executor/state.sqlite3")
+            with sqlite3.connect(dbfile.as_uri()+"?mode=ro",uri=True,timeout=8) as db:
+                db.execute("PRAGMA query_only=ON")
+                quick=db.execute("PRAGMA quick_check(1)").fetchone()[0]
+                print("V2_LEDGER_QUICK_CHECK="+("OK" if quick=="ok" else "FAILED"),flush=True)
+                cols={c[1] for c in db.execute("PRAGMA table_info(order_intents)")}
+                if "state" not in cols:
+                    print("V2_INTENT_STATE_COLUMN=MISSING",flush=True)
+                else:
+                    for name,states in (
+                        ("UNKNOWN",("UNKNOWN",)),
+                        ("OPEN",("SIGNALLED","SUBMITTING","ACKNOWLEDGED","PARTIALLY_FILLED","UNKNOWN")),
+                    ):
+                        marks=",".join("?"*len(states))
+                        n=db.execute("SELECT count(*) FROM order_intents WHERE state IN ("+marks+")",states).fetchone()[0]
+                        print("V2_"+name+"_INTENTS="+str(n),flush=True)
+            socket_path=Path("/var/lib/fintual-executor/cash-ipc/cash.sock")
+            print("V2_READ_ONLY_IPC_SOCKET="+str(socket_path.exists()).lower(),flush=True)
+            if socket_path.exists():
+                sys.path.insert(0,str(release/"src"))
+                try:
+                    from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+                    owner=IpcReadOnlyBrokerHandle(socket_path)
+                    healthy=owner.health()
+                    assert healthy.get("order_capability") is False
+                    print("V2_BROKER_IPC_HEALTH=READY_READ_ONLY",flush=True)
+                except Exception:
+                    print("V2_BROKER_IPC_HEALTH=UNVERIFIED",flush=True)
+            else:
+                print("V2_BROKER_IPC_HEALTH=NOT_AVAILABLE",flush=True)
+            PY
+      - name: Publish sanitized release-readiness evidence
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT: ${{ steps.baseline.outputs.stdout }}
+          OUTCOME: ${{ steps.baseline.outcome }}
+        run: |
+          python3 - <<'PY'
+          import re,os,subprocess
+          allowed=("V2_ACTIVE_RELEASE_SHA","V2_EXECUTOR_SERVICE","V2_SHEET_SYNC_SERVICE","V2_LEGACY_BROWSER_SERVICE","V2_LEDGER_QUICK_CHECK","V2_INTENT_STATE_COLUMN","V2_UNKNOWN_INTENTS","V2_OPEN_INTENTS","V2_READ_ONLY_IPC_SOCKET","V2_BROKER_IPC_HEALTH")
+          evidence=[]
+          for s in os.getenv("OUTPUT","").splitlines():
+              if "=" not in s:continue
+              k,v=s.split("=",1)
+              if k in allowed and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}",v):evidence.append("- "+k+": "+v)
+          body="Read-only v2 readiness baseline. Run: "+os.environ["GH_RUN"]+"\nProbe outcome: "+os.getenv("OUTCOME","UNKNOWN")+"\n\n"+"\n".join(evidence)+"\n\nThis check does not prove broker pending orders, live investable cash or safe rearming. No broker order or service modification."
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual v2 pre-promotion read-only readiness","-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode: raise SystemExit("Could not publish readiness baseline")
+          PY
