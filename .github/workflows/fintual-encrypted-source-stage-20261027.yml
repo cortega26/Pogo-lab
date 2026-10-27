@@ -1,0 +1,135 @@
+name: Fintual encrypted source staging (NO service changes)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-encrypted-source-stage-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Import authenticated encryption envelope; verify Git blobs; stage private source only
+        id: stage
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 15s
+          command_timeout: 140s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import base64,hashlib,hmac,io,json,os,stat,subprocess,sys,tarfile,urllib.request
+            from pathlib import Path
+            URL="https://sb-ux2yrpdz0q4h.vercel.run/artifact/45b12bb354cdaa18b44ca1fe960cbc9f8161ed6c"
+            BASE="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            TARGET="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            root=Path("/var/lib/fintual-executor/secure-release-import-20261027")
+            priv=root/"rsa-private.pem"
+            stage=root/("staged-"+TARGET)
+            def fail(label):
+                print("RELEASE_STAGE="+label,flush=True)
+                raise SystemExit(1)
+            if not priv.is_file() or priv.stat().st_uid!=0 or stat.S_IMODE(priv.stat().st_mode)!=0o600:
+                fail("PRIVATE_KEY_UNAVAILABLE")
+            if not root.is_dir() or root.stat().st_uid!=0 or stat.S_IMODE(root.stat().st_mode)!=0o700:
+                fail("ROOT_STAGING_DIR_UNSAFE")
+            active=Path("/opt/fintual-httpx-current").resolve()
+            if active.name!=BASE:fail("BASE_RELEASE_CHANGED")
+            try:
+                with urllib.request.urlopen(urllib.request.Request(URL,headers={"User-Agent":"fintual-stage-reader/1"}),timeout=35) as resp:
+                    assert resp.status==200
+                    raw=resp.read(500000)
+                    if len(raw)>=500000:fail("ENVELOPE_OVERSIZE")
+                e=json.loads(raw)
+                if (e["format"]!="fintual-release-etm-v1" or
+                    e["base"]!=BASE or e["target"]!=TARGET):
+                    fail("ENVELOPE_METADATA_MISMATCH")
+                iv=base64.b64decode(e["iv"],validate=True)
+                ct=base64.b64decode(e["ciphertext"],validate=True)
+                tag=base64.b64decode(e["tag"],validate=True)
+                wrapped=base64.b64decode(e["wrapped"],validate=True)
+                if len(iv)!=16 or len(tag)!=32 or len(ct)>300000:fail("ENVELOPE_SHAPE_INVALID")
+                keys=subprocess.run(["openssl","pkeyutl","-decrypt","-inkey",str(priv),
+                    "-pkeyopt","rsa_padding_mode:oaep",
+                    "-pkeyopt","rsa_oaep_md:sha256",
+                    "-pkeyopt","rsa_mgf1_md:sha256"],
+                    input=wrapped,capture_output=True,timeout=15,check=True).stdout
+                if len(keys)!=64:fail("WRAPPED_KEY_INVALID")
+                k,mac_key=keys[:32],keys[32:]
+                true_tag=hmac.new(mac_key,b"fintual-release-etm-v1\n"+iv+ct,"sha256").digest()
+                if not hmac.compare_digest(tag,true_tag):fail("CIPHERTEXT_HMAC_FAILED")
+                body=subprocess.run(["openssl","enc","-d","-aes-256-ctr",
+                    "-K",k.hex(),"-iv",iv.hex()],input=ct,capture_output=True,
+                    timeout=15,check=True).stdout
+                if hashlib.sha256(body).hexdigest()!=e["sha256"]:fail("PLAINTEXT_CHECKSUM_FAILED")
+                with tarfile.open(fileobj=io.BytesIO(body),mode="r:gz") as archive:
+                    members=archive.getmembers()
+                    names=[m.name for m in members]
+                    if len(names)!=22 or set(names)!={m.name for m in members}:
+                        fail("ARCHIVE_CARDINALITY_INVALID")
+                    if "release-manifest.json" not in names:fail("MANIFEST_MISSING")
+                    info=json.load(archive.extractfile("release-manifest.json"))
+                    if info["base"]!=BASE or info["target"]!=TARGET:fail("MANIFEST_IDENTITY_MISMATCH")
+                    hashes=info["files"]
+                    if len(hashes)!=21 or set(names)!=set(hashes)|{"release-manifest.json"}:
+                        fail("MANIFEST_FILESET_MISMATCH")
+                    checks={}
+                    for member in members:
+                        if not member.isfile() or member.size>350000 or member.name.startswith("/") or ".." in Path(member.name).parts:
+                            fail("UNSAFE_ARCHIVE_MEMBER")
+                        buf=archive.extractfile(member).read()
+                        if member.name=="release-manifest.json":
+                            checks[member.name]=buf
+                            continue
+                        sha=hashlib.sha1(b"blob "+str(len(buf)).encode()+b"\0"+buf).hexdigest()
+                        if sha!=hashes[member.name]:fail("GIT_BLOB_MISMATCH")
+                        checks[member.name]=buf
+                if stage.exists():
+                    if any(not (stage/p).is_file() for p in checks):fail("STAGE_PARTIAL")
+                    for p,data in checks.items():
+                        if (stage/p).read_bytes()!=data:fail("STAGE_CONFLICT")
+                else:
+                    stage.mkdir(mode=0o700)
+                    for p,data in checks.items():
+                        dst=stage/p
+                        dst.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+                        with open(dst,"xb") as f:f.write(data)
+                        dst.chmod(0o600)
+                print("RELEASE_STAGE=PASS")
+                print("RELEASE_STAGE_BASE="+BASE)
+                print("RELEASE_STAGE_TARGET="+TARGET)
+                print("RELEASE_STAGE_GIT_BLOBS=21")
+                print("RELEASE_STAGE_BUNDLE_SHA256="+e["sha256"])
+                print("RELEASE_STAGE_NO_SERVICES_CHANGED=true")
+                print("RELEASE_STAGE_NO_ORDERS_SUBMITTED=true")
+            except SystemExit:raise
+            except Exception:
+                fail("UNVERIFIED")
+            PY
+      - name: Publish sanitized staging proof
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROBE: ${{ steps.stage.outcome }}
+          OUT: ${{ steps.stage.outputs.stdout }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          lines=[x for x in os.getenv("OUT","").splitlines() if re.fullmatch(r"RELEASE_STAGE(?:_[A-Z0-9_]+)?=[A-Za-z0-9_.-]+",x)]
+          body=("Encrypted Fintual source overlay stage. **No runtime or order changes.**\n"
+              +"Run: "+os.environ["RUN_URL"]+"\nProbe outcome: "+os.getenv("PROBE","UNKNOWN")
+              +"\n\n"+"\n".join(lines))
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+              "-f","title=Fintual encrypted source stage acceptance",
+              "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Could not publish sanitized staging proof")
+          PY
