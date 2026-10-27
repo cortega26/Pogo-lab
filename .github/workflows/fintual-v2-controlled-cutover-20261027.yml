@@ -39,6 +39,7 @@ jobs:
             from __future__ import annotations
             import datetime,fcntl,hashlib,json,os,pwd,sqlite3,stat,subprocess,time
             from pathlib import Path
+            from types import SimpleNamespace
             from zoneinfo import ZoneInfo
             BASE="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
             TARGET="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
@@ -55,7 +56,11 @@ jobs:
                 out("GATE",code)
                 raise SystemExit(1)
             def cmd(*args,timeout=18):
-                return subprocess.run(args,check=False,capture_output=True,text=True,timeout=timeout)
+                try:
+                    return subprocess.run(args,check=False,capture_output=True,text=True,timeout=timeout)
+                except (OSError,subprocess.TimeoutExpired):
+                    # Never treat an uncertain systemctl command as success.
+                    return SimpleNamespace(returncode=124,stdout="",stderr="")
             def service(name):
                 return cmd("systemctl","is-active",name).stdout.strip()
             def state():
