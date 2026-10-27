@@ -1,0 +1,105 @@
+name: Fintual fee/cash root-cause probe (strict read-only)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-trade-fee-cash-rootcause.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect permitted broker cash balance and IPC allowlist
+        id: check
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 65s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import pwd,stat,subprocess,re
+            from pathlib import Path
+            release=Path("/opt/fintual-httpx-current").resolve()
+            path=Path("/var/lib/fintual-executor/cash-ipc/cash.sock")
+            ss=path.lstat()
+            ps=path.parent.stat()
+            assert stat.S_ISSOCK(ss.st_mode) and stat.S_IMODE(ss.st_mode)==0o600
+            assert stat.S_IMODE(ps.st_mode)==0o700 and ss.st_uid==ps.st_uid
+            owner=pwd.getpwuid(ss.st_uid).pw_name
+            child=r"""
+            import sys
+            from pathlib import Path
+            from decimal import Decimal as D
+            sys.path.insert(0,sys.argv[1])
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle,_validate_read_only_query
+            from fintual_executor.client import PENDING_QUERY,get_buy_state,get_pending
+            from fintual_executor.shadow_http import READ_ONLY_QUERIES
+            sock=Path(sys.argv[2])
+            h=IpcReadOnlyBrokerHandle(sock)
+            health=h.health()
+            assert health["status"]=="READY" and health["order_capability"] is False
+            print("RC_IPC_HEALTH=PASS",flush=True)
+            # Check the local client and its installed allowlist; no broker call.
+            try:
+                _validate_read_only_query("PendingStocksWalletMovements",PENDING_QUERY,None)
+                print("RC_LOCAL_PENDING_QUERY_ALLOWED=true",flush=True)
+            except Exception:
+                print("RC_LOCAL_PENDING_QUERY_ALLOWED=false",flush=True)
+            try:
+                get_pending(h)
+                print("RC_SERVER_PENDING_QUERY_ALLOWED=true",flush=True)
+            except Exception as e:
+                print("RC_SERVER_PENDING_QUERY_ALLOWED=false",flush=True)
+                print("RC_SERVER_PENDING_DENIED_CLASS="+(type(e).__name__ if type(e).__name__ in ("ShadowReadOnlyViolation","ShadowTransportError","AuthRequired") else "OTHER"),flush=True)
+            buy=get_buy_state(h)
+            wallet=buy["stocksWallet"]
+            balance=D(str(wallet["balance"]["amount"]))
+            investable=D(str(wallet["investableAmount"]["amount"]))
+            expected=D("0.01")
+            old=D("0.18")
+            assert balance.is_finite() and investable.is_finite() and balance>=0 and investable>=0
+            print("RC_BALANCE_MATCH_FEE_LEDGER="+str(abs(balance-expected)<=D("0.005")).lower(),flush=True)
+            print("RC_INVESTABLE_MATCH_FEE_LEDGER="+str(abs(investable-expected)<=D("0.005")).lower(),flush=True)
+            print("RC_BALANCE_MATCH_PRE_FEE_LEDGER="+str(abs(balance-old)<=D("0.005")).lower(),flush=True)
+            print("RC_INVESTABLE_MATCH_PRE_FEE_LEDGER="+str(abs(investable-old)<=D("0.005")).lower(),flush=True)
+            print("RC_BALANCE_GE_INVESTABLE="+str(balance>=investable).lower(),flush=True)
+            diff=balance-investable
+            category=("same" if abs(diff)<D("0.005") else "under_cent" if abs(diff)<D("0.01") else "cents" if abs(diff)<=D("0.25") else "material")
+            print("RC_BALANCE_MINUS_INVESTABLE_BAND="+category,flush=True)
+            # Only emit a coarse classification, never balances or credentials.
+            def bucket(value):
+                diff=abs(value-expected)
+                return "under_cent" if diff<D("0.01") else "cents" if diff<=D("0.25") else "material"
+            print("RC_LEDGER_BALANCE_DELTA_BAND="+bucket(balance),flush=True)
+            print("RC_LEDGER_INVESTABLE_DELTA_BAND="+bucket(investable),flush=True)
+            print("RC_PROBE_DONE=true",flush=True)
+            """
+            p=subprocess.run(["sudo","-n","-u",owner,str(release/".venv/bin/python"),"-B","-c",child,str(release/"src"),str(path)],capture_output=True,text=True,timeout=55)
+            for line in p.stdout.splitlines():
+                if re.fullmatch(r"RC_[A-Z0-9_]+=[A-Za-z0-9_.-]+",line):
+                    print(line,flush=True)
+            print("RC_PROCESS="+("PASS" if p.returncode==0 else "FAILED"),flush=True)
+            PY
+      - name: Publish only coarse cash classification; never balances
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LOG: ${{ steps.check.outputs.stdout }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          lines=[s for s in os.getenv("LOG","").splitlines() if re.fullmatch(r"RC_[A-Z0-9_]+=[A-Za-z0-9_.-]+",s)]
+          body="Broker read-only cash/IPC root-cause probe. No monetary values or tokens published.\nRun: "+os.environ["RUN_URL"]+"\n\n"+"\n".join(lines)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual root cause: broker cash vs ledger and IPC allowlist","-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Could not publish sanitized diagnostic")
+          PY
