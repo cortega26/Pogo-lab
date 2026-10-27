@@ -10,7 +10,7 @@ permissions:
 jobs:
   cutover:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 14
     steps:
       - name: Enforce after-market closed 2026-10-27 window before SSH
         shell: bash
@@ -31,7 +31,7 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           timeout: 12s
-          command_timeout: 340s
+          command_timeout: 700s
           capture_stdout: true
           script: |
             set -euo pipefail
@@ -187,60 +187,86 @@ jobs:
             os.replace(tmp,alias)
             if alias.resolve()!=candidate:fail("ATOMIC_PROMOTION_FAILED")
             out("ALIAS_PROMOTED","true")
-            start=cmd("systemctl","start",unit,timeout=35)
-            healthy=False
-            if start.returncode==0:
-                for i in range(27):
+            def live_ipc_health(release):
+                healthscript=(
+                    "from pathlib import Path;"
+                    "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle;"
+                    "p=Path('/var/lib/fintual-executor/cash-ipc/cash.sock');"
+                    "v=IpcReadOnlyBrokerHandle(p).health();"
+                    "assert v.get('status')=='READY' and v.get('order_capability') is False;"
+                    "print('LIVE_READ_ONLY_HEALTH=PASS')"
+                )
+                for attempt in range(35):
                     if service(unit)=="active":
-                        # Correct currently running module and cash IPC owner.
-                        healthscript=(
-                            "from pathlib import Path;"
-                            "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle;"
-                            "p=Path('/var/lib/fintual-executor/cash-ipc/cash.sock');"
-                            "v=IpcReadOnlyBrokerHandle(p).health();"
-                            "assert v.get('status')=='READY' and v.get('order_capability') is False;"
-                            "print('LIVE_READ_ONLY_HEALTH=PASS')"
-                        )
-                        verify=subprocess.run(["sudo","-n","-u",user,
-                            str(candidate/".venv/bin/python"),"-B","-c",healthscript],
-                            capture_output=True,text=True,
-                            env={"PATH":"/usr/bin:/bin","PYTHONPATH":str(candidate/"src"),
-                                 "HOME":home},timeout=6)
-                        if verify.returncode==0 and "LIVE_READ_ONLY_HEALTH=PASS" in verify.stdout:
-                            healthy=True
-                            break
+                        try:
+                            verified=subprocess.run(["sudo","-n","-u",user,
+                                str(release/".venv/bin/python"),"-B","-c",healthscript],
+                                capture_output=True,text=True,
+                                env={"PATH":"/usr/bin:/bin","PYTHONPATH":str(release/"src"),
+                                     "HOME":home},timeout=5)
+                            if verified.returncode==0 and "LIVE_READ_ONLY_HEALTH=PASS" in verified.stdout:
+                                return True
+                        except (OSError,subprocess.TimeoutExpired):
+                            pass
                     time.sleep(2)
-            if not healthy:
-                out("POSTFLIGHT","FAILED")
+                return False
+            def safe_rollback(reason):
+                out("POSTFLIGHT",reason)
                 cmd("systemctl","stop",unit,timeout=35)
-                open_now,fill_now=state()
-                # Automatic rollback is never allowed when financial changes
-                # or uncertain broker state might have occurred.
-                if not open_now and fill_now==before_fills:
-                    try:
-                        broker_gate(original,user,home,history=True)
-                        fallback=Path("/opt/fintual-httpx-current.rollback-next")
-                        if os.path.lexists(fallback):fail("ROLLBACK_ALIAS_CONFLICT")
-                        fallback.symlink_to(original)
-                        os.replace(fallback,alias)
-                        restart=cmd("systemctl","start",unit,timeout=35)
-                        if restart.returncode or service(unit)!="active":
-                            fail("ROLLBACK_RESTART_FAILED")
-                        out("ROLLBACK","OLD_RELEASE_RESTORED")
-                    except Exception:
-                        out("ROLLBACK","FAILED_CLOSED")
-                else:
+                if service(unit)!="inactive":
+                    out("ROLLBACK","FAILED_CLOSED_SERVICE_NOT_STOPPED")
+                    raise SystemExit(1)
+                try:
+                    open_now,fill_now=state()
+                except Exception:
+                    out("ROLLBACK","FAILED_CLOSED_LEDGER_UNVERIFIED")
+                    raise SystemExit(1)
+                if open_now or fill_now!=before_fills:
                     out("ROLLBACK","BLOCKED_BY_FINANCIAL_STATE")
+                    raise SystemExit(1)
+                # Before any old release is restarted independently verify
+                # broker pending lists, history, and market-closed status.
+                try:
+                    broker_gate(original,user,home,history=True)
+                except BaseException:
+                    out("ROLLBACK","FAILED_CLOSED_BROKER_UNVERIFIED")
+                    raise SystemExit(1)
+                fallback=Path("/opt/fintual-httpx-current.rollback-next")
+                if os.path.lexists(fallback):
+                    out("ROLLBACK","FAILED_CLOSED_ALIAS_CONFLICT")
+                    raise SystemExit(1)
+                fallback.symlink_to(original)
+                os.replace(fallback,alias)
+                restart=cmd("systemctl","start",unit,timeout=35)
+                if restart.returncode or not live_ipc_health(original):
+                    cmd("systemctl","stop",unit,timeout=35)
+                    out("ROLLBACK","FAILED_CLOSED_OLD_RUNTIME")
+                    raise SystemExit(1)
+                out("ROLLBACK","OLD_RELEASE_RESTORED_AND_HEALTHY")
                 raise SystemExit(1)
+            start=cmd("systemctl","start",unit,timeout=35)
+            if start.returncode or not live_ipc_health(candidate):
+                safe_rollback("NEW_RUNTIME_NOT_HEALTHY")
+            if alias.resolve()!=candidate:
+                safe_rollback("POSTFLIGHT_ALIAS_MISMATCH")
+            if service("fintual-browser.service")!="inactive":
+                safe_rollback("RESIDENT_BROWSER_ACTIVATED")
+            try:
+                broker_gate(candidate,user,home,history=True)
+            except BaseException:
+                safe_rollback("POSTFLIGHT_BROKER_UNVERIFIED")
             final_open,final_fills=state()
-            if final_open or final_fills!=before_fills:fail("POSTFLIGHT_LEDGER_CHANGED")
-            if alias.resolve()!=candidate:fail("POSTFLIGHT_ALIAS_MISMATCH")
+            if final_open or final_fills!=before_fills:
+                safe_rollback("POSTFLIGHT_LEDGER_CHANGED")
             for f,s in config.items():
                 if hashlib.sha256((Path("/etc/fintual-executor")/f).read_bytes()).hexdigest()!=s:
-                    fail("CONFIG_CHANGED_POSTPROMOTION")
+                    safe_rollback("CONFIG_CHANGED_POSTPROMOTION")
+            if service(unit)!="active" or alias.resolve()!=candidate:
+                safe_rollback("RUNTIME_STATE_CHANGED")
             out("GATE","PASS")
             out("ACTIVE_SHA",TARGET)
             out("BROKER_PREFLIGHT","PASS")
+            out("BROKER_POSTFLIGHT","PASS")
             out("LOCAL_OPEN_INTENTS",final_open)
             out("FILL_COUNT",final_fills)
             out("SERVICE_HEALTH","PASS")
