@@ -1,0 +1,85 @@
+name: Fintual executor incident forensics - sanitized read only
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fintual-executor-incident-forensics-20261027.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  forensic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read only systemd journal and IPC socket forensic evidence
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 100s
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import subprocess,os,stat,socket,re,pwd,collections
+            from pathlib import Path
+            unit='fintual-executor.service'
+            def run(*argv,timeout=15):
+                return subprocess.run(argv,text=True,capture_output=True,timeout=timeout,check=False)
+            show=run('systemctl','show',unit,'-p','ActiveState','-p','SubState','-p','Result','-p','ExecMainCode','-p','ExecMainStatus','-p','NRestarts','-p','User','-p','ExecStart','-p','FragmentPath')
+            info=dict(line.split('=',1) for line in show.stdout.splitlines() if '=' in line)
+            for key in ('ActiveState','SubState','Result','ExecMainCode','ExecMainStatus','NRestarts'):
+                print('FORENSIC_'+key.upper()+'='+re.sub(r'[^A-Za-z0-9_.-]','',info.get(key,''))[:50],flush=True)
+            execstart=info.get('ExecStart','')
+            print('FORENSIC_EXECSTART_RECLAIM_FLAG='+str('--reclaim-stale-socket' in execstart),flush=True)
+            print('FORENSIC_EXECSTART_CASH_SOCKET='+str('cash.sock' in execstart),flush=True)
+            print('FORENSIC_EXECSTART_SESSION_OWNER='+str('session_ipc' in execstart),flush=True)
+            print('FORENSIC_EXECSTART_SHADOW_OWNER='+str('shadow_longrun' in execstart),flush=True)
+            print('FORENSIC_EXECSTART_RELEASE_SYMLINK='+str('fintual-httpx-current' in execstart),flush=True)
+            user=info.get('User','')
+            print('FORENSIC_USER_SET='+str(bool(user)),flush=True)
+            alias=Path('/opt/fintual-httpx-current')
+            print('FORENSIC_ACTIVE_SHA='+alias.resolve().name if alias.is_symlink() else 'FORENSIC_ACTIVE_SHA=NOT_SYMLINK',flush=True)
+            sock=Path('/var/lib/fintual-executor/cash-ipc/cash.sock')
+            try:
+                st=sock.lstat(); parent=sock.parent.stat()
+                print('FORENSIC_SOCKET_TYPE='+('SOCKET' if stat.S_ISSOCK(st.st_mode) else 'OTHER'),flush=True)
+                print('FORENSIC_SOCKET_UID_MATCH='+str(st.st_uid==parent.st_uid),flush=True)
+                print('FORENSIC_SOCKET_OWNER_IS_SERVICE='+str(pwd.getpwuid(st.st_uid).pw_name==user),flush=True)
+                print('FORENSIC_SOCKET_MODE='+oct(stat.S_IMODE(st.st_mode)),flush=True)
+                print('FORENSIC_SOCKET_PARENT_MODE='+oct(stat.S_IMODE(parent.st_mode)),flush=True)
+                with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as probe:
+                    probe.settimeout(2)
+                    try:probe.connect(str(sock)); outcome='CONNECTED'
+                    except OSError as e:outcome='ERRNO_'+str(e.errno)
+                    except TimeoutError:outcome='TIMEOUT'
+                print('FORENSIC_SOCKET_CONNECT='+outcome,flush=True)
+            except FileNotFoundError:
+                print('FORENSIC_SOCKET_TYPE=MISSING',flush=True)
+            journal=run('journalctl','-u',unit,'--since','2026-10-27 20:14:00 UTC','--no-pager','-o','cat','-n','350',timeout=20)
+            lines=journal.stdout.splitlines()
+            print('FORENSIC_JOURNAL_LINES='+str(len(lines)),flush=True)
+            classes=['FileExistsError','PermissionError','ModuleNotFoundError','ImportError','SyntaxError','AssertionError','ValueError','RuntimeError','TypeError','KeyError','AttributeError','OSError','ConnectionRefusedError','TimeoutError','AuthRequired','ShadowTransportError','ShadowReadOnlyViolation','FileNotFoundError']
+            detected=[c for c in classes if any(re.search(r'\\b'+re.escape(c)+r'\\b',line) for line in lines)]
+            print('FORENSIC_EXCEPTION_CLASSES='+(','.join(detected) if detected else 'NONE'),flush=True)
+            terms={'SOCKET_ALREADY_EXISTS':r'(socket path already exists|existing session owner|address already in use|FileExistsError)',
+                   'OWNER_LOCK_HELD':r'(another session owner holds the lock|LOCK_HELD)',
+                   'BOOTSTRAP_FAILED':r'SESSION_OWNER_BOOTSTRAP_FAILED',
+                   'READONLY_READY':r'SESSION_OWNER_READONLY_READY',
+                   'MISSING_MODULE':r'ModuleNotFoundError',
+                   'EXIT_FAILURE':r'(main process exited|failed with result|failed to start)',
+                   'CONFIG_FAILURE':r'(configuration invalid|config_invalid)',
+                   'AUTH_FAILURE':r'(authrequired|authentication required)',
+                   'START_LIMIT':r'start request repeated too quickly',
+                   'PYTHON_TRACEBACK':r'Traceback [(]most recent call last[)]'}
+            for name,pattern in terms.items():
+                print('FORENSIC_EVENT_'+name+'='+str(sum(bool(re.search(pattern,line,re.I)) for line in lines)),flush=True)
+            for line in lines:
+                # Only module path, function, and line number; never log arbitrary source text.
+                m=re.search(r'File "[^"]*/(fintual_executor/[^"/]+\\.py)", line (\\d+), in ([A-Za-z_][A-Za-z_0-9]*)',line)
+                if m:
+                    print('FORENSIC_STACK='+m.group(1)+':'+m.group(2)+':'+m.group(3),flush=True)
+            print('FORENSIC_READ_ONLY=true',flush=True)
+            PY
