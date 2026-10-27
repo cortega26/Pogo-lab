@@ -1,0 +1,236 @@
+name: Fintual Sheets v2 formula activation (dry-run first, atomic six cells)
+# Writes only Stocks!AL3/AO3/AX3/BA3/BB3/BE3 after v2 is verified live.
+# One values.batchUpdate call; on any verification failure restores all six
+# from the hidden Strategy_v1_rollback_20261027 backup tab.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry_run validates only; apply performs the atomic six-cell update
+        required: true
+        type: choice
+        default: dry_run
+        options:
+          - dry_run
+          - apply
+permissions:
+  contents: read
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate or apply six v2 formulas with automatic six-cell rollback
+        uses: appleboy/ssh-action@v1
+        env:
+          MODE: ${{ inputs.mode }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: MODE
+          timeout: 15s
+          command_timeout: 300s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n env MODE="$MODE" /opt/fintual-sheet-sync-venv/bin/python - <<'PY'
+            from __future__ import annotations
+            import datetime, hashlib, json, os, sys
+            from decimal import Decimal, InvalidOperation
+            from pathlib import Path
+
+            sys.path.insert(0, "/opt/fintual-sheet-sync-current/src")
+            from fintual_executor.google_sheets import GoogleSheetConfig, GoogleSheetsProjector
+
+            MODE = os.environ.get("MODE", "dry_run")
+            if MODE not in ("dry_run", "apply"):
+                raise SystemExit(2)
+            env = {}
+            for line in Path("/etc/fintual-executor/sheet-sync.env").read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    env[key.strip()] = value.strip().strip('"').strip("'")
+            spreadsheet = env.get("FINTUAL_SHEET_SPREADSHEET_ID", "")
+            credentials = env.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+            if not spreadsheet or not credentials:
+                raise SystemExit(3)
+            projector = GoogleSheetsProjector.from_service_account(
+                GoogleSheetConfig(spreadsheet_id=spreadsheet, credentials_file=Path(credentials))
+            )
+            values = projector.service.spreadsheets().values()
+
+            def get(range_name, render="FORMULA"):
+                result = values.get(
+                    spreadsheetId=spreadsheet, range=range_name,
+                    valueRenderOption=render, dateTimeRenderOption="SERIAL_NUMBER",
+                ).execute()
+                rows = result.get("values", [])
+                return rows[0][0] if rows and rows[0] else None
+
+            def length(value):
+                return len(value) if isinstance(value, str) else 0
+
+            expected = {
+                "AL3": '=IFERROR(Positions!$I$11*(1-ROUND(Datos!$E$4-1;6));"")',
+                "AO3": '=IFERROR(Positions!$I$11/(1-ROUND(Datos!$E$4-1;6));"")',
+                "AX3": '=IFERROR(Positions!$I$14*(1-ROUND(Datos!$E$4-1;6));"")',
+                "BA3": '=IFERROR(Positions!$I$14/(1-ROUND(Datos!$E$4-1;6));"")',
+                "BB3": '=IFERROR(Positions!$I$15*(1-ROUND(Datos!$E$4-1;6));"")',
+                "BE3": '=IFERROR(Positions!$I$15/(1-ROUND(Datos!$E$4-1;6));"")',
+            }
+            rows = {"I11": 11, "I14": 14, "I15": 15}
+            pair = {"I11": ("AL3", "AO3"), "I14": ("AX3", "BA3"), "I15": ("BB3", "BE3")}
+
+            # Latest pre-write backup manifest created by the read-only audit.
+            root = Path("/var/lib/fintual-executor/sheets-backup")
+            manifests = sorted(root.glob("pre-v2-*.json"))
+            if not manifests:
+                print("SHEETS_UPDATE=NO_BACKUP_MANIFEST", flush=True)
+                raise SystemExit(4)
+            manifest = json.loads(manifests[-1].read_text())
+            backup = {}
+            for cell, text in manifest.get("backup_tab_formulas", {}).items():
+                formula = str(text).strip()
+                if formula.startswith("'"):
+                    formula = formula[1:]
+                if not formula.startswith("="):
+                    print("SHEETS_UPDATE=BACKUP_NOT_FORMULA", flush=True)
+                    raise SystemExit(5)
+                target = None
+                for row_key, cells in pair.items():
+                    if f"Positions!$I${rows[row_key]}" not in formula:
+                        continue
+                    if "*(1-ROUND" in formula:
+                        target = cells[0]
+                    elif "/(1-ROUND" in formula:
+                        target = cells[1]
+                if target is None or target in backup:
+                    print("SHEETS_UPDATE=BACKUP_CLASSIFICATION_FAILED", flush=True)
+                    raise SystemExit(6)
+                backup[target] = formula
+            if set(backup) != set(expected):
+                print("SHEETS_UPDATE=BACKUP_INCOMPLETE", flush=True)
+                raise SystemExit(7)
+            print("SHEETS_UPDATE_BACKUP_CELLS=" + str(len(backup)), flush=True)
+
+            current = {cell: get("Stocks!" + cell) for cell in expected}
+            if current != backup:
+                print("SHEETS_UPDATE=CURRENT_NOT_V1_OR_BACKUP_MISMATCH", flush=True)
+                raise SystemExit(8)
+            print("SHEETS_UPDATE_CURRENT_V1_MATCH=true", flush=True)
+
+            positions = {}
+            for row_key, row in rows.items():
+                raw = get(f"Positions!I{row}", "UNFORMATTED_VALUE")
+                try:
+                    value = Decimal(str(raw))
+                except (InvalidOperation, TypeError, ValueError):
+                    print("SHEETS_UPDATE=POSITION_INVALID", flush=True)
+                    raise SystemExit(9)
+                if not value.is_finite() or value <= 0:
+                    print("SHEETS_UPDATE=POSITION_INVALID", flush=True)
+                    raise SystemExit(9)
+                positions[row_key] = value
+            datos = get("Datos!E4", "UNFORMATTED_VALUE")
+            try:
+                trigger = Decimal(str(datos))
+            except (InvalidOperation, TypeError, ValueError):
+                print("SHEETS_UPDATE=DATOS_INVALID", flush=True)
+                raise SystemExit(10)
+            if trigger != Decimal("1.03"):
+                print("SHEETS_UPDATE=DATOS_NOT_1_03", flush=True)
+                raise SystemExit(10)
+            factor = Decimal("1") - (trigger - Decimal("1"))
+
+            def expected_number(cell):
+                row_key = "I11" if cell in ("AL3", "AO3") else "I14" if cell in ("AX3", "BA3") else "I15"
+                if cell in ("AL3", "AX3", "BB3"):
+                    return positions[row_key] * factor
+                return positions[row_key] / factor
+
+            shadow_before = values.get(
+                spreadsheetId=spreadsheet, range="Strategy_v2_shadow!A1:Z80",
+                valueRenderOption="UNFORMATTED_VALUE",
+            ).execute().get("values", [])
+            pass_before = sum(1 for row in shadow_before for v in row if str(v).strip().upper() == "PASS")
+            fail_before = sum(1 for row in shadow_before for v in row if str(v).strip().upper() == "FAIL")
+            print("SHEETS_UPDATE_SHADOW_BEFORE_PASS=" + str(pass_before), flush=True)
+            print("SHEETS_UPDATE_SHADOW_BEFORE_FAIL=" + str(fail_before), flush=True)
+            if pass_before < 13 or fail_before != 0:
+                print("SHEETS_UPDATE=SHADOW_NOT_GREEN", flush=True)
+                raise SystemExit(11)
+            print("SHEETS_UPDATE_READY=true", flush=True)
+            if MODE == "dry_run":
+                print("SHEETS_UPDATE_RESULT=DRY_RUN_PASS", flush=True)
+                raise SystemExit(0)
+
+            def batch_write(mapping):
+                data = [{"range": "Stocks!" + cell, "values": [[mapping[cell]]]} for cell in expected]
+                values.batchUpdate(
+                    spreadsheetId=spreadsheet,
+                    body={"valueInputOption": "USER_ENTERED", "data": data},
+                ).execute()
+
+            def verify() -> str:
+                stored = {cell: get("Stocks!" + cell) for cell in expected}
+                if stored != expected:
+                    return "STORED_FORMULA_MISMATCH"
+                for cell in expected:
+                    raw = get("Stocks!" + cell, "UNFORMATTED_VALUE")
+                    try:
+                        actual = Decimal(str(raw))
+                    except (InvalidOperation, TypeError, ValueError):
+                        return "EFFECTIVE_VALUE_INVALID"
+                    want = expected_number(cell)
+                    if not actual.is_finite() or abs(actual - want) > max(Decimal("0.000001"), abs(want) * Decimal("0.000000001")):
+                        return "EFFECTIVE_VALUE_MISMATCH"
+                shadow_after = values.get(
+                    spreadsheetId=spreadsheet, range="Strategy_v2_shadow!A1:Z80",
+                    valueRenderOption="UNFORMATTED_VALUE",
+                ).execute().get("values", [])
+                pass_after = sum(1 for row in shadow_after for v in row if str(v).strip().upper() == "PASS")
+                fail_after = sum(1 for row in shadow_after for v in row if str(v).strip().upper() == "FAIL")
+                print("SHEETS_UPDATE_SHADOW_AFTER_PASS=" + str(pass_after), flush=True)
+                print("SHEETS_UPDATE_SHADOW_AFTER_FAIL=" + str(fail_after), flush=True)
+                if pass_after < 13 or fail_after != 0:
+                    return "SHADOW_NOT_GREEN_AFTER_WRITE"
+                return "PASS"
+
+            try:
+                batch_write(expected)
+                status = verify()
+                if status != "PASS":
+                    raise RuntimeError(status)
+                for row_key, row in rows.items():
+                    if Decimal(str(get(f"Positions!I{row}", "UNFORMATTED_VALUE"))) != positions[row_key]:
+                        raise RuntimeError("POSITION_CHANGED_BY_WRITE")
+                if Decimal(str(get("Datos!E4", "UNFORMATTED_VALUE"))) != trigger:
+                    raise RuntimeError("DATOS_CHANGED_BY_WRITE")
+            except BaseException as exc:
+                print("SHEETS_UPDATE_ERROR=" + type(exc).__name__, flush=True)
+                try:
+                    batch_write(backup)
+                    restored = {cell: get("Stocks!" + cell) for cell in expected}
+                    if restored != backup:
+                        print("SHEETS_UPDATE_ROLLBACK=VERIFY_FAILED", flush=True)
+                    else:
+                        print("SHEETS_UPDATE_ROLLBACK=RESTORED_ALL_SIX", flush=True)
+                except BaseException as rollback_exc:
+                    print("SHEETS_UPDATE_ROLLBACK=FAILED_" + type(rollback_exc).__name__, flush=True)
+                raise
+            receipt = {
+                "utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "manifest": manifests[-1].name,
+                "formulas": expected,
+                "numeric": {cell: str(get("Stocks!" + cell, "UNFORMATTED_VALUE")) for cell in expected},
+                "backup_formulas": backup,
+                "spreadsheet_sha256": hashlib.sha256(spreadsheet.encode()).hexdigest(),
+            }
+            receipt_path = root / ("applied-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json")
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True))
+            os.chmod(receipt_path, 0o600)
+            print("SHEETS_UPDATE_RECEIPT_WRITTEN=true", flush=True)
+            print("SHEETS_UPDATE_RESULT=APPLIED_AND_VERIFIED_SIX_OF_SIX", flush=True)
+            PY
