@@ -64,7 +64,17 @@ jobs:
                     "print('READY_READ_ONLY')"
                 )
                 try:
-                    cp=subprocess.run([str(release/".venv/bin/python"),"-c",child,
+                    import pwd,stat
+                    sinfo=socket_path.lstat()
+                    pinfo=socket_path.parent.stat()
+                    if (sinfo.st_uid != pinfo.st_uid or
+                        stat.S_IMODE(pinfo.st_mode)!=0o700 or
+                        stat.S_IMODE(sinfo.st_mode)!=0o600 or
+                        not stat.S_ISSOCK(sinfo.st_mode)):
+                        raise PermissionError("Private IPC socket ownership/mode must be exact")
+                    owner=pwd.getpwuid(sinfo.st_uid).pw_name
+                    cp=subprocess.run(["sudo","-n","-u",owner,
+                                       str(release/".venv/bin/python"),"-B","-c",child,
                                        str(release/"src"),str(socket_path)],
                                        capture_output=True,text=True,timeout=15)
                     result="READY_READ_ONLY" if cp.returncode==0 and "READY_READ_ONLY" in cp.stdout else "UNVERIFIED"
