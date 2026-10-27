@@ -1,0 +1,294 @@
+name: Fintual v2 isolated full regression (no broker credentials)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fintual-v2-isolated-ci.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Retrieve explicitly allowlisted v1 release source from Oracle
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_USER: ${{ secrets.OCI_USER }}
+          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$OCI_SSH_KEY" > "$RUNNER_TEMP/oci_key"
+          chmod 600 "$RUNNER_TEMP/oci_key"
+          cat > remote_readonly.sh <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          cd /opt/fintual-httpx-current
+          [ "$(basename "$(readlink -f .)")" = "93c03b51d69f55ee4103e59d39b1550362bfe3ae" ]
+          set -- src tests pyproject.toml
+          for item in README.md config.example.json docs deploy bin uv.lock .github/workflows; do
+            if [ -e "$item" ]; then set -- "$@" "$item"; fi
+          done
+          tar --exclude='__pycache__' --exclude='*.pyc' --exclude='*.sqlite*' -czf - "$@"
+          REMOTE_SCRIPT
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" -o ConnectTimeout=12 -i "$RUNNER_TEMP/oci_key" "$OCI_USER@$OCI_HOST" bash -s < remote_readonly.sh > source.tgz
+          test -s source.tgz
+          tar -tzf source.tgz | grep -E '^src/fintual_executor/domain.py$'
+          tar -tzf source.tgz | grep -E '^tests/test_domain.py$'
+          tar -tzf source.tgz | grep -E '^pyproject.toml$'
+          # Fail closed if any file unexpectedly escapes the allowlisted source tree.
+          tar -tzf source.tgz | python3 -c 'import sys; paths=[s.strip() for s in sys.stdin if s.strip()]; allowed=("src/","tests/","docs/","deploy/","bin/",".github/workflows/","pyproject.toml","README.md","config.example.json","uv.lock"); assert all(not (p.startswith("/") or "/../" in p or p.startswith("../") or (not p.startswith(allowed))) for p in paths); print("FINTUAL_ALLOWLIST_PASS="+str(len(paths)))'
+          sha256sum source.tgz
+          rm -f "$RUNNER_TEMP/oci_key" remote_readonly.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fintual-v1-source-allowlisted
+          path: source.tgz
+          retention-days: 1
+  test:
+    needs: source
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fintual-v1-source-allowlisted
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.8'
+      - name: Apply exact strategy-v2 source and tests patch in an isolated directory
+        run: |
+          set -euo pipefail
+          mkdir -p isolated
+          tar -xzf source.tgz -C isolated
+          cat > strategy.patch <<'PATCH_END_V2'
+          diff --git a/src/fintual_executor/domain.py b/src/fintual_executor/domain.py
+          index c2878cc..61e6471 100644
+          --- a/src/fintual_executor/domain.py
+          +++ b/src/fintual_executor/domain.py
+          @@ -47,14 +47,17 @@ def signal_from_prices(
+               if last_fill <= 0 or current <= 0:
+                   raise ValueError("prices must be positive")
+           
+          +    if not D("0") < trigger < D("1"):
+          +        raise ValueError("trigger must be strictly between zero and one")
+          +
+          +    # Symmetric bounded distance: both legs of a round-trip share the
+          +    # same percentage, and a stock-price decline can never exceed 100%.
+          +    deviation = abs(current - last_fill) / max(current, last_fill)
+               if current > last_fill:
+          -        deviation = current / last_fill - D("1")
+          -        side = Side.SELL if deviation > trigger else Side.HOLD
+          +        side = Side.SELL if deviation >= trigger else Side.HOLD
+               elif current < last_fill:
+          -        deviation = last_fill / current - D("1")
+          -        side = Side.BUY if deviation > trigger else Side.HOLD
+          +        side = Side.BUY if deviation >= trigger else Side.HOLD
+               else:
+          -        deviation = D("0")
+                   side = Side.HOLD
+           
+               raw = deviation * D("100") * usd_per_percentage_point
+          diff --git a/src/fintual_executor/runner.py b/src/fintual_executor/runner.py
+          index 17e680c..fee95e3 100644
+          --- a/src/fintual_executor/runner.py
+          +++ b/src/fintual_executor/runner.py
+          @@ -112,8 +112,8 @@ def _load_config(path: Path) -> dict[str, Any]:
+               config["symbols"] = symbols
+           
+               trigger = Decimal(str(config["trigger"]))
+          -    if trigger <= 0:
+          -        raise ValueError("config.trigger must be positive")
+          +    if not Decimal("0") < trigger < Decimal("1"):
+          +        raise ValueError("config.trigger must be strictly between zero and one")
+           
+               market_data = config.get("market_data")
+               if not isinstance(market_data, dict):
+          @@ -203,9 +203,9 @@ def _market_data_source(spec: dict[str, Any], symbols: list[str]):
+           
+           
+           def _detector_zone(deviation: Decimal, lower: Decimal, trigger: Decimal, upper: Decimal) -> str:
+          -    if deviation <= lower:
+          +    if deviation < lower:
+                   return "outside_confirmation_band"
+          -    if deviation <= trigger:
+          +    if deviation < trigger:
+                   return "pre_signal_band"
+               if deviation <= upper:
+                   return "signal_band"
+          diff --git a/tests/test_domain.py b/tests/test_domain.py
+          index b90e232..9dd38c4 100644
+          --- a/tests/test_domain.py
+          +++ b/tests/test_domain.py
+          @@ -10,23 +10,81 @@
+           )
+           
+           
+          -def test_buy_deviation_uses_inverse_ratio():
+          +def test_buy_deviation_is_conventional_loss_bounded_below_100_percent():
+               s = signal_from_prices(D("100"), D("96.80"))
+               assert s.side is Side.BUY
+          -    assert s.deviation == D("100") / D("96.80") - D("1")
+          -    assert s.order_amount_usd == D("33.05")
+          +    assert s.deviation == D("0.032")
+          +    assert s.order_amount_usd == D("32.00")
+           
+           
+          -def test_sell_deviation():
+          +def test_sell_deviation_normalizes_to_higher_price():
+               s = signal_from_prices(D("100"), D("103.70"))
+               assert s.side is Side.SELL
+          -    assert s.deviation == D("0.037")
+          -    assert s.order_amount_usd == D("37.00")
+          -
+          -
+          -def test_exact_three_percent_is_hold_both_directions():
+          -    assert signal_from_prices(D("100"), D("103")).side is Side.HOLD
+          -    assert signal_from_prices(D("100"), D("100") / D("1.03")).side is Side.HOLD
+          +    assert s.deviation == (D("103.70") - D("100")) / D("103.70")
+          +    assert s.order_amount_usd == D("35.67")
+          +
+          +
+          +def test_exact_three_percent_is_a_symmetric_round_trip():
+          +    down = signal_from_prices(D("100"), D("97"))
+          +    up = signal_from_prices(D("97"), D("100"))
+          +    assert down.side is Side.BUY
+          +    assert up.side is Side.SELL
+          +    assert down.deviation == up.deviation == D("0.03")
+          +    assert down.order_amount_usd == up.order_amount_usd == D("30.00")
+          +
+          +
+          +def test_both_directions_have_equal_bounded_deviation_over_wide_ranges():
+          +    for high, low in (
+          +        (D("100"), D("40")),
+          +        (D("100"), D("0.01")),
+          +        (D("100000"), D("1")),
+          +        (D("237.17"), D("216.61")),
+          +    ):
+          +        down = signal_from_prices(high, low)
+          +        up = signal_from_prices(low, high)
+          +        assert D("0") <= down.deviation < D("1")
+          +        assert down.deviation == up.deviation
+          +        assert down.order_amount_usd == up.order_amount_usd
+          +
+          +
+          +def test_nvda_size_uses_last_fintual_sell_fill():
+          +    signal = signal_from_prices(D("237.17"), D("216.61"))
+          +    assert signal.side is Side.BUY
+          +    assert signal.order_amount_usd == D("86.68")
+          +
+          +
+          +def test_reference_3_percent_thresholds_are_inverse_price_boundaries():
+          +    anchor = D("237.17")
+          +    trigger = D("0.03")
+          +    buy_price = anchor * (D("1") - trigger)
+          +    sell_price = buy_price / (D("1") - trigger)
+          +    assert sell_price == anchor
+          +    assert signal_from_prices(anchor, buy_price).side is Side.BUY
+          +    assert signal_from_prices(buy_price, sell_price).side is Side.SELL
+          +    assert signal_from_prices(anchor, buy_price).order_amount_usd == D("30.00")
+          +    assert signal_from_prices(buy_price, sell_price).order_amount_usd == D("30.00")
+          +
+          +
+          +def test_nvda_cash_policy_can_flip_across_a_small_quote_change():
+          +    # Policy is unchanged. Only the v2 target differs at each fresh quote.
+          +    target_at_217_21 = signal_from_prices(D("237.17"), D("217.21")).order_amount_usd
+          +    target_at_216_61 = signal_from_prices(D("237.17"), D("216.61")).order_amount_usd
+          +    assert target_at_217_21 == D("84.15")
+          +    assert target_at_216_61 == D("86.68")
+          +    assert decide_buy(target_at_217_21, D("80")).action is Action.BUY_ALL_CASH
+          +    assert decide_buy(target_at_216_61, D("80")).action is Action.NO_ACTION
+          +
+          +
+          +def test_prices_and_trigger_must_be_valid():
+          +    from pytest import raises
+          +
+          +    for reference, current in ((D("0"), D("10")), (D("10"), D("0")),
+          +                               (D("-1"), D("10"))):
+          +        with raises(ValueError):
+          +            signal_from_prices(reference, current)
+          +    for trigger in (D("0"), D("1"), D("1.2")):
+          +        with raises(ValueError):
+          +            signal_from_prices(D("100"), D("90"), trigger=trigger)
+           
+           def test_fintual_amount_truncates_not_rounds():
+               assert fintual_usd(D("33.057")) == D("33.05")
+          @@ -69,7 +127,7 @@ def test_strategy_parameters_are_effective():
+                   usd_per_percentage_point=D("5"),
+               )
+               assert s.side is Side.SELL
+          -    assert s.order_amount_usd == D("18.50")
+          +    assert s.order_amount_usd == D("17.83")
+           
+               d = decide_buy(D("100"), D("91"), max_shortfall=D("0.10"))
+               assert d.action is Action.BUY_ALL_CASH
+          diff --git a/tests/test_market_data.py b/tests/test_market_data.py
+          index c7c6a3b..ba560ba 100644
+          --- a/tests/test_market_data.py
+          +++ b/tests/test_market_data.py
+          @@ -50,7 +50,9 @@ def test_confirmation_band_tracks_runtime_trigger():
+           def test_confirmation_zone_boundaries():
+               lower, trigger, upper = _confirmation_band(Decimal("0.03"), 20)
+               assert _detector_zone(Decimal("0.0279"), lower, trigger, upper) == "outside_confirmation_band"
+          +    assert _detector_zone(lower, lower, trigger, upper) == "pre_signal_band"
+               assert _detector_zone(Decimal("0.029"), lower, trigger, upper) == "pre_signal_band"
+          +    assert _detector_zone(trigger, lower, trigger, upper) == "signal_band"
+               assert _detector_zone(Decimal("0.031"), lower, trigger, upper) == "signal_band"
+               assert _detector_zone(Decimal("0.033"), lower, trigger, upper) == "beyond_signal_band"
+                    PATCH_END_V2
+          cd isolated
+          patch --batch --fuzz=0 --forward -p1 < ../strategy.patch
+          python -m compileall -q src tests
+          printf '%s\n' "V2_PATCH_EXACT_AND_COMPILE=PASS" > ../patch-status.txt
+      - name: Install tools and execute all repository tests (no broker config)
+        id: verify
+        run: |
+          set +e
+          cd isolated
+          {
+            python -m pip install -e ".[dev,shadow]"
+            install_rc=$?
+            echo "INSTALL_RC=$install_rc"
+            if [ "$install_rc" -eq 0 ]; then
+              ruff check src tests
+              lint_rc=$?
+              echo "LINT_RC=$lint_rc"
+            else lint_rc=1; fi
+            if [ "$lint_rc" -eq 0 ]; then
+              pytest -q
+              test_rc=$?
+              echo "PYTEST_RC=$test_rc"
+            else test_rc=1; fi
+            test "$install_rc" -eq 0 && test "$lint_rc" -eq 0 && test "$test_rc" -eq 0
+          } > ../ci-v2-log.txt 2>&1
+          status=$?
+          echo "FULL_CI_EXIT=$status" >> ../ci-v2-log.txt
+          tail -n 115 ../ci-v2-log.txt
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fintual-v2-ci-evidence
+          path: |
+            ci-v2-log.txt
+            patch-status.txt
+          retention-days: 7
+      - name: Publish full regression result on Pogo-lab
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TEST_OUTCOME: ${{ steps.verify.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          from pathlib import Path
+          log=Path("ci-v2-log.txt").read_text(errors="replace") if Path("ci-v2-log.txt").exists() else "Test log not created; source/patch/setup failure."
+          log=log[-10000:]
+          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\nSource: deployed immutable v1 release 93c03b51...\nPatch: exact four code/test diffs of fintual-executor PR #87\nRun: "+os.environ["GH_RUN"]+"\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\n\n```\n"+log+"\n```"
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual strategy v2 — isolated full regression evidence","-f","body="+body],capture_output=True,text=True,timeout=30)
+          if p.returncode:raise SystemExit("Could not publish CI evidence")
+          PY
