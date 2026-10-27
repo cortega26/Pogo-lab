@@ -46,22 +46,27 @@ jobs:
             health=handle.health()
             assert health["status"]=="READY" and health["order_capability"] is False
             print("V2_SHADOW_READ_ONLY=true",flush=True)
+            print("V2_SHADOW_STAGE=PENDING",flush=True)
             pending=get_pending(handle)
             buys=pending.get("stocksPendingAssetMarketBuys",[])
             sells=pending.get("stocksPendingAssetMarketSells",[])
             assert isinstance(buys,list) and isinstance(sells,list)
             print("V2_SHADOW_BROKER_PENDING_BUYS="+str(len(buys)),flush=True)
             print("V2_SHADOW_BROKER_PENDING_SELLS="+str(len(sells)),flush=True)
+            print("V2_SHADOW_STAGE=BUY_STATE",flush=True)
             buy=get_buy_state(handle)
             investable=D(str(buy["stocksWallet"]["investableAmount"]["amount"]))
             assert investable.is_finite() and investable>=0
             print("V2_SHADOW_INVESTABLE_AT_LEAST_80="+str(investable>=D("80")).lower(),flush=True)
+            print("V2_SHADOW_STAGE=MARKET_INFO",flush=True)
             market=get_market_info(handle)
             info=market["stocksAssetsMarketInfo"]
             print("V2_SHADOW_MARKET_OPEN="+str(bool(info["isMarketOpen"])).lower(),flush=True)
             anchors={"NVDA":D("237.17"),"TSLA":D("396.91"),"STX":D("779.48")}
             for symbol in ("NVDA","TSLA","STX"):
+                print("V2_SHADOW_STAGE="+symbol+"_REFERENCE",flush=True)
                 ref=latest_reference(handle,symbol)
+                print("V2_SHADOW_STAGE="+symbol+"_PRICE",flush=True)
                 price,stamp=handle.current_price(symbol)
                 assert price.is_finite() and price>0 and ref.price>0
                 dt=datetime.fromisoformat(stamp.replace("Z","+00:00"))
@@ -87,6 +92,11 @@ jobs:
             for line in p.stdout.splitlines():
                 if re.fullmatch(r"V2_SHADOW_[A-Z0-9_]+=[A-Za-z0-9_.-]+",line):
                     print(line,flush=True)
+            if p.returncode:
+                classes={"ShadowTransportError","AuthRequired","ShadowReadOnlyViolation","PermissionError","ValueError","RuntimeError","KeyError","TypeError","AssertionError","OSError"}
+                found=[line.split(":",1)[0].strip().rsplit(".",1)[-1] for line in p.stderr.splitlines()]
+                result=next((x for x in reversed(found) if x in classes),"UNCLASSIFIED")
+                print("V2_SHADOW_ERROR_CLASS="+result,flush=True)
             print("V2_SHADOW_PROCESS="+("success" if p.returncode==0 else "failed"),flush=True)
             ROOT
       - name: Publish sanitized no-order shadow evidence
