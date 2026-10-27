@@ -1,0 +1,69 @@
+name: Fintual IPC health probe root cause - read only
+# Reproduces the exact 2026-10-27 cutover health-probe invocation without
+# starting/stopping any service or touching the broker, ledger or config.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Reproduce PYTHONPATH/import and socket-owner behavior
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 90s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import json, os, pwd, re, subprocess
+            from pathlib import Path
+            release = Path("/opt/fintual-httpx-current").resolve()
+            python = release / ".venv/bin/python"
+            home = pwd.getpwnam("fintual").pw_dir
+
+            def run(label, argv, env=None, timeout=20):
+                p = subprocess.run(argv, capture_output=True, text=True,
+                                   env=env, timeout=timeout, check=False)
+                out = p.stdout.strip().splitlines()
+                err = p.stderr.strip().splitlines()
+                klass = "NONE"
+                for line in reversed(err):
+                    m = re.search(r"\b([A-Za-z_]+(?:Error|Exception|Required|Violation))\b", line)
+                    if m:
+                        klass = m.group(1)
+                        break
+                marker = next((x for x in out if re.fullmatch(r"[A-Z_]+=(?:PASS|FAIL|IMPORT_OK)", x)), "NONE")
+                print("PROBE_" + label + "_RC=" + str(p.returncode))
+                print("PROBE_" + label + "_MARKER=" + marker)
+                print("PROBE_" + label + "_CLASS=" + klass)
+
+            # Exact 2026-10-27 release health invocation: PYTHONPATH is
+            # supplied through sudo's environment, not sys.path.insert.
+            exact = ("import fintual_executor; "
+                     "print('IMPORT_OK')")
+            env = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(release / "src"),
+                   "HOME": home}
+            run("EXACT_PYTHONPATH_THROUGH_SUDO", ["sudo", "-n", "-u", "fintual",
+                str(python), "-B", "-c", exact], env=env)
+
+            # Same interpreter, explicit sys.path insertion (the pattern the
+            # broker preflight and readiness baseline already use).
+            explicit = ("import sys; sys.path.insert(0, sys.argv[1]); "
+                        "import fintual_executor; print('IMPORT_OK')")
+            run("EXPLICIT_SYS_PATH", ["sudo", "-n", "-u", "fintual",
+                str(python), "-B", "-c", explicit, str(release / "src")])
+
+            # Prove the env var is stripped by sudo rather than the module
+            # being absent from the release.
+            run("DIRECT_INTERPRETER_IMPORT", [str(python), "-B", "-c", exact],
+                env={**env, "PYTHONPATH": str(release / "src")})
+            print("PROBE_RELEASE_MARKER=" + str((release / "HTTPX_RUNTIME_READY.json").is_file()))
+            print("PROBE_READ_ONLY=true")
+            PY
