@@ -1,0 +1,147 @@
+name: Fintual v2 cash and fee parity audit (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Compare broker wallet balance to sheet accounting cash and fees once
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 180s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'ROOT'
+            import json, os, pwd, subprocess
+            from pathlib import Path
+
+            release = Path("/opt/fintual-httpx-current").resolve()
+            user = subprocess.run(["systemctl", "show", "-P", "User", "fintual-executor.service"],
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+            home = pwd.getpwnam(user).pw_dir
+            # No temp value files: only sanitized JSON markers cross processes.
+            broker_script = r"""
+            from pathlib import Path
+            import json, sys
+            sys.path.insert(0, sys.argv[1])
+            from decimal import Decimal
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            from fintual_executor.client import get_buy_state
+            h = IpcReadOnlyBrokerHandle(Path(sys.argv[2]))
+            v = h.health()
+            assert v.get("status") == "READY" and v.get("order_capability") is False
+            w = get_buy_state(h)["stocksWallet"]
+            balance = Decimal(str(w["balance"]["amount"]))
+            investable = Decimal(str(w["investableAmount"]["amount"]))
+            assert balance.is_finite() and balance >= 0
+            assert investable.is_finite() and investable >= 0
+            print("BROKER_JSON=" + json.dumps({"balance": str(balance), "investable": str(investable)}, separators=(",", ":")))
+            """
+            p = subprocess.run(
+                ["sudo", "-n", "-u", user, str(release / ".venv/bin/python"), "-B",
+                 "-c", broker_script, str(release / "src"),
+                 "/var/lib/fintual-executor/cash-ipc/cash.sock"],
+                capture_output=True, text=True,
+                env={"PATH": "/usr/bin:/bin", "HOME": home, "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout=35,
+            )
+            broker_line = next((line for line in p.stdout.splitlines() if line.startswith("BROKER_JSON=")), "")
+            if p.returncode != 0 or not broker_line:
+                print("CASH_AUDIT_RESULT=BROKER_READ_FAILED", flush=True)
+                raise SystemExit(1)
+            broker = json.loads(broker_line.split("=", 1)[1])
+
+            sheet_script = r"""
+            from pathlib import Path
+            import json, sys
+            from decimal import Decimal
+            sys.path.insert(0, "/opt/fintual-sheet-sync-current/src")
+            from fintual_executor.google_sheets import GoogleSheetConfig, GoogleSheetsProjector
+            env = {}
+            for line in Path("/etc/fintual-executor/sheet-sync.env").read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    env[k.strip()] = v.strip().strip('"').strip("'")
+            p = GoogleSheetsProjector.from_service_account(GoogleSheetConfig(
+                spreadsheet_id=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                credentials_file=Path(env["GOOGLE_APPLICATION_CREDENTIALS"])))
+            values = p.service.spreadsheets().values()
+            cash_rows = values.get(spreadsheetId=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                range="Cash_Fintual!A2:I5000", valueRenderOption="UNFORMATTED_VALUE").execute().get("values", [])
+            cash = None
+            for row in reversed(cash_rows):
+                if len(row) > 8:
+                    try:
+                        candidate = Decimal(str(row[8]))
+                    except Exception:
+                        continue
+                    if candidate.is_finite():
+                        cash = candidate
+                        break
+            if cash is None:
+                raise SystemExit("NO_CASH_ROW")
+            ledger = values.get(spreadsheetId=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                range="Ledger_Fintual!A2:M5000", valueRenderOption="UNFORMATTED_VALUE").execute().get("values", [])
+            fee_count = 0
+            fee_sum = Decimal("0")
+            for row in ledger:
+                if len(row) < 11:
+                    continue
+                if str(row[2]).upper() != "FEE":
+                    continue
+                source = str(row[10])
+                if not (source.startswith("fintual-op:") and source.endswith(":commission")):
+                    continue
+                fee_count += 1
+                fee_sum += abs(Decimal(str(row[5])))
+            print("SHEET_JSON=" + json.dumps({
+                "cash": str(cash), "fee_count": fee_count, "fee_sum": str(fee_sum)
+            }, separators=(",", ":")))
+            """
+            p = subprocess.run(
+                ["/opt/fintual-sheet-sync-venv/bin/python", "-B", "-c", sheet_script],
+                capture_output=True, text=True, timeout=60,
+            )
+            sheet_line = next((line for line in p.stdout.splitlines() if line.startswith("SHEET_JSON=")), "")
+            if p.returncode != 0 or not sheet_line:
+                print("CASH_AUDIT_RESULT=SHEET_READ_FAILED", flush=True)
+                raise SystemExit(1)
+            sheet = json.loads(sheet_line.split("=", 1)[1])
+
+            import sqlite3
+            con = sqlite3.connect("file:/var/lib/fintual-executor/state.sqlite3?mode=ro",
+                                  uri=True, timeout=10)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                rows = con.execute(
+                    "SELECT charged_commission_usd FROM fills WHERE CAST(charged_commission_usd AS REAL) > 0"
+                ).fetchall()
+            finally:
+                con.close()
+            sqlite_fee_count = len(rows)
+            sqlite_fee_sum = sum(Decimal(str(row[0])) for row in rows)
+
+            b = broker
+            s = sheet
+            balance = Decimal(b["balance"])
+            cash = Decimal(s["cash"])
+            sheet_fee_sum = Decimal(s["fee_sum"])
+            print("CASH_AUDIT_BALANCE_PARITY=" + str(abs(balance - cash) <= Decimal("0.005")).lower(), flush=True)
+            print("CASH_AUDIT_FEE_COUNT_MATCH=" + str(int(s["fee_count"]) == sqlite_fee_count).lower(), flush=True)
+            print("CASH_AUDIT_FEE_SUM_MATCH=" + str(abs(sheet_fee_sum - sqlite_fee_sum) <= Decimal("0.000001")).lower(), flush=True)
+            print("CASH_AUDIT_SHEET_FEE_ROWS=" + str(int(s["fee_count"])), flush=True)
+            print("CASH_AUDIT_SQLITE_FEE_FILLS=" + str(sqlite_fee_count), flush=True)
+            print("CASH_AUDIT_INVESTABLE_IS_SEPARATE_FIELD=" + str(Decimal(b["investable"]) != balance).lower(), flush=True)
+            print("CASH_AUDIT_RESULT=" + ("PASS" if (abs(balance - cash) <= Decimal("0.005")
+                  and int(s["fee_count"]) == sqlite_fee_count
+                  and abs(sheet_fee_sum - sqlite_fee_sum) <= Decimal("0.000001")) else "FAIL"), flush=True)
+            ROOT
