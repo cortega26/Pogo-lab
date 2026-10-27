@@ -1,0 +1,269 @@
+name: Fintual v2 one-time code-only cutover (gated, no test orders)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-controlled-cutover-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  cutover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Enforce after-market closed 2026-10-27 window before SSH
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from datetime import datetime,time,date
+          from zoneinfo import ZoneInfo
+          now=datetime.now(ZoneInfo("America/New_York"))
+          if now.date()!=date(2026,10,27) or now.time()<time(16,15):
+              raise SystemExit("CUTOVER_GATE=MARKET_WINDOW_CLOSED_TO_CHANGES")
+          print("CUTOVER_GATE=US_REGULAR_MARKET_CLOSED_WINDOW")
+          PY
+      - name: Independent broker preflight, consistent backup, atomic code switch, fail-closed rollback
+        id: release
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 340s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'ROOT'
+            from __future__ import annotations
+            import datetime,fcntl,hashlib,json,os,pwd,sqlite3,stat,subprocess,time
+            from pathlib import Path
+            from zoneinfo import ZoneInfo
+            BASE="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            TARGET="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            unit="fintual-executor.service"
+            alias=Path("/opt/fintual-httpx-current")
+            releases=Path("/opt/fintual-httpx-releases")
+            original=releases/BASE
+            candidate=releases/TARGET
+            sqlite_path=Path("/var/lib/fintual-executor/state.sqlite3")
+            profile=Path("/var/lib/fintual-browser/profile")
+            chrome=Path("/var/lib/fintual-browser/chrome")
+            def out(k,v):print("CUTOVER_"+k+"="+str(v),flush=True)
+            def fail(code):
+                out("GATE",code)
+                raise SystemExit(1)
+            def cmd(*args,timeout=18):
+                return subprocess.run(args,check=False,capture_output=True,text=True,timeout=timeout)
+            def service(name):
+                return cmd("systemctl","is-active",name).stdout.strip()
+            def state():
+                con=sqlite3.connect(sqlite_path.as_uri()+"?mode=ro",uri=True,timeout=10)
+                try:
+                    con.execute("PRAGMA query_only=ON")
+                    if con.execute("PRAGMA integrity_check").fetchone()!=("ok",):
+                        fail("LEDGER_INTEGRITY")
+                    mark="('SIGNALLED','SUBMITTING','UNKNOWN','ACKNOWLEDGED','PARTIALLY_FILLED')"
+                    open_n=con.execute("SELECT COUNT(*) FROM order_intents WHERE state IN "+mark).fetchone()[0]
+                    fill_n=con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                    return int(open_n),int(fill_n)
+                finally:con.close()
+            def broker_gate(source:Path,user:str,home:str,*,history:bool):
+                script=r"""
+            from pathlib import Path
+            import sys,json
+            sys.path.insert(0,sys.argv[1])
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_pending,get_market_info,get_buy_state
+            from fintual_executor.g8_history import audit_history_against_ledger
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(owner,profile=Path(sys.argv[2]),chrome_binary=Path(sys.argv[3]))
+                handle=owner.borrow(armed=False)
+                assert handle.execution_enabled is False
+                pending=get_pending(handle)
+                buys=pending.get("stocksPendingAssetMarketBuys")
+                sells=pending.get("stocksPendingAssetMarketSells")
+                market=get_market_info(handle)
+                assert isinstance(buys,list) and isinstance(sells,list)
+                assert isinstance(market.get("isMarketOpen"),bool)
+                assert len(buys)==0 and len(sells)==0
+                assert market["isMarketOpen"] is False
+                wallet=get_buy_state(handle)["stocksWallet"]
+                from decimal import Decimal
+                for field in ("balance","investableAmount"):
+                    value=Decimal(str(wallet[field]["amount"]))
+                    assert value.is_finite() and value>=0
+                if sys.argv[5]=="1":
+                    audit=audit_history_against_ledger(handle,Path(sys.argv[4]),["NVDA","TSLA","STX"],page_size=20,max_pages=15)
+                    assert audit["status"]=="BOUNDED_READ_ONLY_LEDGER_PARITY_PASS"
+                    assert audit["local_open_intents"]==0
+                    assert audit["local_fills_unmatched"]==0
+                    assert audit["broker_fulfilled_without_local_fill"]==0
+                print("BROKER_GATE=PASS")
+                """
+                env={"PATH":"/usr/bin:/bin","DISPLAY":":99","HOME":home,
+                     "PYTHONPATH":str(source/"src")}
+                p=subprocess.run(["sudo","-n","-u",user,str(source/".venv/bin/python"),"-B",
+                    "-c",script,str(source/"src"),str(profile),str(chrome),str(sqlite_path),
+                    "1" if history else "0"],capture_output=True,text=True,env=env,timeout=140)
+                if p.returncode or "BROKER_GATE=PASS" not in p.stdout:
+                    fail("BROKER_INDEPENDENT_READ_FAILED")
+                if service("fintual-browser.service")!="inactive":
+                    fail("TRANSIENT_CHROME_NOT_CLOSED")
+            now=datetime.datetime.now(ZoneInfo("America/New_York"))
+            if (now.date()!=datetime.date(2026,10,27) or
+                now.time()<datetime.time(16,15)):
+                fail("OUTSIDE_APPROVED_US_AFTER_HOURS_WINDOW")
+            if not alias.is_symlink() or alias.resolve()!=original:
+                fail("ACTIVE_RELEASE_NOT_BASELINE")
+            if not candidate.is_dir() or not (candidate/"HTTPX_RUNTIME_READY.json").is_file():
+                fail("TARGET_NOT_PREPARED")
+            marker=json.loads((candidate/"HTTPX_RUNTIME_READY.json").read_text())
+            if (marker.get("source_sha")!=TARGET or
+                marker.get("source_overlay_blobs_verified")!=21 or
+                marker.get("runtime_imports_verified") is not True):
+                fail("TARGET_RUNTIME_NOT_ATTESTED")
+            if (service(unit)!="active" or
+                service("fintual-sheet-sync.service")!="active" or
+                service("fintual-browser.service")!="inactive"):
+                fail("SERVICE_BASELINE_UNEXPECTED")
+            user=cmd("systemctl","show","-P","User",unit).stdout.strip()
+            if not user or user=="root":fail("SERVICE_IDENTITY_UNSAFE")
+            home=pwd.getpwnam(user).pw_dir
+            if not profile.is_dir() or profile.stat().st_uid!=pwd.getpwnam(user).pw_uid or os.path.lexists(profile/"SingletonLock"):
+                fail("AUTH_PROFILE_UNSAFE")
+            config={}
+            for f in ("config.json","market-data.env","httpx-order.env"):
+                p=Path("/etc/fintual-executor")/f
+                if not p.is_file():fail("CONFIG_ABSENT")
+                config[f]=hashlib.sha256(p.read_bytes()).hexdigest()
+            before_open,before_fills=state()
+            if before_open:fail("LOCAL_ORDERS_OPEN")
+            broker_gate(original,user,home,history=True)
+            out("BROKER_PREFLIGHT","PASS")
+            # Fresh SQLite online backup; original remains open and running.
+            root=Path("/var/lib/fintual-g8-backups")
+            root.mkdir(mode=0o700,exist_ok=True)
+            stamp=datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            restore=root/("v2-cutover-"+TARGET[:12]+"-"+stamp)
+            restore.mkdir(mode=0o700)
+            snapshot=restore/"state.sqlite3"
+            src=sqlite3.connect(sqlite_path.as_uri()+"?mode=ro",uri=True,timeout=15)
+            with src,sqlite3.connect(snapshot,timeout=20) as dest:
+                src.backup(dest,pages=256,sleep=0.02)
+            src.close()
+            snapshot.chmod(0o600)
+            with sqlite3.connect(snapshot,timeout=10) as check:
+                if check.execute("PRAGMA integrity_check").fetchone()!=("ok",):
+                    fail("FRESH_BACKUP_FAILED")
+                if check.execute("SELECT COUNT(*) FROM fills").fetchone()[0]!=before_fills:
+                    fail("FRESH_BACKUP_FILL_MISMATCH")
+            info={"utc":stamp,"source":BASE,"target":TARGET,
+                  "backup_sha256":hashlib.sha256(snapshot.read_bytes()).hexdigest(),
+                  "config_sha256":config,"fills_at_snapshot":before_fills}
+            (restore/"recovery-manifest.json").write_text(json.dumps(info,sort_keys=True))
+            (restore/"recovery-manifest.json").chmod(0o600)
+            out("BACKUP","PASS")
+            # No consent or configuration modification. Preserve systemd unit.
+            stop=cmd("systemctl","stop",unit,timeout=32)
+            if stop.returncode or service(unit)!="inactive":
+                fail("OLD_EXECUTOR_NOT_QUIESCED")
+            post_open,post_fills=state()
+            if post_open or post_fills!=before_fills:
+                fail("LEDGER_CHANGED_DURING_QUIESCE")
+            lockfile=Path("/var/lib/fintual-executor/runner.lock")
+            with lockfile.open("a+") as lock:
+                try:fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+                except BlockingIOError:fail("FINANCIAL_LOCK_HELD")
+                else:fcntl.flock(lock.fileno(),fcntl.LOCK_UN)
+            broker_gate(original,user,home,history=True)
+            if alias.resolve()!=original:fail("RACE_ACTIVE_ALIAS_CHANGED")
+            # atomic alias replacement on same filesystem, no unit edit
+            tmp=Path("/opt/fintual-httpx-current.release-next")
+            if os.path.lexists(tmp):fail("TEMP_ALIAS_ALREADY_EXISTS")
+            tmp.symlink_to(candidate)
+            os.replace(tmp,alias)
+            if alias.resolve()!=candidate:fail("ATOMIC_PROMOTION_FAILED")
+            out("ALIAS_PROMOTED","true")
+            start=cmd("systemctl","start",unit,timeout=35)
+            healthy=False
+            if start.returncode==0:
+                for i in range(27):
+                    if service(unit)=="active":
+                        # Correct currently running module and cash IPC owner.
+                        healthscript=(
+                            "from pathlib import Path;"
+                            "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle;"
+                            "p=Path('/var/lib/fintual-executor/cash-ipc/cash.sock');"
+                            "v=IpcReadOnlyBrokerHandle(p).health();"
+                            "assert v.get('status')=='READY' and v.get('order_capability') is False;"
+                            "print('LIVE_READ_ONLY_HEALTH=PASS')"
+                        )
+                        verify=subprocess.run(["sudo","-n","-u",user,
+                            str(candidate/".venv/bin/python"),"-B","-c",healthscript],
+                            capture_output=True,text=True,
+                            env={"PATH":"/usr/bin:/bin","PYTHONPATH":str(candidate/"src"),
+                                 "HOME":home},timeout=6)
+                        if verify.returncode==0 and "LIVE_READ_ONLY_HEALTH=PASS" in verify.stdout:
+                            healthy=True
+                            break
+                    time.sleep(2)
+            if not healthy:
+                out("POSTFLIGHT","FAILED")
+                cmd("systemctl","stop",unit,timeout=35)
+                open_now,fill_now=state()
+                # Automatic rollback is never allowed when financial changes
+                # or uncertain broker state might have occurred.
+                if not open_now and fill_now==before_fills:
+                    try:
+                        broker_gate(original,user,home,history=True)
+                        fallback=Path("/opt/fintual-httpx-current.rollback-next")
+                        if os.path.lexists(fallback):fail("ROLLBACK_ALIAS_CONFLICT")
+                        fallback.symlink_to(original)
+                        os.replace(fallback,alias)
+                        restart=cmd("systemctl","start",unit,timeout=35)
+                        if restart.returncode or service(unit)!="active":
+                            fail("ROLLBACK_RESTART_FAILED")
+                        out("ROLLBACK","OLD_RELEASE_RESTORED")
+                    except Exception:
+                        out("ROLLBACK","FAILED_CLOSED")
+                else:
+                    out("ROLLBACK","BLOCKED_BY_FINANCIAL_STATE")
+                raise SystemExit(1)
+            final_open,final_fills=state()
+            if final_open or final_fills!=before_fills:fail("POSTFLIGHT_LEDGER_CHANGED")
+            if alias.resolve()!=candidate:fail("POSTFLIGHT_ALIAS_MISMATCH")
+            for f,s in config.items():
+                if hashlib.sha256((Path("/etc/fintual-executor")/f).read_bytes()).hexdigest()!=s:
+                    fail("CONFIG_CHANGED_POSTPROMOTION")
+            out("GATE","PASS")
+            out("ACTIVE_SHA",TARGET)
+            out("BROKER_PREFLIGHT","PASS")
+            out("LOCAL_OPEN_INTENTS",final_open)
+            out("FILL_COUNT",final_fills)
+            out("SERVICE_HEALTH","PASS")
+            out("ROLLBACK_BACKUP","PASS")
+            out("CONFIG_UNCHANGED","true")
+            out("NEW_TRADE_ORDERS_SUBMITTED","false")
+            ROOT
+      - name: Publish sanitized release verdict (no secrets, amounts or order IDs)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT: ${{ steps.release.outputs.stdout }}
+          STATUS: ${{ steps.release.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          facts=[s for s in os.getenv("OUTPUT","").splitlines()
+                 if re.fullmatch(r"CUTOVER_[A-Z0-9_]+=[A-Za-z0-9_.-]+",s)]
+          body="Guarded one-time release. Note: a market-window gate failure occurs before SSH and does not stop service.\nRun: "+os.environ["RUN"]+"\nStage: "+os.environ["STATUS"]+"\n\n"+"\n".join(facts)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+               "-f","title=Fintual guarded code-only cutover verdict",
+               "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Release verdict publication failed")
+          PY
