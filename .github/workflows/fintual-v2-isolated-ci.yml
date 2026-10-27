@@ -248,8 +248,8 @@ jobs:
                    )
                store = StateStore(Path(state_path))
           -    last_cash_event_poll = 0.0
-          +    # None guarantees the first cash IPC check runs immediately, even when
-          +    # the host's monotonic clock has not yet reached the 300s poll interval.
+          +    # None forces the first read-only cash reconciliation immediately, even on
+          +    # freshly booted machines where time.monotonic() is below the poll interval.
           +    last_cash_event_poll: float | None = None
                cash_state = "DEGRADED_CASH_SYNC" if fills_only else "CASH_UNVERIFIED"
                while True:
@@ -271,8 +271,8 @@ jobs:
                class EndOneCycle(Exception):
                    pass
            
-          +    # A fresh host can have monotonic uptime < the 300-second poll interval.
-          +    monkeypatch.setattr(sync.time, "monotonic", lambda: 1.0)
+          +    # Simulate early uptime: monotonic < 300 seconds must not delay initial poll.
+          +    monkeypatch.setattr(sync.time, "monotonic", lambda: 30.0)
                monkeypatch.setattr(sync.time, "sleep", lambda _: (_ for _ in ()).throw(EndOneCycle))
                with pytest.raises(EndOneCycle):
                    sync.run_worker(str(store.path), cash_ipc_socket=socket)
@@ -280,8 +280,8 @@ jobs:
                class EndOneCycle(Exception):
                    pass
            
-          +    # A fresh host can have monotonic uptime < the 300-second poll interval.
-          +    monkeypatch.setattr(sync.time, "monotonic", lambda: 1.0)
+          +    # Simulate early uptime: monotonic < 300 seconds must not delay initial poll.
+          +    monkeypatch.setattr(sync.time, "monotonic", lambda: 30.0)
                monkeypatch.setattr(sync.time, "sleep", lambda _: (_ for _ in ()).throw(EndOneCycle))
                with pytest.raises(EndOneCycle):
                    sync.run_worker(str(store.path), cash_ipc_socket=tmp_path / "socket")
@@ -289,8 +289,14 @@ jobs:
           cd isolated
           patch --batch --fuzz=0 --forward -p1 < ../strategy.patch
           patch --batch --fuzz=0 --forward -p1 < ../sheet-sync-startup.patch
+          test "$(git hash-object src/fintual_executor/domain.py)" = "61e6471235c71956d4030dc00cc4d359479dea4d" || { echo "BLOB_MISMATCH_src_fintual_executor_domain.py"; exit 1; }
+          test "$(git hash-object src/fintual_executor/runner.py)" = "fee95e3f11f5811f14220c31a29d2dbb7702054e" || { echo "BLOB_MISMATCH_src_fintual_executor_runner.py"; exit 1; }
+          test "$(git hash-object tests/test_domain.py)" = "9dd38c45dabc5011c20be2277aeb9dcd6a4715c2" || { echo "BLOB_MISMATCH_tests_test_domain.py"; exit 1; }
+          test "$(git hash-object tests/test_market_data.py)" = "ba560bae4b7c72f3b5a1f4d3ae5c2385e43f7fff" || { echo "BLOB_MISMATCH_tests_test_market_data.py"; exit 1; }
+          test "$(git hash-object src/fintual_executor/sheet_sync.py)" = "eeb8adfcb9ae3f2af4c8be62e7deda585db5cd5b" || { echo "BLOB_MISMATCH_src_fintual_executor_sheet_sync.py"; exit 1; }
+          test "$(git hash-object tests/test_sheet_sync.py)" = "de0c45e723eb2215a412498558ade9fa8fd822e6" || { echo "BLOB_MISMATCH_tests_test_sheet_sync.py"; exit 1; }
           python -m compileall -q src tests
-          printf '%s\n' "V2_PATCH_EXACT_AND_COMPILE=PASS" > ../patch-status.txt
+          printf '%s\n' "V2_SIX_FILES_MATCH_PR87_GIT_BLOBS=PASS" "V2_PATCH_EXACT_AND_COMPILE=PASS" > ../patch-status.txt
       - name: Install tools and execute all repository tests (no broker config)
         id: verify
         run: |
