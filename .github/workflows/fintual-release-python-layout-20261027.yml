@@ -1,0 +1,75 @@
+name: Fintual release runtime layout inventory (read only)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-release-python-layout-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read-only inspect active Python executable and source path
+        id: probe
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 55s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            import subprocess,sys,shutil
+            active=Path("/opt/fintual-httpx-current").resolve()
+            target="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            root=Path("/var/lib/fintual-executor/secure-release-import-20261027")
+            print("VENV_INSPECT_ACTIVE_SHA="+active.name)
+            print("VENV_INSPECT_ENCRYPTED_STAGE_EXISTS="+str((root/("staged-"+target)/"release-manifest.json").is_file()).lower())
+            print("VENV_INSPECT_DISK_FREE_GB="+str(shutil.disk_usage("/opt").free//(1024**3)))
+            print("VENV_INSPECT_SYSTEM_PYTHON_MAJOR="+str(sys.version_info.major))
+            print("VENV_INSPECT_SYSTEM_PYTHON_MINOR="+str(sys.version_info.minor))
+            cp=subprocess.run([str(active/".venv/bin/python"),"-B","-c",
+              "import sys,importlib.util,pathlib,os;"
+              "print('VENV_INSPECT_RUNTIME_MAJOR='+str(sys.version_info.major));"
+              "print('VENV_INSPECT_RUNTIME_MINOR='+str(sys.version_info.minor));"
+              "print('VENV_INSPECT_RUNTIME_BASE_IS_VENV='+str(sys.prefix!=sys.base_prefix).lower());"
+              "print('VENV_INSPECT_PIP_AVAILABLE='+str(importlib.util.find_spec('pip') is not None).lower());"
+              "print('VENV_INSPECT_PYTEST_AVAILABLE='+str(importlib.util.find_spec('pytest') is not None).lower());"
+              "print('VENV_INSPECT_IMPORT_MATCHES_RELEASE='+str(any(str(x).startswith(sys.argv[1]) for x in __import__('fintual_executor').__path__)).lower())",
+              str(active)],
+              capture_output=True,text=True,timeout=15)
+            for line in cp.stdout.splitlines():
+                if line.startswith("VENV_INSPECT_") and len(line)<115:print(line)
+            print("VENV_INSPECT_PYTHON_EXIT="+str(cp.returncode))
+            cfg=(active/".venv/pyvenv.cfg")
+            print("VENV_INSPECT_PYVENV_CFG_EXISTS="+str(cfg.is_file()).lower())
+            pth=list((active/".venv/lib").rglob("*.pth")) if (active/".venv/lib").is_dir() else []
+            reloc=any(str(active) in p.read_text(errors="replace") for p in pth[:80])
+            print("VENV_INSPECT_ABSOLUTE_EDITABLE_PATH="+str(reloc).lower())
+            print("VENV_INSPECT_VENV_SIZE_MB="+str(sum(p.stat().st_size for p in (active/".venv").rglob("*") if p.is_file() and not p.is_symlink())//(1024**2)))
+            PY
+      - name: Publish sanitized environment inventory
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUT: ${{ steps.probe.outputs.stdout }}
+          STATUS: ${{ steps.probe.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          rows=[x for x in os.getenv("OUT","").splitlines() if re.fullmatch(r"VENV_INSPECT_[A-Z0-9_]+=[A-Za-z0-9_.-]{1,100}",x)]
+          body="Read-only Python release-layout inventory. No environment secrets or broker data.\nRun: "+os.environ["RUN"]+"\nOutcome: "+os.environ["STATUS"]+"\n\n"+"\n".join(rows)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+                 "-f","title=Fintual immutable release Python environment inventory",
+                 "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Issue publish failed")
+          PY
