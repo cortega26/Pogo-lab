@@ -96,6 +96,11 @@ jobs:
                 except OSError:
                     pass
             os.chmod(RUN, 0o700)
+            # uv --target may leave a root-only executable bit; make the
+            # disposable tree readable/executable by the unprivileged runner.
+            run(["chmod", "-R", "a+rX", str(RUN)])
+            for executable in (RUN / "vendor/bin").glob("*"):
+                executable.chmod(0o755)
 
             inner = r'''
             set -eu
