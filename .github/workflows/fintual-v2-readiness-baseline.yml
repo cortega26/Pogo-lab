@@ -110,3 +110,4 @@ jobs:
           p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual v2 pre-promotion read-only readiness","-f","body="+body],capture_output=True,text=True,timeout=20)
           if p.returncode: raise SystemExit("Could not publish readiness baseline")
           PY
+# one-time read-only preflight refresh 2026-10-27 16:21 America/Santiago
