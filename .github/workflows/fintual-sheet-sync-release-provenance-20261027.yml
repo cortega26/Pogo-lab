@@ -1,0 +1,42 @@
+name: Fintual sheet sync release provenance (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Compare sheet-sync release code and checkpoint field
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 60s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import hashlib,re,subprocess
+            from pathlib import Path
+            def run(*a,timeout=15):
+                return subprocess.run(a,capture_output=True,text=True,timeout=timeout,check=False)
+            current=Path("/opt/fintual-sheet-sync-current")
+            print("SSYNC_RELEASE_IS_SYMLINK="+str(current.is_symlink()))
+            print("SSYNC_RELEASE_TARGET="+(current.resolve().name if current.exists() else "MISSING"))
+            for label,path in (
+                ("SHEET_SYNC",current/"src/fintual_executor/sheet_sync.py"),
+                ("V2",Path("/opt/fintual-httpx-current/src/fintual_executor/sheet_sync.py"))):
+                if path.is_file():
+                    data=path.read_bytes()
+                    print("SSYNC_"+label+"_SHA256="+hashlib.sha256(data).hexdigest()[:16])
+                    text=data.decode("utf-8","replace")
+                    print("SSYNC_"+label+"_USES_BALANCE="+str('["balance"]' in text or "['balance']" in text))
+                    print("SSYNC_"+label+"_USES_INVESTABLE="+str("investableAmount" in text))
+                else:
+                    print("SSYNC_"+label+"_MISSING=true")
+            print("SSYNC_READ_ONLY=true")
+            PY
