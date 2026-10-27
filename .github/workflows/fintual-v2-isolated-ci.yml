@@ -9,10 +9,13 @@ permissions:
   contents: read
   issues: write
 jobs:
-  source:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 19
     steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.8'
       - name: Retrieve explicitly allowlisted v1 release source from Oracle
         env:
           OCI_HOST: ${{ secrets.OCI_HOST }}
@@ -42,22 +45,6 @@ jobs:
           tar -tzf source.tgz | python3 -c 'import sys; paths=[s.strip() for s in sys.stdin if s.strip()]; allowed=("src/","tests/","docs/","deploy/","bin/",".github/workflows/","pyproject.toml","README.md","config.example.json","uv.lock"); assert all(not (p.startswith("/") or "/../" in p or p.startswith("../") or (not p.startswith(allowed))) for p in paths); print("FINTUAL_ALLOWLIST_PASS="+str(len(paths)))'
           sha256sum source.tgz
           rm -f "$RUNNER_TEMP/oci_key" remote_readonly.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fintual-v1-source-allowlisted
-          path: source.tgz
-          retention-days: 1
-  test:
-    needs: source
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: fintual-v1-source-allowlisted
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14.8'
       - name: Apply exact strategy-v2 source and tests patch in an isolated directory
         run: |
           set -euo pipefail
@@ -322,14 +309,6 @@ jobs:
           echo "FULL_CI_EXIT=$status" >> ../ci-v2-log.txt
           tail -n 115 ../ci-v2-log.txt
           exit "$status"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: fintual-v2-ci-evidence
-          path: |
-            ci-v2-log.txt
-            patch-status.txt
-          retention-days: 7
       - name: Publish full regression result on Pogo-lab
         if: always()
         env:
@@ -342,26 +321,14 @@ jobs:
           import os,subprocess
           from pathlib import Path
           log=Path("ci-v2-log.txt").read_text(errors="replace") if Path("ci-v2-log.txt").exists() else "Test log not created; source/patch/setup failure."
-          log=log[-10000:]
-          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\nSource: deployed immutable v1 release 93c03b51...\nPatches: exact code/test diffs of fintual-executor PR #87 + independent cash-worker startup fix PR #88\nRun: "+os.environ["GH_RUN"]+"\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\n\n```\n"+log+"\n```"
+          selected=[line for line in log.splitlines() if line.startswith(("INSTALL_RC=","LINT_RC=","PYTEST_RC=","FULL_CI_EXIT=")) or "passed, " in line or " failed, " in line or "ERROR " in line or "FAILED " in line or "ERROR:" in line]
+          summary="\\n".join(selected[-25:]) if selected else "No test summary: see run failure"
+          body="**Isolated strategy-v2 full suite — no broker credentials or orders**\\nSource: pinned read-only Oracle release 93c03b51...; ephemeral CI filesystem\\nPatch: six PR #87 code/test files, SHA-verified before test\\nRun: "+os.environ["GH_RUN"]+"\\nTest step: "+os.getenv("TEST_OUTCOME","UNKNOWN")+"\\n\\n```\\n"+summary+"\\n```"
           p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual strategy v2 — isolated full regression evidence","-f","body="+body],capture_output=True,text=True,timeout=30)
           if p.returncode:raise SystemExit("Could not publish CI evidence")
           PY
 
-  report:
-    if: always()
-    needs: [source, test]
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - name: Record fallback CI gate outcomes even if source transfer fails
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SOURCE_RESULT: ${{ needs.source.result }}
-          TEST_RESULT: ${{ needs.test.result }}
+      - name: Purge transient private source archive
+        if: always()
         run: |
-          set -euo pipefail
-          body="Source transfer: $SOURCE_RESULT | isolated full suite: $TEST_RESULT | Run: $GH_RUN. No broker orders were sent."
-          gh api -X POST "repos/$GH_REPO/issues" -f "title=Fintual v2 isolated CI fallback status" -f "body=$body" >/dev/null
+          rm -f source.tgz strategy.patch sheet-sync-startup.patch
