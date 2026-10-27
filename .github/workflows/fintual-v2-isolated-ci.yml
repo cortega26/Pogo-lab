@@ -292,3 +292,21 @@ jobs:
           p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual strategy v2 — isolated full regression evidence","-f","body="+body],capture_output=True,text=True,timeout=30)
           if p.returncode:raise SystemExit("Could not publish CI evidence")
           PY
+
+  report:
+    if: always()
+    needs: [source, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Record fallback CI gate outcomes even if source transfer fails
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SOURCE_RESULT: ${{ needs.source.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          set -euo pipefail
+          body="Source transfer: $SOURCE_RESULT | isolated full suite: $TEST_RESULT | Run: $GH_RUN. No broker orders were sent."
+          gh api -X POST "repos/$GH_REPO/issues" -f "title=Fintual v2 isolated CI fallback status" -f "body=$body" >/dev/null
