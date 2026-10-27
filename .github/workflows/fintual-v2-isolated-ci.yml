@@ -237,7 +237,7 @@ jobs:
           +    assert _detector_zone(trigger, lower, trigger, upper) == "signal_band"
                assert _detector_zone(Decimal("0.031"), lower, trigger, upper) == "signal_band"
                assert _detector_zone(Decimal("0.033"), lower, trigger, upper) == "beyond_signal_band"
-                    PATCH_END_V2
+          PATCH_END_V2
           cd isolated
           patch --batch --fuzz=0 --forward -p1 < ../strategy.patch
           python -m compileall -q src tests
