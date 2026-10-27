@@ -1,0 +1,203 @@
+name: Fintual v2 post-promotion independent audit (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify live v2 process, IPC, broker parity, ledger and sheet sync
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 15s
+          command_timeout: 400s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'ROOT'
+            from __future__ import annotations
+            import hashlib, json, os, pwd, re, sqlite3, stat, subprocess
+            from decimal import Decimal
+            from pathlib import Path
+
+            TARGET = "b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            unit = "fintual-executor.service"
+            sheet_unit = "fintual-sheet-sync.service"
+            alias = Path("/opt/fintual-httpx-current")
+            release = alias.resolve()
+            sqlite_path = Path("/var/lib/fintual-executor/state.sqlite3")
+
+            def out(k, v):
+                print("POSTFLIGHT_" + k + "=" + str(v), flush=True)
+
+            def fail(code):
+                out("GATE", code)
+                raise SystemExit(1)
+
+            def cmd(*argv, timeout=30):
+                try:
+                    return subprocess.run(argv, capture_output=True, text=True,
+                                          timeout=timeout, check=False)
+                except (OSError, subprocess.SubprocessError):
+                    return None
+
+            def service(name):
+                p = cmd("systemctl", "is-active", name, timeout=10)
+                return p.stdout.strip() if p else "UNKNOWN"
+
+            out("UTC", __import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            out("ACTIVE_SHA", release.name)
+            if not alias.is_symlink() or release.name != TARGET:
+                fail("ACTIVE_SHA_NOT_V2")
+            marker = json.loads((release / "HTTPX_RUNTIME_READY.json").read_text())
+            if marker.get("source_sha") != TARGET or marker.get("runtime_imports_verified") is not True:
+                fail("MARKER_INVALID")
+            out("MARKER", "PASS")
+            if service(unit) != "active" or service(sheet_unit) != "active":
+                fail("SERVICES_NOT_ACTIVE")
+            browser = service("fintual-browser.service")
+            if browser != "inactive":
+                fail("RESIDENT_BROWSER_ACTIVE")
+            out("SERVICES", "PASS")
+            raw = cmd("systemctl", "show", "-P", "MainPID", unit, timeout=10)
+            pid = int(raw.stdout.strip()) if raw and raw.stdout.strip().isdigit() else 0
+            if pid <= 1:
+                fail("NO_MAIN_PID")
+            cwd = (Path("/proc") / str(pid) / "cwd").resolve()
+            argv = (Path("/proc") / str(pid) / "cmdline").read_bytes().split(b"\0")
+            command = " ".join(os.fsdecode(x) for x in argv if x)
+            if (cwd != release or "fintual_executor.runner" not in command
+                    or "--broker-transport" not in command or "http-order" not in command):
+                fail("PROCESS_PROVENANCE_MISMATCH")
+            out("PROCESS", "PASS")
+            user = cmd("systemctl", "show", "-P", "User", unit, timeout=10).stdout.strip()
+            home = pwd.getpwnam(user).pw_dir
+            config = {}
+            for name, mode_bits in (("config.json", 0o640), ("market-data.env", 0o640),
+                                    ("httpx-order.env", 0o600)):
+                p = Path("/etc/fintual-executor") / name
+                if stat.S_IMODE(p.stat().st_mode) != mode_bits:
+                    fail("CONFIG_MODE_UNSAFE")
+                config[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+            out("CONFIG_MODES", "PASS")
+            con = sqlite3.connect(sqlite_path.as_uri() + "?mode=ro", uri=True, timeout=15)
+            try:
+                con.execute("PRAGMA query_only=ON")
+                if con.execute("PRAGMA integrity_check").fetchone() != ("ok",):
+                    fail("LEDGER_INTEGRITY")
+                open_n = con.execute(
+                    "SELECT COUNT(*) FROM order_intents WHERE state IN "
+                    "('SIGNALLED','SUBMITTING','ACKNOWLEDGED','PARTIALLY_FILLED','UNKNOWN')"
+                ).fetchone()[0]
+                unknown_n = con.execute(
+                    "SELECT COUNT(*) FROM order_intents WHERE state IN ('UNKNOWN','SUBMITTING')"
+                ).fetchone()[0]
+                fills_n = con.execute("SELECT COUNT(*) FROM fills").fetchone()[0]
+                outbox_n = con.execute(
+                    "SELECT COUNT(*) FROM sheet_sync_outbox WHERE state='PENDING'"
+                ).fetchone()[0]
+            finally:
+                con.close()
+            out("LEDGER_OPEN", open_n)
+            out("LEDGER_UNKNOWN", unknown_n)
+            out("LEDGER_FILLS", fills_n)
+            out("OUTBOX_PENDING", outbox_n)
+            if open_n or unknown_n:
+                fail("LOCAL_ORDER_STATE_NOT_CLEAR")
+
+            # Functional cash IPC as the owner UID. Explicit sys.path insert:
+            # the 2026-10-27 outage proved sudo resets PYTHONPATH.
+            ipc_script = (
+                "import sys; sys.path.insert(0, sys.argv[1]); "
+                "from pathlib import Path; "
+                "from decimal import Decimal; "
+                "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle; "
+                "from fintual_executor.client import get_buy_state; "
+                "h=IpcReadOnlyBrokerHandle(Path(sys.argv[2])); "
+                "v=h.health(); "
+                "assert v.get('status')=='READY' and v.get('order_capability') is False; "
+                "w=get_buy_state(h)['stocksWallet']; "
+                "b=Decimal(str(w['balance']['amount'])); "
+                "assert b.is_finite() and b>=0; "
+                "print('POSTFLIGHT_IPC=PASS')"
+            )
+            ipc = subprocess.run(
+                ["sudo", "-n", "-u", user, str(release / ".venv/bin/python"), "-B",
+                 "-c", ipc_script, str(release / "src"),
+                 "/var/lib/fintual-executor/cash-ipc/cash.sock"],
+                capture_output=True, text=True,
+                env={"PATH": "/usr/bin:/bin", "HOME": home,
+                     "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout=35,
+            )
+            if ipc.returncode != 0 or "POSTFLIGHT_IPC=PASS" not in ipc.stdout:
+                out("IPC_CLASS", next((re.search(r"\b([A-Za-z_]+(?:Error|Exception|Required|Violation))\b", line).group(1)
+                                       for line in reversed(ipc.stderr.splitlines())
+                                       if re.search(r"\b([A-Za-z_]+(?:Error|Exception|Required|Violation))\b", line)), "NONE"))
+                fail("IPC_FUNCTIONAL_FAILED")
+            out("IPC", "PASS")
+
+            # Independent broker pending/history gate, unarmed.
+            broker_script = (
+                "from pathlib import Path\n"
+                "import sys\n"
+                "sys.path.insert(0, sys.argv[1])\n"
+                "from decimal import Decimal\n"
+                "from fintual_executor.order_session import HttpOrderSessionOwner\n"
+                "from fintual_executor.transient_auth import bootstrap_transient_profile\n"
+                "from fintual_executor.client import get_pending, get_market_info, get_buy_state\n"
+                "from fintual_executor.g8_history import audit_history_against_ledger\n"
+                "with HttpOrderSessionOwner(requested_execution=False, config_execution_enabled=False) as owner:\n"
+                "    bootstrap_transient_profile(owner, profile=Path(sys.argv[2]), chrome_binary=Path(sys.argv[3]))\n"
+                "    h=owner.borrow(armed=False)\n"
+                "    assert h.execution_enabled is False\n"
+                "    p=get_pending(h); buys=p['stocksPendingAssetMarketBuys']; sells=p['stocksPendingAssetMarketSells']\n"
+                "    assert isinstance(buys,list) and isinstance(sells,list) and not buys and not sells\n"
+                "    m=get_market_info(h); assert isinstance(m.get('isMarketOpen'),bool)\n"
+                "    w=get_buy_state(h)['stocksWallet']\n"
+                "    for f in ('balance','investableAmount'):\n"
+                "        v=Decimal(str(w[f]['amount'])); assert v.is_finite() and v>=0\n"
+                "    a=audit_history_against_ledger(h,Path(sys.argv[4]),['NVDA','TSLA','STX'],page_size=20,max_pages=15)\n"
+                "    assert a.get('status')=='BOUNDED_READ_ONLY_LEDGER_PARITY_PASS'\n"
+                "    assert a.get('local_open_intents')==0 and a.get('local_fills_unmatched')==0\n"
+                "    assert a.get('broker_fulfilled_without_local_fill')==0\n"
+                "    print('POSTFLIGHT_BROKER_GATE=PASS')\n"
+            )
+            b = subprocess.run(
+                ["sudo", "-n", "-u", user, str(release / ".venv/bin/python"), "-B",
+                 "-c", broker_script, str(release / "src"),
+                 "/var/lib/fintual-browser/profile", "/var/lib/fintual-browser/chrome",
+                 str(sqlite_path)],
+                capture_output=True, text=True,
+                env={"PATH": "/usr/bin:/bin", "DISPLAY": ":99", "HOME": home,
+                     "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout=300,
+            )
+            if b.returncode != 0 or "POSTFLIGHT_BROKER_GATE=PASS" not in b.stdout:
+                klass = "NONE"
+                for line in reversed(b.stderr.splitlines()):
+                    m = re.search(r"\b([A-Za-z_]+(?:Error|Exception|Required|Violation))\b", line)
+                    if m:
+                        klass = m.group(1)
+                        break
+                out("BROKER_FAILURE_CLASS", klass)
+                fail("BROKER_GATE_FAILED")
+            out("BROKER", "PASS")
+            if service("fintual-browser.service") != "inactive":
+                fail("TRANSIENT_CHROME_NOT_CLOSED")
+            out("BROWSER", "INACTIVE")
+            if service(unit) != "active" or alias.resolve().name != TARGET:
+                fail("RUNTIME_CHANGED_DURING_AUDIT")
+            for name, digest in config.items():
+                if hashlib.sha256((Path("/etc/fintual-executor") / name).read_bytes()).hexdigest() != digest:
+                    fail("CONFIG_CHANGED_DURING_AUDIT")
+            out("CONFIG_UNCHANGED", "true")
+            out("NEW_TRADE_ORDERS_SUBMITTED", "false")
+            out("GATE", "PASS")
+            ROOT
