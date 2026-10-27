@@ -1,0 +1,110 @@
+name: Fintual v2 production backup and local preflight (read only on source)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-online-snapshot-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Online consistent SQLite backup, integrity and configuration fingerprint
+        id: backup
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 110s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import datetime,hashlib,json,os,sqlite3,stat,subprocess
+            from pathlib import Path
+            TARGET="b9415c5ae4df8336d98b4dd1b910b979075b6e8f"
+            BASE="93c03b51d69f55ee4103e59d39b1550362bfe3ae"
+            def fail(code):
+                print("BACKUP_GATE="+code,flush=True)
+                raise SystemExit(1)
+            base=Path("/opt/fintual-httpx-current").resolve()
+            target=Path("/opt/fintual-httpx-releases")/TARGET
+            if base.name!=BASE or not target.is_dir():fail("RELEASE_CHANGED_OR_MISSING")
+            for unit in ("fintual-executor.service","fintual-sheet-sync.service"):
+                cp=subprocess.run(["systemctl","is-active",unit],capture_output=True,text=True,timeout=7)
+                if cp.returncode or cp.stdout.strip()!="active":fail("SERVICE_NOT_ACTIVE")
+            dbfile=Path("/var/lib/fintual-executor/state.sqlite3")
+            if not dbfile.is_file():fail("DB_MISSING")
+            with sqlite3.connect(dbfile.as_uri()+"?mode=ro",uri=True,timeout=20) as db:
+                db.execute("PRAGMA query_only=ON")
+                if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+                    fail("SOURCE_INTEGRITY")
+                cols={row[1] for row in db.execute("PRAGMA table_info(order_intents)")}
+                if "state" not in cols:fail("INTENT_SCHEMA_UNKNOWN")
+                statuses={str(s):n for s,n in db.execute("SELECT state,count(*) FROM order_intents GROUP BY state")}
+                busy=sum(n for s,n in statuses.items() if s in
+                    {"SIGNALLED","SUBMITTING","ACKNOWLEDGED","PARTIALLY_FILLED","UNKNOWN"})
+                unknown=sum(n for s,n in statuses.items() if s=="UNKNOWN")
+                if busy or unknown:fail("LOCAL_INTENT_FENCE")
+                run=datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                backup_base=Path("/var/lib/fintual-g8-backups")
+                backup_base.mkdir(parents=True,exist_ok=True,mode=0o700)
+                run_dir=backup_base/("v2-"+TARGET[:12]+"-"+run)
+                run_dir.mkdir(mode=0o700)
+                dbcopy=run_dir/"state.sqlite3"
+                with sqlite3.connect(str(dbcopy),timeout=20) as target_db:
+                    db.backup(target_db,pages=256,sleep=0.02)
+                dbcopy.chmod(0o600)
+            with sqlite3.connect(str(dbcopy),timeout=10) as checked:
+                if checked.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+                    fail("BACKUP_INTEGRITY")
+                n_fills=checked.execute("SELECT count(*) FROM fills").fetchone()[0]
+            config={}
+            for name in ("config.json","market-data.env","httpx-order.env"):
+                f=Path("/etc/fintual-executor")/name
+                if not f.is_file():fail("CONFIG_MISSING")
+                if name.endswith(".env") and stat.S_IMODE(f.stat().st_mode)&0o077:
+                    fail("CONFIG_PERMISSIONS_UNSAFE")
+                config[name]=hashlib.sha256(f.read_bytes()).hexdigest()
+            audit={"backup_utc":run,"backup_file":str(dbcopy),
+                   "backup_sha256":hashlib.sha256(dbcopy.read_bytes()).hexdigest(),
+                   "base":BASE,"target":TARGET,"config_sha256":config,
+                   "local_open_intents":busy,"local_unknown_intents":unknown,
+                   "fills_at_snapshot":n_fills,
+                   "source":"consistent SQLite online backup"}
+            manifest=run_dir/"recovery-manifest.json"
+            manifest.write_text(json.dumps(audit,sort_keys=True,indent=2))
+            manifest.chmod(0o600)
+            print("BACKUP_GATE=PASS")
+            print("BACKUP_TIMESTAMP_UTC="+run)
+            print("BACKUP_SNAPSHOT_SHA256="+audit["backup_sha256"])
+            print("BACKUP_OPEN_INTENTS="+str(busy))
+            print("BACKUP_UNKNOWN_INTENTS="+str(unknown))
+            print("BACKUP_FILL_COUNT="+str(n_fills))
+            print("BACKUP_CONFIG_HASHES_RECORDED=true")
+            print("BACKUP_SOURCE_SERVICES_UNCHANGED=true")
+            print("BACKUP_REAL_ORDERS_SENT=false")
+            PY
+      - name: Publish sanitized recovery evidence
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OUT: ${{ steps.backup.outputs.stdout }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULT: ${{ steps.backup.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          rows=[x for x in os.getenv("OUT","").splitlines() if re.fullmatch(r"BACKUP_[A-Z0-9_]+=[A-Za-z0-9_.-]+",x)]
+          body="Read-only source snapshot / isolated root-private backup.\n"+os.environ["RUN_URL"]+"\nStep: "+os.getenv("RESULT","UNKNOWN")+"\n\n"+"\n".join(rows)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+                "-f","title=Fintual v2 consistent rollback snapshot and intent gate",
+                "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Could not publish snapshot evidence")
+          PY
