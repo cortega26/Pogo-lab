@@ -47,6 +47,22 @@ jobs:
             print("FINTUAL_VENV_PYTHON_PRESENT="+str((release/".venv/bin/python").is_file()).lower())
             print("FINTUAL_VENV_PYTEST_PRESENT="+str((release/".venv/bin/pytest").is_file()).lower())
             print("FINTUAL_VENV_RUFF_PRESENT="+str((release/".venv/bin/ruff").is_file()).lower())
+            import os,subprocess,importlib.util,shutil
+            print("FINTUAL_SYSTEM_PYTEST="+str(importlib.util.find_spec("pytest") is not None).lower())
+            print("FINTUAL_SYSTEM_PIP="+str(importlib.util.find_spec("pip") is not None).lower())
+            print("FINTUAL_UV_BIN="+str(shutil.which("uv") is not None).lower())
+            print("FINTUAL_GIT_BIN="+str(shutil.which("git") is not None).lower())
+            print("FINTUAL_RELEASE_HAS_GIT="+str((release/".git").exists()).lower())
+            print("FINTUAL_DISK_FREE_GB="+str(shutil.disk_usage("/tmp").free//(1024**3)))
+            env=os.environ.copy()
+            env["GIT_TERMINAL_PROMPT"]="0"
+            env["GCM_INTERACTIVE"]="never"
+            try:
+                p=subprocess.run(["git","ls-remote","https://github.com/cortega26/fintual-executor.git","HEAD"],env=env,capture_output=True,timeout=12)
+                print("FINTUAL_GIT_REMOTE_READABLE="+str(p.returncode==0 and len(p.stdout)>20).lower())
+            except (OSError,subprocess.TimeoutExpired):
+                print("FINTUAL_GIT_REMOTE_READABLE=false")
+
             PY
       - name: Publish test inventory
         if: always()
