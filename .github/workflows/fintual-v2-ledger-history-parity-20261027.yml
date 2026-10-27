@@ -1,0 +1,100 @@
+name: Fintual v2 independent broker-to-ledger history parity
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-v2-ledger-history-parity-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Strict read-only authenticated paginated broker vs financial ledger parity
+        id: audit
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 175s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'ROOT'
+            import os,pwd,stat,subprocess,re,json
+            from pathlib import Path
+            base=Path("/opt/fintual-httpx-current").resolve()
+            if base.name!="93c03b51d69f55ee4103e59d39b1550362bfe3ae":raise SystemExit("BASE_CHANGED")
+            def svc(n):
+                return subprocess.run(["systemctl","is-active",n],capture_output=True,text=True,timeout=5).stdout.strip()
+            if svc("fintual-executor.service")!="active" or svc("fintual-browser.service")!="inactive":
+                raise SystemExit("SERVICE_NOT_READY")
+            user=subprocess.run(["systemctl","show","-P","User","fintual-executor.service"],
+                       capture_output=True,text=True,timeout=6).stdout.strip()
+            pw=pwd.getpwnam(user)
+            profile=Path("/var/lib/fintual-browser/profile")
+            if not profile.is_dir() or profile.stat().st_uid!=pw.pw_uid or os.path.lexists(profile/"SingletonLock"):
+                raise SystemExit("PROFILE_UNSAFE")
+            child=r"""
+            import json,sys
+            from pathlib import Path
+            sys.path.insert(0,sys.argv[1])
+            from fintual_executor.order_session import HttpOrderSessionOwner
+            from fintual_executor.transient_auth import bootstrap_transient_profile
+            from fintual_executor.client import get_pending
+            from fintual_executor.g8_history import audit_history_against_ledger
+            with HttpOrderSessionOwner(requested_execution=False,config_execution_enabled=False) as owner:
+                bootstrap_transient_profile(owner,profile=Path(sys.argv[2]),chrome_binary=Path(sys.argv[3]))
+                client=owner.borrow(armed=False)
+                assert client.execution_enabled is False
+                pending=get_pending(client)
+                buys=pending["stocksPendingAssetMarketBuys"]
+                sells=pending["stocksPendingAssetMarketSells"]
+                assert isinstance(buys,list) and isinstance(sells,list)
+                report=audit_history_against_ledger(client,Path(sys.argv[4]),["NVDA","TSLA","STX"],page_size=20,max_pages=15)
+                for key in ("status","pages_read","local_fills_checked","local_fills_unmatched","broker_fulfilled_without_local_fill","broker_legacy_fills_before_bot","local_open_intents","offset_traversal_complete","all_known_fills_match","error"):
+                    value=report.get(key)
+                    if isinstance(value,(bool,str,int)) or value is None:
+                        print("HISTORY_PARITY_"+key.upper()+"="+str(value).replace("None","NULL").lower() if isinstance(value,bool) else "HISTORY_PARITY_"+key.upper()+"="+str(value or "NULL"),flush=True)
+                print("HISTORY_PARITY_BROKER_PENDING_ZERO="+str(len(buys)==0 and len(sells)==0).lower(),flush=True)
+                if report["status"]!="BOUNDED_READ_ONLY_LEDGER_PARITY_PASS" or buys or sells:
+                    raise SystemExit(3)
+            """
+            cmd=["sudo","-n","-u",user,"env","-u","FINTUAL_REAL_EXECUTION","-u","FINTUAL_HTTP_MUTATIONS",
+                 "HOME="+pw.pw_dir,"DISPLAY=:99","PYTHONPATH="+str(base/"src"),
+                 str(base/".venv/bin/python"),"-B","-c",child,str(base/"src"),
+                 str(profile),"/var/lib/fintual-browser/chrome",
+                 "/var/lib/fintual-executor/state.sqlite3"]
+            try:r=subprocess.run(cmd,capture_output=True,text=True,timeout=145)
+            except subprocess.TimeoutExpired:
+                print("HISTORY_PARITY_RUN=TIMEOUT")
+                raise SystemExit(1)
+            for line in r.stdout.splitlines():
+                if re.fullmatch(r"HISTORY_PARITY_[A-Z0-9_]+=[A-Za-z0-9_.-]+",line):
+                    print(line,flush=True)
+            print("HISTORY_PARITY_RUN="+("PASS" if r.returncode==0 else "BLOCKED"),flush=True)
+            assert svc("fintual-executor.service")=="active"
+            if r.returncode:raise SystemExit(1)
+            ROOT
+      - name: Publish sanitized parity verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUT: ${{ steps.audit.outputs.stdout }}
+          RESULT: ${{ steps.audit.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          rows=[s for s in os.getenv("OUT","").splitlines() if re.fullmatch(r"HISTORY_PARITY_[A-Z0-9_]+=[A-Za-z0-9_.-]+",s)]
+          body="No credentials, broker order IDs, prices, or balances. Validated source is the existing order-session client with all mutations disabled.\nRun: "+os.environ["RUN"]+"\nResult: "+os.environ["RESULT"]+"\n\n"+"\n".join(rows)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+                           "-f","title=Fintual broker history vs financial ledger parity",
+                           "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Issue publication failed")
+          PY
