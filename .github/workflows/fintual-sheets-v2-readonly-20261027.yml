@@ -1,0 +1,161 @@
+name: Fintual Sheets v2 read-only parity audit
+# Reads the six operative formulas, reference cells, hidden v1 backup tab and
+# shadow fixtures. Never writes a cell, order, ledger or service.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Audit formulas and effective values without writes
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 180s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import datetime, hashlib, json, os, re, sqlite3, stat, sys
+            from decimal import Decimal, InvalidOperation
+            from pathlib import Path
+
+            sys.path.insert(0, "/opt/fintual-sheet-sync-current/src")
+            from fintual_executor.google_sheets import GoogleSheetConfig, GoogleSheetsProjector
+
+            env = {}
+            for line in Path("/etc/fintual-executor/sheet-sync.env").read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    env[key.strip()] = value.strip().strip('"').strip("'")
+            spreadsheet = env.get("FINTUAL_SHEET_SPREADSHEET_ID", "")
+            credentials = env.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+            print("SHEETS_SPREADSHEET_CONFIGURED=" + str(bool(spreadsheet)), flush=True)
+            print("SHEETS_CREDENTIALS_CONFIGURED=" + str(bool(credentials)), flush=True)
+            if not spreadsheet or not credentials:
+                raise SystemExit(2)
+            projector = GoogleSheetsProjector.from_service_account(
+                GoogleSheetConfig(spreadsheet_id=spreadsheet, credentials_file=Path(credentials))
+            )
+            values = projector.service.spreadsheets().values()
+
+            def get(range_name, render="FORMULA"):
+                try:
+                    result = values.get(
+                        spreadsheetId=spreadsheet, range=range_name,
+                        valueRenderOption=render, dateTimeRenderOption="SERIAL_NUMBER",
+                    ).execute()
+                except Exception:
+                    return []
+                return result.get("values", [])
+
+            def cell(range_name, render="FORMULA"):
+                rows = get(range_name, render)
+                return rows[0][0] if rows and rows[0] else None
+
+            expected = {
+                "AL3": '=IFERROR(Positions!$I$11*(1-ROUND(Datos!$E$4-1;6));"")',
+                "AO3": '=IFERROR(Positions!$I$11/(1-ROUND(Datos!$E$4-1;6));"")',
+                "AX3": '=IFERROR(Positions!$I$14*(1-ROUND(Datos!$E$4-1;6));"")',
+                "BA3": '=IFERROR(Positions!$I$14/(1-ROUND(Datos!$E$4-1;6));"")',
+                "BB3": '=IFERROR(Positions!$I$15*(1-ROUND(Datos!$E$4-1;6));"")',
+                "BE3": '=IFERROR(Positions!$I$15/(1-ROUND(Datos!$E$4-1;6));"")',
+            }
+            formulas = {name: cell("Stocks!" + name, "FORMULA") for name in expected}
+            numeric = {name: cell("Stocks!" + name, "UNFORMATTED_VALUE") for name in expected}
+            for name in expected:
+                print("SHEETS_" + name + "_IS_V2_FORMULA=" + str(formulas[name] == expected[name]), flush=True)
+                try:
+                    number = float(numeric[name])
+                    print("SHEETS_" + name + "_VALUE_NUMERIC=" + str(number == number and abs(number) < 1e12), flush=True)
+                except (TypeError, ValueError):
+                    print("SHEETS_" + name + "_VALUE_NUMERIC=false", flush=True)
+
+            positions = {}
+            for name, row, symbol in (("NVDA", 11, "NVDA"), ("TSLA", 14, "TSLA"), ("STX", 15, "STX")):
+                raw = cell("Positions!I" + str(row), "UNFORMATTED_VALUE")
+                try:
+                    value = Decimal(str(raw))
+                    valid = value.is_finite() and value > 0
+                except (InvalidOperation, TypeError, ValueError):
+                    value = None
+                    valid = False
+                positions[name] = raw
+                print("SHEETS_POSITION_" + name + "_VALID=" + str(valid), flush=True)
+                if valid:
+                    con = sqlite3.connect(
+                        "file:/var/lib/fintual-executor/state.sqlite3?mode=ro", uri=True, timeout=10
+                    )
+                    try:
+                        latest = con.execute(
+                            "SELECT average_price FROM fills WHERE symbol=? "
+                            "ORDER BY fulfilled_at DESC, recorded_at DESC LIMIT 1", (symbol,)
+                        ).fetchone()
+                    finally:
+                        con.close()
+                    match = False
+                    if latest:
+                        try:
+                            match = Decimal(str(latest[0])) == value
+                        except InvalidOperation:
+                            match = False
+                    print("SHEETS_POSITION_" + name + "_MATCHES_LATEST_FILL=" + str(match), flush=True)
+
+            datos = cell("Datos!E4", "UNFORMATTED_VALUE")
+            try:
+                datos_ok = Decimal(str(datos)) == Decimal("1.03")
+            except (InvalidOperation, TypeError, ValueError):
+                datos_ok = False
+            print("SHEETS_DATOS_E4_IS_1_03=" + str(datos_ok), flush=True)
+
+            hidden = get("Strategy_v1_rollback_20261027!A1:Z40", "FORMULA")
+            backup = {}
+            for r, row in enumerate(hidden, start=1):
+                for c, value in enumerate(row, start=1):
+                    text = str(value).strip()
+                    if not text:
+                        continue
+                    # Formulas may be stored as literal text (leading apostrophe).
+                    probe = text[1:] if text.startswith("'") else text
+                    if "IFERROR" in probe and "Positions!$I$" in probe:
+                        col = ""
+                        n = c
+                        while n:
+                            n, rem = divmod(n - 1, 26)
+                            col = chr(65 + rem) + col
+                        backup[f"Strategy_v1_rollback_20261027!{col}{r}"] = text
+            print("SHEETS_BACKUP_FORMULAS_FOUND=" + str(len(backup)), flush=True)
+            for key in sorted(backup):
+                print("SHEETS_BACKUP_CELL=" + key, flush=True)
+
+            shadow = get("Strategy_v2_shadow!A1:Z80", "UNFORMATTED_VALUE")
+            passed = sum(1 for row in shadow for value in row if str(value).strip().upper() == "PASS")
+            failed = sum(1 for row in shadow for value in row if str(value).strip().upper() == "FAIL")
+            print("SHEETS_SHADOW_PASS_COUNT=" + str(passed), flush=True)
+            print("SHEETS_SHADOW_FAIL_COUNT=" + str(failed), flush=True)
+
+            stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            root = Path("/var/lib/fintual-executor/sheets-backup")
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            manifest = {
+                "utc": stamp,
+                "spreadsheet_sha256": hashlib.sha256(spreadsheet.encode()).hexdigest(),
+                "formulas": formulas,
+                "numeric": numeric,
+                "positions": positions,
+                "datos_e4": datos,
+                "backup_tab_formulas": backup,
+            }
+            path = root / ("pre-v2-" + stamp + ".json")
+            path.write_text(json.dumps(manifest, sort_keys=True))
+            os.chmod(path, 0o600)
+            print("SHEETS_MANIFEST_WRITTEN=" + str(path.is_file()), flush=True)
+            print("SHEETS_WRITE_PERFORMED=false", flush=True)
+            PY
