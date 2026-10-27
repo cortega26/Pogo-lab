@@ -1,0 +1,111 @@
+name: Fintual cash checkpoint duplicate-date diagnostic (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Diagnose the sheet checkpoint mismatch without printing money
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 120s
+          capture_stdout: false
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'ROOT'
+            import json, os, pwd, subprocess
+            from decimal import Decimal
+            from pathlib import Path
+
+            release = Path("/opt/fintual-httpx-current").resolve()
+            user = subprocess.run(["systemctl", "show", "-P", "User", "fintual-executor.service"],
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+            home = pwd.getpwnam(user).pw_dir
+
+            broker_script = r"""
+            from pathlib import Path
+            import json, sys
+            sys.path.insert(0, sys.argv[1])
+            from decimal import Decimal
+            from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
+            from fintual_executor.client import get_buy_state
+            h = IpcReadOnlyBrokerHandle(Path(sys.argv[2]))
+            assert h.health().get("status") == "READY"
+            w = get_buy_state(h)["stocksWallet"]
+            b = Decimal(str(w["balance"]["amount"]))
+            print("BROKER_JSON=" + json.dumps({"balance": str(b)}))
+            """
+            p = subprocess.run(
+                ["sudo", "-n", "-u", user, str(release / ".venv/bin/python"), "-B",
+                 "-c", broker_script, str(release / "src"),
+                 "/var/lib/fintual-executor/cash-ipc/cash.sock"],
+                capture_output=True, text=True,
+                env={"PATH": "/usr/bin:/bin", "HOME": home, "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout=35,
+            )
+            broker_line = next((l for l in p.stdout.splitlines() if l.startswith("BROKER_JSON=")), "")
+            if p.returncode != 0 or not broker_line:
+                print("CHECKPOINT_DIAG=broker_read_failed", flush=True)
+                raise SystemExit(1)
+            balance = Decimal(json.loads(broker_line.split("=", 1)[1])["balance"])
+
+            sheet_script = r"""
+            from pathlib import Path
+            import json, sys
+            from datetime import date
+            sys.path.insert(0, "/opt/fintual-sheet-sync-current/src")
+            from fintual_executor.google_sheets import GoogleSheetConfig, GoogleSheetsProjector
+            env = {}
+            for line in Path("/etc/fintual-executor/sheet-sync.env").read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    env[k.strip()] = v.strip().strip('"').strip("'")
+            p = GoogleSheetsProjector.from_service_account(GoogleSheetConfig(
+                spreadsheet_id=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                credentials_file=Path(env["GOOGLE_APPLICATION_CREDENTIALS"])))
+            rows = p.service.spreadsheets().values().get(
+                spreadsheetId=env["FINTUAL_SHEET_SPREADSHEET_ID"],
+                range="Cash_Fintual!A2:I5000", valueRenderOption="UNFORMATTED_VALUE",
+                dateTimeRenderOption="SERIAL_NUMBER").execute().get("values", [])
+            today = "2026-10-27"
+            values = []
+            for index, row in enumerate(rows, start=2):
+                if len(row) < 9 or row[8] in ("", None):
+                    continue
+                raw_date = row[0]
+                if isinstance(raw_date, (int, float)):
+                    key = (date(1899, 12, 30) + __import__("datetime").timedelta(days=int(raw_date))).isoformat()
+                else:
+                    key = str(raw_date)[:10]
+                if key == today:
+                    values.append(str(row[8]))
+            print("SHEET_JSON=" + json.dumps({"today_count": len(values), "values": values}))
+            """
+            p = subprocess.run(
+                ["/opt/fintual-sheet-sync-venv/bin/python", "-B", "-c", sheet_script],
+                capture_output=True, text=True, timeout=60,
+            )
+            sheet_line = next((l for l in p.stdout.splitlines() if l.startswith("SHEET_JSON=")), "")
+            if p.returncode != 0 or not sheet_line:
+                print("CHECKPOINT_DIAG=sheet_read_failed", flush=True)
+                raise SystemExit(1)
+            data = json.loads(sheet_line.split("=", 1)[1])
+            vals = [Decimal(v) for v in data["values"]]
+            print("CHECKPOINT_TODAY_ROWS=" + str(data["today_count"]), flush=True)
+            if not vals:
+                print("CHECKPOINT_DIAG=no_today_rows", flush=True)
+                raise SystemExit(2)
+            print("CHECKPOINT_FIRST_LAST_EQUAL=" + str(vals[0] == vals[-1]).lower(), flush=True)
+            print("CHECKPOINT_BROKER_MATCHES_FIRST=" + str(abs(balance - vals[0]) <= Decimal("0.005")).lower(), flush=True)
+            print("CHECKPOINT_BROKER_MATCHES_LAST=" + str(abs(balance - vals[-1]) <= Decimal("0.005")).lower(), flush=True)
+            print("CHECKPOINT_DISTINCT_VALUES=" + str(len(set(vals))), flush=True)
+            print("CHECKPOINT_DIAG=complete", flush=True)
+            ROOT
