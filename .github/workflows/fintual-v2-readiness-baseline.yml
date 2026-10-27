@@ -55,15 +55,22 @@ jobs:
             socket_path=Path("/var/lib/fintual-executor/cash-ipc/cash.sock")
             print("V2_READ_ONLY_IPC_SOCKET="+str(socket_path.exists()).lower(),flush=True)
             if socket_path.exists():
-                sys.path.insert(0,str(release/"src"))
+                child=(
+                    "import sys; sys.path.insert(0,sys.argv[1]); "
+                    "from pathlib import Path; "
+                    "from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle; "
+                    "h=IpcReadOnlyBrokerHandle(Path(sys.argv[2])).health(); "
+                    "assert h.get('status')=='READY' and h.get('order_capability') is False; "
+                    "print('READY_READ_ONLY')"
+                )
                 try:
-                    from fintual_executor.session_ipc import IpcReadOnlyBrokerHandle
-                    owner=IpcReadOnlyBrokerHandle(socket_path)
-                    healthy=owner.health()
-                    assert healthy.get("order_capability") is False
-                    print("V2_BROKER_IPC_HEALTH=READY_READ_ONLY",flush=True)
-                except Exception:
-                    print("V2_BROKER_IPC_HEALTH=UNVERIFIED",flush=True)
+                    cp=subprocess.run([str(release/".venv/bin/python"),"-c",child,
+                                       str(release/"src"),str(socket_path)],
+                                       capture_output=True,text=True,timeout=15)
+                    result="READY_READ_ONLY" if cp.returncode==0 and "READY_READ_ONLY" in cp.stdout else "UNVERIFIED"
+                except (OSError,subprocess.TimeoutExpired):
+                    result="UNVERIFIED"
+                print("V2_BROKER_IPC_HEALTH="+result,flush=True)
             else:
                 print("V2_BROKER_IPC_HEALTH=NOT_AVAILABLE",flush=True)
             PY
