@@ -1,0 +1,72 @@
+name: Fintual production env permission audit (read only)
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/fintual-runtime-config-permission-audit-20261027.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check config file permission classes, never contents
+        id: inspect
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 45s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            import grp,pwd,stat,subprocess
+            from pathlib import Path
+            user=subprocess.run(["systemctl","show","-P","User","fintual-executor.service"],
+                capture_output=True,text=True,timeout=7).stdout.strip()
+            group=subprocess.run(["systemctl","show","-P","Group","fintual-executor.service"],
+                capture_output=True,text=True,timeout=7).stdout.strip()
+            wanted_gid=None
+            try:
+                if group:wanted_gid=grp.getgrnam(group).gr_gid
+                elif user:wanted_gid=pwd.getpwnam(user).pw_gid
+            except KeyError:pass
+            print("CONFIG_AUDIT_SERVICE_NONROOT="+str(bool(user and user!="root")).lower())
+            for label,file in [
+                ("CONFIG","config.json"),("MARKET_DATA","market-data.env"),
+                ("HTTPX_ORDER","httpx-order.env")]:
+                p=Path("/etc/fintual-executor")/file
+                if not p.is_file():
+                    print("CONFIG_AUDIT_"+label+"_PRESENT=false")
+                    continue
+                st=p.stat()
+                m=stat.S_IMODE(st.st_mode)
+                print("CONFIG_AUDIT_"+label+"_PRESENT=true")
+                print("CONFIG_AUDIT_"+label+"_OWNER_ROOT="+str(st.st_uid==0).lower())
+                print("CONFIG_AUDIT_"+label+"_GROUP_IS_SERVICE="+str(wanted_gid is not None and st.st_gid==wanted_gid).lower())
+                print("CONFIG_AUDIT_"+label+"_MODE_OCT="+format(m,"04o"))
+                print("CONFIG_AUDIT_"+label+"_WORLD_ACCESS="+str(bool(m&0o007)).lower())
+                print("CONFIG_AUDIT_"+label+"_GROUP_WRITE="+str(bool(m&0o020)).lower())
+            PY
+      - name: Record config metadata classification
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUT: ${{ steps.inspect.outputs.stdout }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          rows=[line for line in os.getenv("OUT","").splitlines() if re.fullmatch(r"CONFIG_AUDIT_[A-Z0-9_]+=[A-Za-z0-9_.-]{1,60}",line)]
+          body="Read-only Fintual systemd config permission metadata; no contents or account data.\nRun: "+os.environ["RUN"]+"\n\n"+"\n".join(rows)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues",
+            "-f","title=Fintual environment file mode audit",
+            "-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Could not publish audit")
+          PY
