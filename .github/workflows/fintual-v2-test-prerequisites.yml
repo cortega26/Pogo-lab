@@ -1,0 +1,67 @@
+name: Fintual v2 independent test prerequisites (read only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fintual-v2-test-prerequisites.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  prerequisites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check cross-repository CI access without exposing credentials
+        id: access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api repos/cortega26/fintual-executor -q '.name' >/dev/null 2>&1; then
+            echo "FINTUAL_REPO_ACCESS=true" >> "$GITHUB_OUTPUT"
+            echo "FINTUAL_REPO_ACCESS=true"
+          else
+            echo "FINTUAL_REPO_ACCESS=false" >> "$GITHUB_OUTPUT"
+            echo "FINTUAL_REPO_ACCESS=false"
+          fi
+      - name: Read-only runtime test inventory (no broker orders)
+        id: inventory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          timeout: 12s
+          command_timeout: 45s
+          capture_stdout: true
+          script: |
+            set -euo pipefail
+            sudo -n /usr/bin/python3 - <<'PY'
+            from pathlib import Path
+            release=Path("/opt/fintual-httpx-current").resolve()
+            print("FINTUAL_RELEASE_NAME="+release.name)
+            print("FINTUAL_SRC_PRESENT="+str((release/"src/fintual_executor/domain.py").is_file()).lower())
+            print("FINTUAL_TESTS_PRESENT="+str((release/"tests").is_dir()).lower())
+            print("FINTUAL_TEST_FILE_COUNT="+str(len(list((release/"tests").glob("test_*.py")))))
+            print("FINTUAL_VENV_PYTHON_PRESENT="+str((release/".venv/bin/python").is_file()).lower())
+            print("FINTUAL_VENV_PYTEST_PRESENT="+str((release/".venv/bin/pytest").is_file()).lower())
+            print("FINTUAL_VENV_RUFF_PRESENT="+str((release/".venv/bin/ruff").is_file()).lower())
+            PY
+      - name: Publish test inventory
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ACCESS: ${{ steps.access.outputs.FINTUAL_REPO_ACCESS }}
+          INVENTORY: ${{ steps.inventory.outputs.stdout }}
+          PROBE_RESULT: ${{ steps.inventory.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os,re,subprocess
+          lines=[s for s in os.getenv("INVENTORY","").splitlines() if re.fullmatch(r"FINTUAL_[A-Z_]+=[A-Za-z0-9_.-]+",s)]
+          body="**Fintual v2 CI fallback prerequisites**\nRun: "+os.environ["GH_RUN"]+"\nSSH probe: "+os.getenv("PROBE_RESULT","UNKNOWN")+"\nPogo-lab GitHub token access to executor repo: "+os.getenv("ACCESS","UNKNOWN")+"\n\n" + "\n".join("- `"+s+"`" for s in lines)
+          p=subprocess.run(["gh","api","-X","POST",f"repos/{os.environ['GH_REPO']}/issues","-f","title=Fintual v2 CI fallback: environment inventory","-f","body="+body],capture_output=True,text=True,timeout=20)
+          if p.returncode:raise SystemExit("Could not publish read-only inventory.")
+          PY
