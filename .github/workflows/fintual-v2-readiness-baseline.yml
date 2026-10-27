@@ -111,3 +111,4 @@ jobs:
           if p.returncode: raise SystemExit("Could not publish readiness baseline")
           PY
 # one-time read-only preflight refresh 2026-10-27 16:21 America/Santiago
+# 2026-10-27 17:19 America/Santiago post-failed-cutover read-only incident probe
