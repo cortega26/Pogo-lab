@@ -2,6 +2,17 @@ name: Fintual v1 recovery forensics - sanitized read only
 # Read-only: no service start/stop, no config/ledger/broker mutation.
 on:
   workflow_dispatch:
+    inputs:
+      since:
+        description: Journal start (journalctl syntax)
+        required: false
+        default: '2026-10-27 20:05:00 UTC'
+        type: string
+      until:
+        description: Journal end (journalctl syntax)
+        required: false
+        default: '2026-10-27 20:30:00 UTC'
+        type: string
 permissions:
   contents: read
   issues: write
@@ -12,16 +23,20 @@ jobs:
     steps:
       - name: Collect sanitized unit, socket, journal and runtime evidence
         uses: appleboy/ssh-action@v1
+        env:
+          SINCE: ${{ inputs.since }}
+          UNTIL: ${{ inputs.until }}
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          envs: SINCE,UNTIL
           timeout: 12s
           command_timeout: 120s
           capture_stdout: false
           script: |
             set -euo pipefail
-            sudo -n /usr/bin/python3 - <<'PY'
+            sudo -n env SINCE="$SINCE" UNTIL="$UNTIL" /usr/bin/python3 - <<'PY'
             import datetime, json, os, pwd, re, socket, sqlite3, stat, subprocess
             from pathlib import Path
 
@@ -161,8 +176,11 @@ jobs:
             except sqlite3.Error as exc:
                 print("RX_LEDGER=ERROR_" + type(exc).__name__)
 
-            j = run("journalctl", "-u", unit, "--since", "2026-10-27 20:05:00 UTC",
-                    "--until", "2026-10-27 20:30:00 UTC", "--no-pager", "-o", "json", timeout=30)
+            since = os.environ.get("SINCE", "2026-10-27 20:05:00 UTC")
+            until = os.environ.get("UNTIL", "2026-10-27 20:30:00 UTC")
+            print("RX_JOURNAL_WINDOW=" + since.replace(" ", "_") + ".." + until.replace(" ", "_"))
+            j = run("journalctl", "-u", unit, "--since", since,
+                    "--until", until, "--no-pager", "-o", "json", timeout=30)
             lines = j.stdout.splitlines() if j is not None else []
             print("RX_JOURNAL_ENTRIES=" + str(len(lines)))
             allowed = ("state", "event", "armed", "ok", "source", "provider", "transport",

@@ -99,6 +99,7 @@ jobs:
             def process_ready(release: Path, *, deadline_seconds: float = 120.0) -> bool:
                 deadline = time.monotonic() + deadline_seconds
                 last_pid = 0
+                last_reason = "SERVICE_NOT_ACTIVE"
                 while time.monotonic() < deadline:
                     if service(unit) == "active":
                         raw = cmd("systemctl", "show", "-P", "MainPID", unit, timeout=10)
@@ -107,30 +108,38 @@ jobs:
                         except ValueError:
                             pid = 0
                         if pid > 1:
+                            last_pid = pid
                             try:
                                 argv = (Path("/proc") / str(pid) / "cmdline").read_bytes().split(b"\0")
-                                exe = (Path("/proc") / str(pid) / "exe").resolve()
+                                cwd = (Path("/proc") / str(pid) / "cwd").resolve()
                             except OSError:
                                 argv = []
-                                exe = Path("/")
+                                cwd = Path("/")
                             command = " ".join(os.fsdecode(x) for x in argv if x)
-                            if (exe.is_relative_to(release)
-                                    and "fintual_executor.runner" in command
-                                    and "--broker-transport" in command
-                                    and "http-order" in command):
+                            if cwd != release:
+                                last_reason = "CWD_MISMATCH"
+                            elif ("fintual_executor.runner" not in command
+                                  or "--broker-transport" not in command
+                                  or "http-order" not in command):
+                                last_reason = "CMDLINE_MISMATCH"
+                            else:
                                 journal = cmd("journalctl", "-u", unit, "_PID=" + str(pid),
                                               "--no-pager", "-o", "cat", "-n", "250", timeout=20)
                                 text = journal.stdout if journal else ""
-                                if ("Traceback (most recent call last)" not in text
-                                        and "MARKET_DATA_SOURCE_CONNECTED" in text):
+                                if "Traceback (most recent call last)" in text:
+                                    last_reason = "JOURNAL_TRACEBACK"
+                                elif "MARKET_DATA_SOURCE_CONNECTED" not in text:
+                                    last_reason = "MARKET_DATA_NOT_OBSERVED"
+                                else:
                                     time.sleep(10)
                                     after = cmd("systemctl", "show", "-P", "MainPID", unit, timeout=10)
                                     after_pid = after.stdout.strip() if after else ""
                                     if service(unit) == "active" and after_pid == str(pid):
-                                        last_pid = pid
                                         return True
+                                    last_reason = "PID_CHANGED"
                     time.sleep(2)
                 out("PROCESS_LAST_PID", last_pid)
+                out("PROCESS_LAST_REASON", last_reason)
                 return False
 
             def ipc_probe(release: Path, user: str, home: str):
