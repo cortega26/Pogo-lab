@@ -1,0 +1,36 @@
+name: RRR OCI read-only preflight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rrr-oci-preflight
+  cancel-in-progress: false
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect OCI host without modifying it
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            set -eu
+            echo '=== RRR OCI READ-ONLY PREFLIGHT ==='
+            echo "ARCH=$(uname -m)"
+            echo "KERNEL=$(uname -s)"
+            echo "CPU_COUNT=$(nproc)"
+            awk '/MemTotal:/{print "MEM_TOTAL_KIB="$2} /MemAvailable:/{print "MEM_AVAILABLE_KIB="$2}' /proc/meminfo
+            df -Pk / /opt 2>/dev/null | awk 'NR==1 || !seen[$6]++ {print "DISK_KIB="$2,"FREE_KIB="$4,"MOUNT="$6}'
+            for cmd in python3 uv git systemctl; do
+              if command -v "$cmd" >/dev/null 2>&1; then echo "TOOL_$cmd=present"; else echo "TOOL_$cmd=missing"; fi
+            done
+            for svc in pogo-lab.service fintual-executor.service fintual-browser.service; do
+              echo "SERVICE_$svc=$(systemctl is-active "$svc" 2>/dev/null || true)"
+            done
+            if test -d /opt/remote-role-radar; then echo 'RRR_INSTALL=present'; else echo 'RRR_INSTALL=absent'; fi
+            echo 'PREFLIGHT_COMPLETE=1'
